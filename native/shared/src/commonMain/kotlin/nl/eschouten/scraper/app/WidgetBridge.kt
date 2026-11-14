@@ -40,6 +40,7 @@ import nl.eschouten.scraper.ui.APP_NAME
   val planning: Boolean? = null,
   val next: String = "",
   val seen: Long = 0,
+  val paused: Boolean = false,   // planning off only for a running route: it comes back on by itself
 ) {
   /** Route [l]'s name, or "Route A". */
   fun title(l: String) = routes.firstOrNull { it.l == l }?.t ?: tr.routeLetter(l)
@@ -48,7 +49,7 @@ import nl.eschouten.scraper.ui.APP_NAME
 data class WidgetButton(val route: String, val title: String)
 
 /** [status]: what a running tap does, else the schedule when known, else the last result.
- *  [scheduleOn]: the schedule switch, null when not known (no switch shown). [changesAt]: when
+ *  [scheduleOn]: the schedule switch (on while only paused for a route), null when not known (no switch shown). [changesAt]: when
  *  [status] changes by itself (the next run has passed: its time is dropped), epoch ms; null =
  *  not by itself. */
 data class WidgetBar(
@@ -92,6 +93,7 @@ object WidgetBridge {
       WidgetRobot(
         r.uid, r.displayName, r.visibleRoutes.map { WidgetRoute(it, r.routeTitle(it)) },
         r.snapshot?.planning, r.snapshot?.nextRide.orEmpty(), r.snapshot?.at ?: 0,
+        r.snapshot?.let { it.resumes && it.planning == false } == true,
       )
     }
     store.putString("w.robots", json.encodeToString(list))
@@ -135,10 +137,11 @@ object WidgetBridge {
       r?.routes?.map { WidgetButton(it.l, it.t) } ?: Settings.allRoutes.map { WidgetButton(it, tr.routeLetter(it)) },
       when {
         busy && last != null -> last.substringAfter("  ")   // without its time: the line stays short
+        r?.paused == true -> tr.widgetSchedulePaused
         planning != null -> tr.widgetSchedule(planning, next)
         else -> last ?: tr.tapRouteToStart
       },
-      planning,
+      if (r?.paused == true) true else planning,   // paused for a route: the schedule is on
       runAt?.takeIf { now < it },
     )
   }

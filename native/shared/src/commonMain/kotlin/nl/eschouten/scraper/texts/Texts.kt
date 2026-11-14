@@ -131,6 +131,7 @@ class Tr(val code: String) {
     next.isEmpty() -> t("Planning aan", "Schedule on")
     else -> t("Planning aan · volgende $next", "Schedule on · next $next")
   }
+  val widgetSchedulePaused: String get() = t("Planning gepauzeerd voor de route", "Schedule paused for the route")
   fun widgetSwitchPlanning(on: Boolean): String =
       if (on) t("Planning aanzetten", "Switch the schedule on") else t("Planning uitzetten", "Switch the schedule off")
   val setupFirst: String get() = t("Stel eerst de app in", "Set up the app first")

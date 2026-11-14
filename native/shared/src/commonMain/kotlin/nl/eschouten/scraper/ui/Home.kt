@@ -67,8 +67,8 @@ fun homeScreen(s: ControllerState, now: Long, platform: Platform): HomeScreen {
     if (m.can(Capability.Planning)) add(
       Fact(
         FactId.Planning, tr.planning,
-        when (snap?.planning) { true -> tr.on; false -> if (s.planningResumes) tr.paused else tr.off; null -> "–" },
-        when (snap?.planning) { true -> Tone.Ok; false -> if (s.planningResumes) Tone.Warn else Tone.Idle; null -> null },
+        when (snap?.planning) { true -> tr.on; false -> if (s.planningResumes || snap.resumes) tr.paused else tr.off; null -> "–" },
+        when (snap?.planning) { true -> Tone.Ok; false -> if (s.planningResumes || snap.resumes) Tone.Warn else Tone.Idle; null -> null },
         editable = snap?.planning != null && !s.isBusy,
         testId = "fact-planning",
       ),

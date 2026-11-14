@@ -214,6 +214,11 @@ class RobotController(
         val title = settings.robot.routeTitle(route)
         if (dryRun) return@job Outcome(true, tr.dryRunDone(title))
         planningResumes = wasOn
+        if (wasOn) {   // paused for the route; the robot's driving screen does not show it, so remember it here
+          settings.updateRobot { p -> p.copy(snapshot = (p.snapshot ?: RobotSnapshot(now())).copy(at = now(), planning = false, resumes = true)) }
+          save()
+          publish()
+        }
         Outcome(true, if (wasOn) tr.routeStartedResumes(title) else tr.routeStartedDot(title))
       },
       record = { o ->
@@ -453,10 +458,11 @@ class RobotController(
     if (st.planning != null) {
       val before = settings.robot.snapshot
       settings.updateRobot {
-        it.copy(snapshot = RobotSnapshot(now(), st.planning, st.nextRun, st.batteryMv, st.activity, st.busy))
+        it.copy(snapshot = RobotSnapshot(now(), st.planning, st.nextRun, st.batteryMv, st.activity, st.busy, planningResumes))
       }
       save()
-      if (before?.planning != st.planning || before?.nextRide != st.nextRun) publish()   // the widgets show the schedule
+      // the widgets show the schedule
+      if (before?.planning != st.planning || before?.nextRide != st.nextRun || before?.resumes != planningResumes) publish()
     }
     emit()
   }
