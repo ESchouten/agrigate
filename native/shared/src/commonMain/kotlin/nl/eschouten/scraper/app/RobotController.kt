@@ -214,6 +214,13 @@ class RobotController(
         val title = settings.robot.routeTitle(route)
         if (dryRun) return@job Outcome(true, tr.dryRunDone(title))
         planningResumes = wasOn
+        if (wasOn) {
+          // The robot switches the schedule back on after the route: keep it "on" (widgets, a later
+          // start of the app). Its driving screen does not show the schedule (Erik 2026-11-14).
+          settings.updateRobot { p -> p.copy(snapshot = (p.snapshot ?: RobotSnapshot(now())).copy(at = now(), planning = true)) }
+          save()
+          publish()
+        }
         Outcome(true, if (wasOn) tr.routeStartedResumes(title) else tr.routeStartedDot(title))
       },
       record = { o ->

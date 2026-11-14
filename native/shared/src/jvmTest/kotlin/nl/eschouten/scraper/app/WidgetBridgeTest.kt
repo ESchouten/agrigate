@@ -72,6 +72,18 @@ class WidgetBridgeTest {
     assertEquals(true, WidgetBridge.bar(store, uid).scheduleOn)
   }
 
+  /** A route started from the widget pauses the schedule and the robot switches it back on after
+   *  the route: the widget keeps showing it on (Erik 2026-11-14). */
+  @Test fun aRouteFromTheWidgetKeepsTheScheduleOn() = runBlocking {
+    useLanguage("en")
+    val store = simulated("--planning", "on")
+    val uid = WidgetBridge.robot(store, null)!!.uid
+    assertTrue(WidgetBridge.tap(store, uid, "A") {}.ok)
+    val bar = WidgetBridge.bar(store, uid)
+    assertEquals(true, bar.scheduleOn)
+    assertTrue(bar.status.startsWith("Schedule on"), bar.status)
+  }
+
   /** Driving, or the robot's "finish the route?" question on screen: nothing pressed, never answered. */
   @Test fun scheduleSwitchOnABusyRobotPressesNothing() = runBlocking {
     useLanguage("en")
