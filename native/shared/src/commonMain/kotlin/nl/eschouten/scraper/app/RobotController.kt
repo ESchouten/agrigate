@@ -214,8 +214,10 @@ class RobotController(
         val title = settings.robot.routeTitle(route)
         if (dryRun) return@job Outcome(true, tr.dryRunDone(title))
         planningResumes = wasOn
-        if (wasOn) {   // paused for the route; the robot's driving screen does not show it, so remember it here
-          settings.updateRobot { p -> p.copy(snapshot = (p.snapshot ?: RobotSnapshot(now())).copy(at = now(), planning = false, resumes = true)) }
+        if (wasOn) {
+          // The robot switches the schedule back on after the route: keep it "on" (widgets, a later
+          // start of the app). Its driving screen does not show the schedule (Erik 2026-11-14).
+          settings.updateRobot { p -> p.copy(snapshot = (p.snapshot ?: RobotSnapshot(now())).copy(at = now(), planning = true)) }
           save()
           publish()
         }
@@ -458,11 +460,10 @@ class RobotController(
     if (st.planning != null) {
       val before = settings.robot.snapshot
       settings.updateRobot {
-        it.copy(snapshot = RobotSnapshot(now(), st.planning, st.nextRun, st.batteryMv, st.activity, st.busy, planningResumes))
+        it.copy(snapshot = RobotSnapshot(now(), st.planning, st.nextRun, st.batteryMv, st.activity, st.busy))
       }
       save()
-      // the widgets show the schedule
-      if (before?.planning != st.planning || before?.nextRide != st.nextRun || before?.resumes != planningResumes) publish()
+      if (before?.planning != st.planning || before?.nextRide != st.nextRun) publish()   // the widgets show the schedule
     }
     emit()
   }

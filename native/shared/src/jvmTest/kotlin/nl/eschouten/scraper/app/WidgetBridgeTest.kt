@@ -72,17 +72,16 @@ class WidgetBridgeTest {
     assertEquals(true, WidgetBridge.bar(store, uid).scheduleOn)
   }
 
-  /** A route started from the widget pauses the schedule; the robot switches it back on after the
-   *  route, so the widget keeps the switch on and says it is paused (Erik 2026-11-14). */
-  @Test fun aRouteFromTheWidgetPausesTheSchedule() = runBlocking {
+  /** A route started from the widget pauses the schedule and the robot switches it back on after
+   *  the route: the widget keeps showing it on (Erik 2026-11-14). */
+  @Test fun aRouteFromTheWidgetKeepsTheScheduleOn() = runBlocking {
     useLanguage("en")
     val store = simulated("--planning", "on")
     val uid = WidgetBridge.robot(store, null)!!.uid
     assertTrue(WidgetBridge.tap(store, uid, "A") {}.ok)
     val bar = WidgetBridge.bar(store, uid)
-    assertEquals("Schedule paused for the route", bar.status)
     assertEquals(true, bar.scheduleOn)
-    assertEquals(true, Settings.load(store).robot.snapshot?.resumes)   // the app shows "Paused" too
+    assertTrue(bar.status.startsWith("Schedule on"), bar.status)
   }
 
   /** Driving, or the robot's "finish the route?" question on screen: nothing pressed, never answered. */
@@ -123,8 +122,7 @@ class WidgetBridgeTest {
     assertTrue(o.ok, o.message)
     bar = WidgetBridge.bar(store, uid)
     val on = bar.scheduleOn
-    if (WidgetBridge.robot(store, uid)!!.paused) assertEquals(tr.widgetSchedulePaused, bar.status)   // on: paused for the route
-    else if (on != null) assertEquals(tr.widgetSchedule(on, WidgetBridge.robot(store, uid)!!.next), bar.status)   // the schedule, once seen
+    if (on != null) assertEquals(tr.widgetSchedule(on, WidgetBridge.robot(store, uid)!!.next), bar.status)   // the schedule, once seen
     else assertTrue(bar.status.endsWith(tr.routeStarted("Route B")), bar.status)
     assertTrue(store.getString("w.status.$uid")!!.endsWith(tr.routeStarted("Route B")))
     // the schedule the tap saw is what the widget shows (the tap's own controller does not publish)

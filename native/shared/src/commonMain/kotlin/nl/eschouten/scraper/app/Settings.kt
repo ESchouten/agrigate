@@ -22,7 +22,6 @@ data class RobotSnapshot(
   val batteryMv: Int? = null,
   val action: String = "",
   val busy: Boolean = false,
-  val resumes: Boolean = false, // planning off only for a running route: the robot switches it back on after it
 )
 
 /** One robot: which type it is, how to reach it and how its routes are shown. */
