@@ -17,6 +17,8 @@ import nl.eschouten.scraper.ui.watchIn
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -309,8 +311,10 @@ class RobotController(
     return o
   }
 
-  override suspend fun release() {
-    if (holds == 0) return
+  /** Once asked, the connection is let go also when the caller goes away meanwhile (a web
+   *  page whose tab closes while a key is still being let go). */
+  override suspend fun release() = withContext(NonCancellable) {
+    if (holds == 0) return@withContext
     holds--
     if (holds == 0) mutex.withLock {
       close()
@@ -322,7 +326,7 @@ class RobotController(
     val r = robot
     if (r == null || !r.isConnected) return@withLock Outcome(false, tr.notConnected)
     coroutineScope {
-      val up = until?.let { async { runCatching { it.collect() }.also { r -> println("DBG until $r") } } }   // a flow that breaks (the page dropped) is a let-go too
+      val up = until?.let { async { runCatching { it.collect() } } }   // a flow that breaks (the page dropped) is a let-go too
       try {
         r.input(name, up)
         readStatus()
@@ -330,7 +334,6 @@ class RobotController(
       } catch (e: ScraperException) {
         Outcome(false, e.message ?: "")
       } finally {
-        println("DBG input end $name")
         up?.cancel()
       }
     }

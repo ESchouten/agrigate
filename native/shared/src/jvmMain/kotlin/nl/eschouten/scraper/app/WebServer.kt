@@ -35,6 +35,7 @@ import nl.eschouten.scraper.ui.DEFAULT_WEB_PORT
 import nl.eschouten.scraper.ui.WebPageHost
 import nl.eschouten.scraper.ui.WebPageState
 import java.io.File
+import java.util.concurrent.atomic.AtomicInteger
 import java.net.Inet4Address
 import java.net.NetworkInterface
 import kotlin.time.Duration.Companion.seconds
@@ -102,7 +103,7 @@ class WebServer(
           rpcConfig { serialization { json() } }
           val page = Page(controller)
           registerService<RobotApi> { page }
-          println("DBG page open"); closeReason.invokeOnCompletion { println("DBG page closed $it ${closeReason.getCompleted()}"); scope.launch { page.close(); println("DBG page released") } }
+          closeReason.invokeOnCompletion { scope.launch { page.close() } }
         }
       }
       files?.takeIf { it.isDirectory }?.let { staticFiles("/", it) }
@@ -134,23 +135,24 @@ class WebServer(
   /** One page's calls. Its hold on the robot connection (the panel) ends with the page. It gets
    *  the robots without their PINs ([HIDDEN]), and a robot sent back with one keeps its PIN. */
   private class Page(private val c: RobotController) : RobotApi by c {
-    private var holds = 0
+    private val holds = AtomicInteger()
 
     override fun states() = c.state.map { s -> s.copy(robots = s.robots.map(::hide), robot = hide(s.robot)) }
 
     override suspend fun updateRobot(p: RobotProfile) =
       c.updateRobot(if (p.pin == HIDDEN) p.copy(pin = c.state.value.robots.firstOrNull { it.uid == p.uid }?.pin ?: "") else p)
 
-    override suspend fun hold() = c.hold().also { if (it.ok) holds++ }
-
-    override suspend fun release() {
-      if (holds > 0) {
-        holds--
-        c.release()
-      }
+    // counted before asking, so a page that goes away during the call is let go by [close]
+    override suspend fun hold(): Outcome {
+      holds.incrementAndGet()
+      return c.hold().also { if (!it.ok) holds.decrementAndGet() }
     }
 
-    suspend fun close() = repeat(holds) { c.release() }
+    override suspend fun release() {
+      if (holds.getAndUpdate { maxOf(it - 1, 0) } > 0) c.release()
+    }
+
+    suspend fun close() = repeat(holds.getAndSet(0)) { c.release() }
 
     private fun hide(p: RobotProfile) = if (p.pin.isEmpty()) p else p.copy(pin = HIDDEN)
   }

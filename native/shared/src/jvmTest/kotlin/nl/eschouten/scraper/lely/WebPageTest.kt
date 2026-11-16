@@ -160,4 +160,21 @@ class WebPageTest {
     barn.release()
     scope.cancel()
   }
+
+  @Test fun aPageThatLetsGoAndDropsAtOnceStillFreesTheRobot() = runBlocking {
+    // a phone's tab closing: the page lets go of the key and the robot, and is gone before the
+    // barn computer finished letting go
+    barn("mode=manual")
+    val scope = CoroutineScope(Dispatchers.Default + Job())
+    val rpc = http.rpc(url()) { rpcConfig { serialization { json() } } }
+    val page = remoteController(rpc.withService<RobotApi>(), scope)
+    assertTrue(page.hold().ok)
+    scope.launch { page.input(RobotKey.StartStop.name, flow { delay(60_000) }) }
+    delay(500)
+    scope.launch { page.release() } // waits: the key is still down
+    delay(300)
+    rpc.webSocketSession.await().cancel()
+    withTimeout(10_000) { while (barn.isConnected) delay(20) }
+    scope.cancel()
+  }
 }

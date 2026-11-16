@@ -80,26 +80,11 @@ await other.addInitScript(() => localStorage.setItem('scraper.pin', '4321'))
 const watch = await phone('watch ', other)
 await watch.goto('http://localhost:8080/')
 await check('second-tab-sees-the-panel-connection', s => s.startsWith('watch <- ') && s.includes('connected\\":true'))
-for (let round = 1; round <= 4; round++) {
-  if (round > 1) {
-    p = await phone()
-    await p.setViewportSize({ width: 390, height: 1200 })
-    await p.goto('http://localhost:8080/')
-    await p.waitForTimeout(8_000)
-    await p.mouse.click(195, 860) // "Bedieningspaneel"
-    await p.waitForTimeout(1_500)
-    await p.mouse.click(195, 602) // "Verbinden met het paneel"
-    await check(`panel-connects-${round}`, s => s.startsWith('watch <- ') && s.includes('connected\\":true'))
-  }
-  const f = await ctx.newCDPSession(p)
-  await f.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: kx, y: ky }] })
-  await check(`key-down-again-${round}`, s => s.startsWith('-> ') && s.includes('input') && s.includes('Down'), 5_000)
-  const t = Date.now()
-  await p.close()
-  p = watch
-  await check(`barn-computer-lets-go-${round}`, s => s.startsWith('watch <- ') && s.includes('states') && !s.includes('connected\\":true'), 150_000)
-  console.log(`     let go after ${Date.now() - t} ms`)
-}
+await touch('touchStart', kx, ky)
+await check('key-down-again', s => s.startsWith('-> ') && s.includes('input') && s.includes('Down'), 5_000)
+await p.close()
+p = watch
+await check('barn-computer-lets-go', s => s.startsWith('watch <- ') && s.includes('states') && !s.includes('connected\\":true'), 10_000)
 if (seen.some(s => s.startsWith('pageerror'))) failed = true
 await browser.close()
 process.exit(failed ? 1 : 0)
