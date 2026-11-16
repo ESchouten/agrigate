@@ -30,7 +30,7 @@ jobs:
       - name: Desktop app with the demo robot (serves the page)
         working-directory: native
         run: |
-          (xvfb-run -a ./gradlew :composeApp:run --args="--demo" --console=plain > ../app.log 2>&1 &)
+          (xvfb-run -a ./gradlew :composeApp:run --args="--demo setup=done" --console=plain > ../app.log 2>&1 &)
           for i in $(seq 1 120); do curl -sf http://localhost:8080/ > /dev/null && break; sleep 5; done
           curl -sI http://localhost:8080/composeApp.wasm | head -5 || true
       - name: Browser

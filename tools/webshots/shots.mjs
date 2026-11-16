@@ -3,30 +3,29 @@ import fs from 'fs'
 fs.mkdirSync('out', { recursive: true })
 const log = []
 const b = await chromium.launch()
-async function phone(code, lang = 'nl-NL') {
-  const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, locale: lang, isMobile: true, hasTouch: true })
+async function phone(code) {
+  const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, locale: 'nl-NL', isMobile: true, hasTouch: true })
   if (code) await ctx.addInitScript(c => localStorage.setItem('scraper.code', c), code)
   const p = await ctx.newPage()
-  p.on('console', m => log.push(`[${m.type()}] ${m.text()}`))
+  p.on('console', m => { if (m.type() !== 'warning') log.push(`[${m.type()}] ${m.text()}`) })
   p.on('pageerror', e => log.push(`[pageerror] ${e}`))
   p.on('websocket', ws => {
     log.push(`ws open ${ws.url()}`)
-    ws.on('framereceived', f => log.push(`<- ${String(f.payload).slice(0, 200)}`))
-    ws.on('framesent', f => log.push(`-> ${String(f.payload).slice(0, 200)}`))
+    ws.on('framereceived', f => log.push(`<- ${String(f.payload).slice(0, 300)}`))
+    ws.on('framesent', f => log.push(`-> ${String(f.payload).slice(0, 300)}`))
     ws.on('close', () => log.push('ws close'))
   })
   await p.goto('http://localhost:8080/')
   return p
 }
-let p = await phone(null)
+const shot = async (p, name) => { await p.waitForTimeout(2500); await p.screenshot({ path: `out/${name}.png` }) }
+let p = await phone('000000')
 await p.waitForTimeout(12000)
-await p.screenshot({ path: 'out/1-code.png' })
+await shot(p, '1-wrong-code')
 p = await phone('123456')
 await p.waitForTimeout(12000)
-await p.screenshot({ path: 'out/2-home.png' })
-// tap the middle of the screen's first route card region, then wait
-await p.mouse.click(195, 560)
-await p.waitForTimeout(4000)
-await p.screenshot({ path: 'out/3-tap.png' })
+await shot(p, '2-home')
+await p.mouse.click(150, 400) // route A row
+await shot(p, '3-route-sheet')
 fs.writeFileSync('out/log.txt', log.join('\n'))
 await b.close()
