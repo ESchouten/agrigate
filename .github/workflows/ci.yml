@@ -1,11 +1,14 @@
 name: ci
-# Every check on a push, each part only when its files changed (a push of only docs runs
-# nothing): the robot drivers' tests and the buttons' firmware (M5Stack), the apps (native/:
-# shared Kotlin module with the robot driver, Compose for Android and desktop, SwiftUI for iOS).
-# Run it by hand for everything, with the Windows scenario tests and iOS (macOS minutes count
-# 10x; also once a day when something changed). Releases: workflow release, by hand.
+# Every check on a pull request and on main, each part only when its files changed (a change of
+# only docs runs nothing): the robot drivers' tests and the buttons' firmware (M5Stack), the apps
+# (native/: shared Kotlin module with the robot driver, Compose for Android and desktop, SwiftUI
+# for iOS). Main runs again after a merge: a release needs a green run of its own commit, and
+# only main's runs save the caches every branch reads. Run it by hand for everything, with the
+# Windows scenario tests and iOS (macOS minutes count 10x; also once a day when something
+# changed). Releases: workflow release, by hand.
 on:
   push:
+    branches: [main] # a pull request's own run covers its branch
   pull_request:
   workflow_dispatch:
   schedule:
