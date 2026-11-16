@@ -104,6 +104,15 @@ jobs:
       - name: Web page (Compose for Web), as the desktop app serves it
         working-directory: native
         run: ./gradlew :composeApp:wasmJsBrowserDistribution --console=plain
+      - name: Web page in a browser, served by the desktop app (demo robot)
+        working-directory: native/scenarios
+        run: |
+          mkdir -p ~/.config/scraper-control && echo '{"web.on":"1"}' > ~/.config/scraper-control/settings.json
+          (cd .. && xvfb-run -a ./gradlew :composeApp:run --args="--demo setup=done" --console=plain > web-app.log 2>&1 &)
+          npm i --no-save playwright@1 > /dev/null && npx playwright install --with-deps chromium > /dev/null
+          for i in $(seq 1 60); do curl -sf http://localhost:8080/ > /dev/null && break; sleep 5; done
+          trap 'fuser -k 8080/tcp; rm ~/.config/scraper-control/settings.json' EXIT
+          node web-page.mjs
       - name: Scenario tests on the Compose app (desktop, demo robot) + screenshots
         working-directory: native
         run: ./gradlew :composeApp:jvmTest --console=plain
@@ -123,6 +132,8 @@ jobs:
           name: compose-screenshots-and-reports
           path: |
             native/composeApp/build/screenshots/
+            native/scenarios/web-page/
+            native/web-app.log
             native/composeApp/build/reports/tests/
             native/shared/build/reports/tests/
 

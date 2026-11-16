@@ -71,6 +71,7 @@ when the page lets go or drops.
 ```sh
 ./gradlew :composeApp:run --args="--demo"        # the desktop app with the page, Settings > Web page
 ./gradlew :composeApp:wasmJsBrowserDistribution  # only the page (build/dist/wasmJs/productionExecutable)
+cd scenarios && node web-page.mjs                 # the page in a browser, against the app run with --demo setup=done
 ```
 
 ## The demo robot

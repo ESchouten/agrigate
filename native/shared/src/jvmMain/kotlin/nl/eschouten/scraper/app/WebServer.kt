@@ -9,7 +9,7 @@ package nl.eschouten.scraper.app
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.Application
 import io.ktor.server.application.ApplicationCall
-import io.ktor.server.application.ApplicationCallPipeline
+import io.ktor.server.application.createRouteScopedPlugin
 import io.ktor.server.application.install
 import io.ktor.server.cio.CIO
 import io.ktor.server.engine.EmbeddedServer
@@ -95,13 +95,9 @@ class WebServer(
       // so the page can tell a wrong PIN from a barn computer that is off
       get("/pin") { call.respond(pin(call)) }
       route("/rpc") {
-        intercept(ApplicationCallPipeline.Plugins) {
-          val p = pin(context)
-          if (p != HttpStatusCode.OK) {
-            context.respond(p)
-            finish()
-          }
-        }
+        install(createRouteScopedPlugin("pin") {
+          onCall { call -> pin(call).takeIf { it != HttpStatusCode.OK }?.let { call.respond(it) } }
+        })
         rpc {
           rpcConfig { serialization { json() } }
           val page = Page(controller)
@@ -122,10 +118,12 @@ class WebServer(
     val now = System.currentTimeMillis()
     if (now < lockedUntil) return HttpStatusCode.TooManyRequests
     val pins = controller.state.value.robots.map { it.pin }.filter { it.isNotEmpty() }
-    if (pins.isEmpty() || call.request.queryParameters["pin"] in pins) {
+    val pin = call.request.queryParameters["pin"].orEmpty()
+    if (pins.isEmpty() || pin in pins) {
       wrong = 0
       return HttpStatusCode.OK
     }
+    if (pin.isEmpty()) return HttpStatusCode.Forbidden // a page asking whether it needs one
     if (++wrong >= 5) {
       wrong = 0
       lockedUntil = now + 60_000

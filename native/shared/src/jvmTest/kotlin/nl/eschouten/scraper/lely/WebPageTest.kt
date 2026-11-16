@@ -80,9 +80,11 @@ class WebPageTest {
   @Test fun onlyARobotsPinGetsIn() = runBlocking {
     barn()
     val scope = CoroutineScope(Dispatchers.Default + Job())
+    assertEquals(HttpStatusCode.NotFound, http.get("http://localhost:$port/").status) // only the robot needs the PIN, not the page's files
     assertTrue(runCatching { withTimeout(5_000) { page(scope, "1234") } }.isFailure)
     assertTrue(runCatching { withTimeout(5_000) { page(scope, "") } }.isFailure)
     assertEquals(HttpStatusCode.OK, status("4321")) // a right PIN starts the count again
+    repeat(5) { assertEquals(HttpStatusCode.Forbidden, status("")) } // asking whether a PIN is needed is no try
     // 5 wrong tries in a row: a minute in which even the right PIN is refused
     repeat(4) { assertEquals(HttpStatusCode.Forbidden, status("$it")) }
     assertEquals(HttpStatusCode.Forbidden, status("1234"))
