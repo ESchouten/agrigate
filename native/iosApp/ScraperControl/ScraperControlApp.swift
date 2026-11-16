@@ -71,6 +71,8 @@ struct ScraperControlApp: App {
   var body: some Scene {
     WindowGroup {
       RootView().environmentObject(app).tint(C.primary)
+        // the QR code of the buttons or a computer with the web API, scanned by the camera
+        .onOpenURL { url in Task { _ = try? await Actions.shared.openLink(c: app.controller, link: url.absoluteString) } }
     }
   }
 }

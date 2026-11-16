@@ -36,7 +36,7 @@
 #define LV_USE_BUTTON 0
 #define LV_USE_BUTTONMATRIX 0
 #define LV_USE_CALENDAR 0
-#define LV_USE_CANVAS 0
+#define LV_USE_CANVAS 1                // under the QR code
 #define LV_USE_CHART 0
 #define LV_USE_CHECKBOX 0
 #define LV_USE_DROPDOWN 0
@@ -61,6 +61,7 @@
 #define LV_USE_WIN 0
 #define LV_USE_GRID 0
 #define LV_USE_OBSERVER 0
+#define LV_USE_QRCODE 1                // settings > wifi: a phone's camera adds this robot to the app
 
 #define LV_BUILD_EXAMPLES 0
 

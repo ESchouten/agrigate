@@ -69,7 +69,8 @@ kotlin {
       kotlin.srcDir("src/jniMain/kotlin")
       dependencies {
         implementation("io.ktor:ktor-client-cio:$ktor")
-        implementation("org.jmdns:jmdns:3.6.5")   // the desktop's web API as scraper-control.local
+        implementation("org.jmdns:jmdns:3.6.5")   // the desktop's web API as scraper-control-1a2b.local
+        implementation("com.google.zxing:core:3.5.4")   // its QR code for a phone's camera
       }
     }
     iosMain.dependencies { implementation("io.ktor:ktor-client-darwin:$ktor") }

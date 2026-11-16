@@ -1366,10 +1366,16 @@ static void drawWifi() {
   using namespace ui;
   ui::Screen scr(tx->wifiRow);
   card(10, 56, 300, 136, kCard);
-  settingRow(0, ICON_WIFI, tx->networkWord, wifiSsid.isEmpty() ? String(tx->notSet) : wifiSsid);
-  settingRow(1, ICON_DOWNLOAD, tx->versionRow, FW_VERSION);
-  if (!wifiSsid.isEmpty())   // where apps and other tools reach the web API
-    settingRow(2, ICON_BOLT, tx->apiRow, serving ? hostName() + ".local" : String(tx->apiOffline));
+  if (serving) {   // a QR code that adds this robot to the app on a phone (Erik 2026-11-16)
+    qr(String("scraper-control://add?via=") + hostName() + ".local&pin=" + pin, 26, 66, 96);
+    text(tx->apiRow, 140, 62, kBold, kInk);
+    wrap(tx->scanToAdd, 140, 86, 160, kBody, kInk, 166);
+    centred(hostName() + ".local", 160, 168, kBody, kMuted);
+  } else {
+    settingRow(0, ICON_WIFI, tx->networkWord, wifiSsid.isEmpty() ? String(tx->notSet) : wifiSsid);
+    settingRow(1, ICON_DOWNLOAD, tx->versionRow, FW_VERSION);
+    if (!wifiSsid.isEmpty()) settingRow(2, ICON_BOLT, tx->apiRow, tx->apiOffline);
+  }
   String label[3] = {String(ICON_SEARCH) + " " + tx->networkWord, tx->wpsWord, String(ICON_DOWNLOAD) + " " + tx->updateWord};
   Pill style[3] = {Pill::Neutral, Pill::Neutral, Pill::Neutral};
   pills(label, style);

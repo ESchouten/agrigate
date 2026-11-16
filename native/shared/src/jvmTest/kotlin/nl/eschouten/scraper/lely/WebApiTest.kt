@@ -15,6 +15,7 @@ import nl.eschouten.scraper.app.RobotController
 import nl.eschouten.scraper.app.RobotProfile
 import nl.eschouten.scraper.app.Settings
 import nl.eschouten.scraper.texts.useLanguage
+import nl.eschouten.scraper.ui.Actions
 import java.net.HttpURLConnection
 import java.net.URI
 import kotlin.test.AfterTest
@@ -128,5 +129,19 @@ class WebApiTest {
     assertFalse(o.ok)
     assertEquals(Problem.NotFound, o.problem)
     assertTrue("127.0.0.1:1" in o.message, o.message)
+  }
+
+  @Test fun theQrCodeAddsTheRobotThroughThatDevice() = runBlocking {
+    val p = RobotController(Settings(), MemoryStore())   // a new app, before its first setup
+    assertFalse(Actions.openLink(p, "https://example.com"))
+    assertTrue(Actions.openLink(p, "scraper-control://add?via=127.0.0.1:$port&pin=4321"))
+    val s = p.state.value
+    assertTrue(s.onboarded)
+    assertEquals(1, s.robots.size)   // the empty first robot became this one
+    assertEquals("127.0.0.1:$port", s.robot.via)
+    assertEquals("4321", s.robot.pin)
+    assertTrue(Actions.openLink(p, "scraper-control://add?via=127.0.0.1:$port&pin=1234"))   // scanned again: the new PIN
+    assertEquals(1, p.state.value.robots.size)
+    assertEquals("1234", p.state.value.robot.pin)
   }
 }

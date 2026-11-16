@@ -471,5 +471,9 @@ class Tr(val code: String) {
     "Apps and other programs on this network control the robot in use through $address, with that robot's PIN. For your own network only: never open the port to the internet.",
   )
   fun apiFailed(detail: String): String = t("De web-API kon niet starten: $detail", "The web API could not start: $detail")
+  val scanToAdd: String get() = t(
+    "Scan met de camera van je telefoon om de robot in de app te zetten.",
+    "Scan with your phone's camera to add the robot to the app.",
+  )
   val apiPortHelp: String get() = t("Een getal van 1024 tot 65535", "A number from 1024 to 65535")
 }

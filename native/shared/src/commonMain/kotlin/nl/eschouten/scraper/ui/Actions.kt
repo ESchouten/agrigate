@@ -55,6 +55,38 @@ object Actions {
   /** A robot through another device's web API ("" = Bluetooth from here). */
   suspend fun setVia(c: RobotController, uid: String, via: String) = update(c, uid) { it.copy(via = via.trim()) }
 
+  /** A link from a QR code on the buttons or a computer with the web API (docs/API.md):
+   *  scraper-control://add?via=<address>&pin=<PIN>. Adds that robot (or updates the one already
+   *  through that address), makes it the robot in use and ends the first setup. False when it
+   *  is not such a link. */
+  suspend fun openLink(c: RobotController, link: String): Boolean {
+    val q = addLink(link) ?: return false
+    val via = q["via"]?.takeIf { it.isNotBlank() } ?: return false
+    val pin = q["pin"] ?: ""
+    val s = c.state.value
+    val same = s.robots.firstOrNull { it.via.equals(via, ignoreCase = true) }
+    val fresh = s.robots.singleOrNull()?.takeIf { !s.onboarded && it.robotId == null && it.via.isEmpty() }   // the empty first robot
+    when {
+      same != null -> {
+        c.updateRobot(same.copy(pin = pin))
+        c.selectRobot(same.uid)
+      }
+      fresh != null -> c.updateRobot(fresh.copy(via = via, pin = pin))
+      else -> c.addRobot(RobotProfile(via = via, pin = pin))
+    }
+    c.updateSettings { onboarded = true }
+    return true
+  }
+
+  /** The query of a scraper-control://add?... link, or null. */
+  fun addLink(link: String): Map<String, String>? {
+    val prefix = "scraper-control://add?"
+    if (!link.startsWith(prefix, ignoreCase = true)) return null
+    return link.substring(prefix.length).split('&').mapNotNull { p ->
+      p.split('=', limit = 2).takeIf { it.size == 2 }?.let { it[0] to it[1] }
+    }.toMap()
+  }
+
   /** Desktop: serve the web API or not, and on which port (1024..65535; else unchanged). */
   suspend fun setApi(c: RobotController, on: Boolean) = c.updateSettings { apiOn = on }
 

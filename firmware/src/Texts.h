@@ -44,7 +44,7 @@ struct Texts {
   // home screen: the robot as last seen, read every 15 minutes (printf formats: %d)
   const char *notReadYet, *readEvery, *justNow, *minAgo, *hourAgo;
   // settings > wifi: where apps and other tools reach the M5's web API (Api.h)
-  const char *apiRow, *apiOffline;
+  const char *apiRow, *apiOffline, *scanToAdd;
 };
 
 static const Texts kNl = {
@@ -79,6 +79,7 @@ static const Texts kNl = {
     "Nog niet gelezen", "Leest de robot elke 15 min", "zojuist",
     "%d min geleden", "%d uur geleden",
     "Web-API", "zodra de wifi verbonden is",
+    "Scan met de camera van je telefoon om de robot in de app te zetten.",
 };
 
 static const Texts kEn = {
@@ -113,6 +114,7 @@ static const Texts kEn = {
     "Not read yet", "Reads the robot every 15 min", "just now",
     "%d min ago", "%d h ago",
     "Web API", "once Wi-Fi is connected",
+    "Scan with your phone's camera to add the robot to the app.",
 };
 
 // "nl" -> Dutch, anything else -> English.

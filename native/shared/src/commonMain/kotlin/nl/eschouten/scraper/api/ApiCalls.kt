@@ -78,8 +78,9 @@ class ApiCalls(private val c: RobotController, private val now: () -> Long) {
   }
 }
 
-/** Where a host serves the web API, for its settings screen: the address, or why it does not run. */
-data class WebApiState(val address: String = "", val error: String? = null)
+/** Where a host serves the web API, for its settings screen: the address, or why it does not
+ *  run, and a QR code (rows of dark modules) that adds the robot in use to the app on a phone. */
+data class WebApiState(val address: String = "", val error: String? = null, val qr: List<BooleanArray>? = null)
 
 /** Set by a host that serves the web API (the desktop); null where none does. */
 object WebApiHost {

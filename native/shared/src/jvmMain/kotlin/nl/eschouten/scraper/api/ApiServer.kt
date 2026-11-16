@@ -4,6 +4,9 @@
 // (the end of its network address), so two devices never swap names (Erik 2026-11-16).
 package nl.eschouten.scraper.api
 
+import com.google.zxing.BarcodeFormat
+import com.google.zxing.EncodeHintType
+import com.google.zxing.qrcode.QRCodeWriter
 import com.sun.net.httpserver.HttpServer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -22,14 +25,28 @@ class ApiServer(private val controller: RobotController) {
   private val calls = ApiCalls(controller) { System.currentTimeMillis() }
   private var server: HttpServer? = null
   private var mdns: JmDNS? = null
+  private var via = ""   // how a phone reaches this computer, e.g. "scraper-control-1a2b.local:8080"
 
   /** Runs and stops with the setting, for as long as [scope] lives. */
-  fun follow(scope: CoroutineScope) = scope.launch {
-    controller.state.map { it.apiOn to it.apiPort }.distinctUntilChanged().collect { (on, port) ->
-      stop()
-      if (on) start(port)
-      else WebApiHost.mutable.value = null
+  fun follow(scope: CoroutineScope) {
+    scope.launch {
+      controller.state.map { it.apiOn to it.apiPort }.distinctUntilChanged().collect { (on, port) ->
+        stop()
+        if (on) start(port)
+        else WebApiHost.mutable.value = null
+      }
     }
+    scope.launch {   // the QR code carries the PIN of the robot in use
+      controller.state.map { it.robot.pin }.distinctUntilChanged().collect { showQr() }
+    }
+  }
+
+  @Synchronized private fun showQr() {
+    val st = WebApiHost.mutable.value ?: return
+    if (via.isEmpty()) return
+    val link = "scraper-control://add?via=$via&pin=${controller.state.value.robot.pin}"
+    val m = QRCodeWriter().encode(link, BarcodeFormat.QR_CODE, 0, 0, mapOf(EncodeHintType.MARGIN to 0))
+    WebApiHost.mutable.value = st.copy(qr = (0 until m.height).map { y -> BooleanArray(m.width) { x -> m.get(x, y) } })
   }
 
   /** Serves on [port] (0: any free one); the port it got. */
@@ -61,6 +78,8 @@ class ApiServer(private val controller: RobotController) {
     }.getOrNull()
     val names = listOfNotNull("$name.local".takeIf { mdns != null }, lan?.second?.hostAddress)
     WebApiHost.mutable.value = WebApiState(names.joinToString(" / ") { "http://$it:$got" })
+    via = names.firstOrNull()?.let { "$it:$got" } ?: ""
+    showQr()
     return got
   }
 
@@ -69,6 +88,7 @@ class ApiServer(private val controller: RobotController) {
     mdns = null
     server?.stop(0)
     server = null
+    via = ""
   }
 
   companion object {

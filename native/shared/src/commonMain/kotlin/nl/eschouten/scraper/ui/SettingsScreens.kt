@@ -97,7 +97,7 @@ fun settingsScreen(s: ControllerState, now: Long, platform: Platform, api: WebAp
     tr.webApi,
     listOf(
       Row(RowId.API, Glyph.Phone, tr.webApi, if (s.apiOn) tr.on else tr.off, toggle = s.apiOn),
-      Row(RowId.API_PORT, null, tr.apiPort, s.apiPort.toString()),
+      Row(RowId.API_PORT, Glyph.Dialpad, tr.apiPort, s.apiPort.toString()),
     ),
     footer = if (!s.apiOn) null else api?.error?.let { tr.apiFailed(it) } ?: api?.address?.takeIf { it.isNotEmpty() }?.let { tr.apiFooter(it) },
   )

@@ -2,6 +2,7 @@
 // (models: shared ui/Lists.kt, ui/SettingsScreens.kt, ui/Onboarding.kt).
 package nl.eschouten.scraper.app
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -242,6 +243,10 @@ fun SettingsScreen(controller: RobotController, host: AppHost, nav: Nav) {
           },
         )
       }
+      val qr = api?.qr
+      if (qr != null && s.apiOn && sec.rows.any { it.id == RowId.API }) {
+        item(key = "api-qr") { QrCode(qr, tr.scanToAdd) }
+      }
     }
   }
   if (askPort) {
@@ -423,5 +428,23 @@ fun AddRobotScreen(controller: RobotController, host: AppHost, nav: Nav) {
         }
       }
     }
+  }
+}
+
+/** A QR code (rows of dark modules) with a line under it, for a phone's camera. */
+@Composable
+fun QrCode(modules: List<BooleanArray>, caption: String) {
+  Column(Modifier.fillMaxWidth().padding(top = Space.l), horizontalAlignment = Alignment.CenterHorizontally) {
+    androidx.compose.foundation.Canvas(
+      Modifier.size(196.dp).background(Color.White, RoundedCornerShape(8.dp)).padding(14.dp).testTag("api-qr"),
+    ) {
+      val cell = size.minDimension / modules.size
+      modules.forEachIndexed { y, row ->
+        row.forEachIndexed { x, dark ->
+          if (dark) drawRect(Color.Black, androidx.compose.ui.geometry.Offset(x * cell, y * cell), androidx.compose.ui.geometry.Size(cell + 0.5f, cell + 0.5f))
+        }
+      }
+    }
+    Text(caption, Modifier.padding(top = Space.s), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
   }
 }

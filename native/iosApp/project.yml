@@ -44,6 +44,9 @@ targets:
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
         NSLocalNetworkUsageDescription: Om de robot te bedienen via een ander apparaat in je netwerk.
+        CFBundleURLTypes:   # scraper-control://add?... from the QR code of the buttons or a computer
+          - CFBundleURLName: nl.eschouten.scraper.add
+            CFBundleURLSchemes: [scraper-control]
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: nl.eschouten.scraper
