@@ -580,10 +580,10 @@ static Result askFinish(Robot& r) {
 // Start/Stop on the driving screen, as on the robot, then the robot's question: asked on the
 // M5 (ask), or left open for whoever called the web API. If the robot still shows that
 // question (left open earlier), the same. Otherwise it starts the route.
-static Job routeJob(char letter, bool ask) {
+static Job routeJob(char letter, bool ask, bool dryRun = false) {
   routeStopped = Stopped::No;
-  return [letter, ask](Robot& r) {
-    if (r.drivingRoute() || r.stopQuestion()) {
+  return [letter, ask, dryRun](Robot& r) {
+    if (!dryRun && (r.drivingRoute() || r.stopQuestion())) {
       routeStopped = Stopped::Yes;
       if (r.drivingRoute()) {
         Result res = r.stopRoute();
@@ -594,7 +594,7 @@ static Job routeJob(char letter, bool ask) {
       routeStopped = Stopped::LeftOpen;
       return Result::Ok;
     }
-    return r.startRoute(letter);
+    return r.startRoute(letter, dryRun);
   };
 }
 
@@ -720,6 +720,16 @@ static void chooseRobot() {
 static String wifiSsid, wifiPass;
 static WebServer server(80);   // the web API, while the wifi is up (wifiTick)
 static bool serving = false;
+
+// The M5 on the network: http://scraper-control-1a2b.local, a fixed name of its own (the end of
+// its MAC), so two never swap names after a restart (Erik 2026-11-16).
+static String hostName() {
+  uint8_t m[6];
+  WiFi.macAddress(m);
+  char b[24];
+  snprintf(b, sizeof b, "scraper-control-%02x%02x", m[4], m[5]);
+  return b;
+}
 
 // Before a download over https: the web API and Bluetooth off, so TLS has the memory (Erik
 // 2026-11-16). The API comes back by itself (wifiTick), Bluetooth at the next robot session.
@@ -1220,8 +1230,7 @@ static void wifiTick() {
   if (!serving) {
     server.begin();
     serving = true;
-    // http://scraper-control.local (a second one on the network gets "-2")
-    if (MDNS.begin("scraper-control")) MDNS.addService("http", "tcp", 80);
+    if (MDNS.begin(hostName().c_str())) MDNS.addService("http", "tcp", 80);
     Serial.printf("web API: http://%s/api\n", WiFi.localIP().toString().c_str());
     logHeap("wifi");
   }
@@ -1312,7 +1321,7 @@ static void handleApi() {
     String title = c.kind == ApiCall::Planning ? String(tx->planning) : String(tx->route) + " " + c.route;
     Kind kind = c.kind == ApiCall::Planning ? Kind::Planning : Kind::Route;
     Job job;
-    if (c.kind == ApiCall::Route) job = routeJob(c.route, false);
+    if (c.kind == ApiCall::Route) job = routeJob(c.route, false, c.dryRun);
     else if (c.kind == ApiCall::Planning) job = [on = c.yes](Robot& rb) { return rb.status().planning < 0 ? Result::Busy : rb.setPlanning(on); };
     else if (c.kind == ApiCall::Stop) {
       title = tx->routeStopped;
@@ -1360,7 +1369,7 @@ static void drawWifi() {
   settingRow(0, ICON_WIFI, tx->networkWord, wifiSsid.isEmpty() ? String(tx->notSet) : wifiSsid);
   settingRow(1, ICON_DOWNLOAD, tx->versionRow, FW_VERSION);
   if (!wifiSsid.isEmpty())   // where apps and other tools reach the web API
-    settingRow(2, ICON_BOLT, tx->apiRow, serving ? "http://" + WiFi.localIP().toString() + "/api" : String(tx->apiOffline));
+    settingRow(2, ICON_BOLT, tx->apiRow, serving ? hostName() + ".local" : String(tx->apiOffline));
   String label[3] = {String(ICON_SEARCH) + " " + tx->networkWord, tx->wpsWord, String(ICON_DOWNLOAD) + " " + tx->updateWord};
   Pill style[3] = {Pill::Neutral, Pill::Neutral, Pill::Neutral};
   pills(label, style);

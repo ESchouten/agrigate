@@ -15,6 +15,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import nl.eschouten.scraper.api.ApiServer
 import nl.eschouten.scraper.ui.Platform
 
 object DesktopHost : AppHost {
@@ -37,6 +40,7 @@ fun main(args: Array<String>) {
   val icon = appIcon()
   val demo = demoWords(args)
   val controller = AppStart.controller(FileStore(), demo)
+  ApiServer(controller).follow(CoroutineScope(Dispatchers.IO))   // Settings > Web API
   val nav = Nav()
   application {
     Window(

@@ -26,6 +26,7 @@ import nl.eschouten.scraper.model.ScraperFault
 import nl.eschouten.scraper.model.ScraperModel
 import nl.eschouten.scraper.model.ScraperSession
 import nl.eschouten.scraper.model.ScraperStatus
+import nl.eschouten.scraper.api.ApiSession
 import nl.eschouten.scraper.texts.tr
 import kotlin.concurrent.Volatile
 import kotlin.time.Clock
@@ -60,6 +61,9 @@ data class ControllerState(
   val onboarded: Boolean = false,
   val widgetTipSeen: Boolean = false,
   val language: String = "",
+  /** Desktop: serve the web API (docs/API.md) on [apiPort]. */
+  val apiOn: Boolean = false,
+  val apiPort: Int = Settings.API_PORT,
   /** A stopped route asks "finish it?": show [nl.eschouten.scraper.ui.finishQuestion] and
    *  call [RobotController.answerFinish]. The link stays open meanwhile. */
   val finishQuestion: Boolean = false,
@@ -105,6 +109,10 @@ class RobotController(
   @Volatile private var revision = 0L
   @Volatile private var finishAnswer: CompletableDeferred<Boolean?>? = null
 
+  /** The robot in use as last read, also on a driving or menu screen, with when (the web API). */
+  @Volatile var lastSeen: Pair<ScraperStatus, Long>? = null
+    private set
+
   private val _state = MutableStateFlow(build())
   val state: StateFlow<ControllerState> = _state
 
@@ -123,6 +131,7 @@ class RobotController(
     if (uid == settings.robot.uid) return@withLock
     holds = 0
     close()
+    lastSeen = null
     settings.select(uid)
     planningResumes = false
     steps = emptyList()
@@ -191,8 +200,9 @@ class RobotController(
 
   /** [route] "A".."D". One tap: connect, start, disconnect (unless the panel holds the link).
    *  A safety stop when a route already runs (Erik 2026-11-05): a route button pressed during
-   *  a route stops it instead (not for a dry run). */
-  suspend fun startRoute(route: String, dryRun: Boolean = false): Outcome {
+   *  a route stops it instead (not for a dry run). [ask]: ask the user whether to finish the
+   *  stopped route; false leaves the question on the robot (the web API answers it apart). */
+  suspend fun startRoute(route: String, dryRun: Boolean = false, ask: Boolean = true): Outcome {
     var stopped = false
     return job(
       work = {
@@ -203,11 +213,11 @@ class RobotController(
           r.stopRoute()
           stopped = true
           planningResumes = false
-          return@job askFinish(r)
+          return@job askFinish(r, ask)
         }
         if (!dryRun && r.status().finishQuestion) {   // stopped earlier, question still open
           stopped = true
-          return@job askFinish(r)
+          return@job askFinish(r, ask)
         }
         val wasOn = r.status().planning == true
         r.startRoute(route, dryRun)
@@ -245,9 +255,9 @@ class RobotController(
   /** The robot asks whether to finish the stopped route: the user decides (Erik 2026-11-11),
    *  the answer goes to the robot 1:1. No answer within 2 minutes (or from the widget, which
    *  cannot ask): the question stays on the robot and nothing is pressed. */
-  private suspend fun askFinish(r: ScraperSession): Outcome {
+  private suspend fun askFinish(r: ScraperSession, ask: Boolean): Outcome {
     if (!r.status().finishQuestion) return Outcome(true, tr.routeStoppedMsg, stopped = true)
-    if (viaWidget) return Outcome(true, tr.finishLeftOpenMsg, stopped = true)
+    if (viaWidget || !ask) return Outcome(true, tr.finishLeftOpenMsg, stopped = true)
     val answer = CompletableDeferred<Boolean?>()
     finishAnswer = answer
     emit()
@@ -261,6 +271,40 @@ class RobotController(
     r.answerStop(finish)
     return Outcome(true, if (finish) tr.routeContinuesMsg else tr.routeCancelledMsg, stopped = true)
   }
+
+  /** A safety stop of the running route, from outside the app (the web API); the robot's
+   *  question after it is left open for [answerStop]. Busy when no route runs. */
+  suspend fun stopRoute(): Outcome = job(
+    work = {
+      val r = robot!!
+      if (!settings.robot.type.can(Capability.Stop) || !r.status().driving) throw ScraperException(ScraperFault.Busy, tr.robotBusyNothingPressed)
+      r.stopRoute()
+      planningResumes = false
+      askFinish(r, ask = false)
+    },
+    record = { o -> stopEvent(o, tr.routeStoppedTitle) },
+  )
+
+  /** The answer to the robot's question after a stop, from outside the app (the web API):
+   *  true = finish the route, false = it ends. Busy when the robot does not ask. */
+  suspend fun answerStop(finish: Boolean): Outcome = job(
+    work = {
+      val r = robot!!
+      if (!r.status().finishQuestion) throw ScraperException(ScraperFault.Busy, tr.robotBusyNothingPressed)
+      r.answerStop(finish)
+      Outcome(true, if (finish) tr.routeContinuesMsg else tr.routeCancelledMsg, stopped = true)
+    },
+    record = { o -> stopEvent(o, o.message) },
+  )
+
+  private fun stopEvent(o: Outcome, title: String) = HistoryEvent(
+    at = now(),
+    kind = if (o.ok) EventKind.Stopped else EventKind.Failed,
+    title = title,
+    detail = if (o.ok) "" else o.message,
+    viaWidget = viaWidget,
+    robot = settings.robot.uid,
+  )
 
   /** The user's answer to [ControllerState.finishQuestion]: true = finish, false = don't,
    *  null = later (leave the question on the robot). */
@@ -385,7 +429,7 @@ class RobotController(
 
   private suspend fun open() {
     var p = settings.robot
-    if (p.robotId == null) {
+    if (p.robotId == null && p.via.isEmpty()) {
       set(LinkState.Searching)
       val found = p.type.discover(p.robotName.ifEmpty { null })
       if (found.isEmpty()) throw NoRobot()
@@ -399,7 +443,7 @@ class RobotController(
     var r: ScraperSession
     var tries = 0
     while (true) {
-      r = settings.robot.type.openSession(
+      r = if (settings.robot.via.isNotEmpty()) ApiSession(settings.robot) else settings.robot.type.openSession(
         settings.robot,
         onStep = { s ->
           steps = steps.filter { it.percent == null } + s
@@ -456,6 +500,7 @@ class RobotController(
     if (onlyIfChanged && rev == seen) return
     seen = rev
     val st = r.status()
+    lastSeen = st to now()
     if (st.planning == true || (st.planning == false && !st.busy && link != LinkState.Working)) planningResumes = false
     if (st.planning != null) {
       val before = settings.robot.snapshot
@@ -495,6 +540,8 @@ class RobotController(
     onboarded = settings.onboarded,
     widgetTipSeen = settings.widgetTipSeen,
     language = settings.language,
+    apiOn = settings.apiOn,
+    apiPort = settings.apiPort,
     finishQuestion = finishAnswer != null,
     revision = revision++,
   )

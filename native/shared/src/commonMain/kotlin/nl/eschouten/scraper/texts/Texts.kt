@@ -446,4 +446,30 @@ class Tr(val code: String) {
   )
   val remove: String get() = t("Verwijderen", "Remove")
   val removeRobot: String get() = t("Robot verwijderen", "Remove robot")
+
+  // ---- the web API (docs/API.md): a robot through another device, and the desktop serving it ----
+  val connection: String get() = t("Verbinding", "Connection")
+  val viaBluetooth: String get() = t("Rechtstreeks via Bluetooth", "Directly over Bluetooth")
+  fun viaDevice(address: String): String = t("Via $address", "Through $address")
+  val viaTitle: String get() = t("Via een ander apparaat", "Through another device")
+  val viaHelp: String get() = t(
+    "Het adres van de knoppen of een computer met de web-API die de robot via Bluetooth bereikt, bijvoorbeeld scraper-control.local. Leeg: rechtstreeks via Bluetooth.",
+    "The address of the buttons or a computer with the web API that reaches the robot over Bluetooth, for example scraper-control.local. Empty: directly over Bluetooth.",
+  )
+  fun deviceUnreachable(address: String): String = t(
+    "Kan $address niet bereiken. Staat het apparaat aan en zit je op hetzelfde netwerk?",
+    "Cannot reach $address. Is the device on, and are you on the same network?",
+  )
+  val tooManyTries: String get() = t(
+    "Te vaak een verkeerde pincode. Probeer het over een minuut opnieuw.",
+    "Too many wrong PINs. Try again in a minute.",
+  )
+  val webApi: String get() = t("Web-API", "Web API")
+  val apiPort: String get() = t("Poort", "Port")
+  fun apiFooter(address: String): String = t(
+    "Apps en andere programma's op dit netwerk bedienen de robot in gebruik via $address, met de pincode van die robot. Alleen voor je eigen netwerk: zet de poort nooit open naar internet.",
+    "Apps and other programs on this network control the robot in use through $address, with that robot's PIN. For your own network only: never open the port to the internet.",
+  )
+  fun apiFailed(detail: String): String = t("De web-API kon niet starten: $detail", "The web API could not start: $detail")
+  val apiPortHelp: String get() = t("Een getal van 1024 tot 65535", "A number from 1024 to 65535")
 }

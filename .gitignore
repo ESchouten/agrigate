@@ -25,3 +25,4 @@ python/scraper_control/scraper_core.dll
 # local build output (Android NDK, XcodeGen)
 native/androidApp/.cxx/
 native/iosApp/Widgets/Info.plist
+native/iosApp/ScraperControl/Info.plist

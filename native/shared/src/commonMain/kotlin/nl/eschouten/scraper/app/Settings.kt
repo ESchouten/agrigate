@@ -34,6 +34,9 @@ data class RobotProfile(
   val robotName: String = "", // advertised name; helps on iOS/macOS
   val label: String = "", // own name, e.g. "Stal 2"
   val pin: String = "",
+  /** Reached through another device's web API (docs/API.md): the buttons or a computer that
+   *  holds the Bluetooth link, e.g. "scraper-control.local". "" = Bluetooth from here. */
+  val via: String = "",
   val routes: String = "ABCD", // which route slots to show, e.g. "ABC"
   val routeNames: Map<String, String> = emptyMap(), // "A" -> "Voergang"
   val routeParts: Map<String, String> = emptyMap(), // "C" -> "1 2 3": what the route is on the robot (read)
@@ -64,6 +67,8 @@ class Settings(
   var onboarded: Boolean = false,
   var widgetTipSeen: Boolean = false, // dismissed the "add the widget" tip
   var language: String = "", // "" = as the phone, or "nl" / "en"
+  var apiOn: Boolean = false, // desktop: serve the web API (docs/API.md)
+  var apiPort: Int = API_PORT,
 ) {
   var robots: List<RobotProfile> = robots
     private set
@@ -121,10 +126,13 @@ class Settings(
     store.putString("onboarded", onboarded.toString())
     store.putString("widgetTipSeen", widgetTipSeen.toString())
     store.putString("language", language)
+    store.putString("api.on", apiOn.toString())
+    store.putString("api.port", apiPort.toString())
   }
 
   companion object {
     val allRoutes = listOf("A", "B", "C", "D")
+    const val API_PORT = 8080
 
     /** Single-robot shortcut for tests. */
     fun single(
@@ -155,6 +163,8 @@ class Settings(
         onboarded = store.getString("onboarded") == "true",
         widgetTipSeen = store.getString("widgetTipSeen") == "true",
         language = store.getString("language") ?: "",
+        apiOn = store.getString("api.on") == "true",
+        apiPort = store.getString("api.port")?.toIntOrNull() ?: API_PORT,
       ).also { if (plainPin) it.save(store) }
     }
   }

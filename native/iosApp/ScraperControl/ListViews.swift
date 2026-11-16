@@ -151,7 +151,7 @@ struct SettingsView: View {
   @State private var pickLanguage = false
   @State private var askReset = false
   var body: some View {
-    let v = SettingsScreensKt.settingsScreen(s: app.state, now: app.now, platform: app.platform)
+    let v = SettingsScreensKt.settingsScreen(s: app.state, now: app.now, platform: app.platform, api: nil)
     Pushed(title: v.title, testId: "settings") {
       ForEach(v.sections, id: \.title) { sec in
         SectionView(sec: sec) { r in SettingsRow(r: r, onTap: tap(r)) }
@@ -218,6 +218,8 @@ struct RobotSettingsView: View {
           TextInputSheet(d: v.nameDialog) { x in Task { try? await Actions.shared.rename(c: app.controller, uid: uid, name: x) } }
         case RowId.shared.PIN:
           TextInputSheet(d: SettingsScreensKt.pinDialog(p: p), help: p.type.pinHelp) { x in Task { try? await Actions.shared.setPin(c: app.controller, uid: uid, pin: x) } }
+        case RowId.shared.VIA:
+          TextInputSheet(d: SettingsScreensKt.viaDialog(p: p), help: tr.viaHelp) { x in Task { try? await Actions.shared.setVia(c: app.controller, uid: uid, via: x) } }
         default:
           let r = String(d.id.dropFirst(6))
           TextInputSheet(d: SettingsScreensKt.routeNameDialog(p: p, r: r)) { x in Task { try? await Actions.shared.renameRoute(c: app.controller, uid: uid, route: r, name: x) } }
@@ -232,7 +234,7 @@ struct RobotSettingsView: View {
 
   private func tap(_ r: Shared.Row) -> (() -> Void)? {
     switch r.id {
-    case RowId.shared.NAME, RowId.shared.PIN: return { dialog = DialogItem(id: r.id) }
+    case RowId.shared.NAME, RowId.shared.PIN, RowId.shared.VIA: return { dialog = DialogItem(id: r.id) }
     case RowId.shared.DEVICE: return { app.push(.chooseDevice(uid)) }
     case RowId.shared.TEST: return { Task { app.show(try? await Actions.shared.testConnection(c: app.controller, uid: uid)) } }
     case RowId.shared.READ_ROUTES: return { Task { app.show(try? await Actions.shared.readRoutes(c: app.controller, uid: uid)) } }

@@ -9,6 +9,7 @@ struct ApiCall {
   char route = 0;      // Route: 'A'..'D'
   bool yes = false;    // Planning: on, Answer: yes (finish the route)
   bool fresh = false;  // Status: read the robot now
+  bool dryRun = false; // Route: only the checks, nothing starts
 };
 
 // method "GET" / "POST", path without the query, query = the part after '?'.
@@ -31,6 +32,7 @@ inline ApiCall parseCall(const std::string& method, const std::string& path, con
     if (r >= 'A' && r <= 'D') {
       c.kind = ApiCall::Route;
       c.route = r;
+      c.dryRun = query.find("dryRun") != std::string::npos;
     }
   } else if (path == "/api/stop") {
     c.kind = ApiCall::Stop;

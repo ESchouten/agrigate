@@ -8,7 +8,7 @@ enum arduino_event_id_t { ARDUINO_EVENT_WPS_ER_SUCCESS, ARDUINO_EVENT_WPS_ER_FAI
 typedef void (*WiFiEventCb)(arduino_event_id_t);
 struct IPAddressT { String toString() const; };
 struct WiFiT {
-  void mode(int); int getMode(); void begin(const char*, const char*); void begin(); int status(); IPAddressT localIP(); void disconnect(bool);
+  void mode(int); int getMode(); void begin(const char*, const char*); void begin(); int status(); IPAddressT localIP(); void macAddress(uint8_t*); void disconnect(bool);
   int16_t scanNetworks(); String SSID(uint8_t); int32_t RSSI(uint8_t); wifi_auth_mode_t encryptionType(uint8_t); void scanDelete();
   String SSID(); String psk(); int onEvent(WiFiEventCb, arduino_event_id_t = ARDUINO_EVENT_MAX); void removeEvent(int);
 };

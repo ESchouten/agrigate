@@ -50,6 +50,7 @@ kotlin {
     }
   }
 
+  val ktor = "3.6.1"
   sourceSets {
     commonMain { kotlin.srcDir(generateVersion.map { versionDir.get().asFile }) }
     commonMain.dependencies {
@@ -57,13 +58,21 @@ kotlin {
       implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.12.0")
       implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
       api("com.juul.kable:kable-core:0.45.0")
+      implementation("io.ktor:ktor-client-core:$ktor")   // the web API's client (api/ApiSession)
     }
     commonTest.dependencies {
       implementation(kotlin("test"))
       implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
     }
     // the same JVM code for Android and desktop: the JNI bridge, the stream link
-    jvmMain { kotlin.srcDir("src/jniMain/kotlin") }
+    jvmMain {
+      kotlin.srcDir("src/jniMain/kotlin")
+      dependencies {
+        implementation("io.ktor:ktor-client-cio:$ktor")
+        implementation("org.jmdns:jmdns:3.6.5")   // the desktop's web API as scraper-control.local
+      }
+    }
+    iosMain.dependencies { implementation("io.ktor:ktor-client-darwin:$ktor") }
   }
 }
 

@@ -12,6 +12,7 @@ int main() {
   c = parseCall("POST", "/api/route/B", "");
   assert(c.kind == ApiCall::Route && c.route == 'B');
   assert(parseCall("POST", "/api/route/d", "").route == 'D');
+  assert(!c.dryRun && parseCall("POST", "/api/route/A", "dryRun").dryRun);
   for (const char* bad : {"/api/route/E", "/api/route/", "/api/route/AB", "/api/route"})
     assert(parseCall("POST", bad, "").kind == ApiCall::None);
   assert(parseCall("GET", "/api/route/A", "").kind == ApiCall::None);   // a link in a browser starts nothing

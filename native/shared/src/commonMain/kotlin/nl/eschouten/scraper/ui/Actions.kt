@@ -52,6 +52,18 @@ object Actions {
 
   suspend fun setPin(c: RobotController, uid: String, pin: String) = update(c, uid) { it.copy(pin = pin.trim()) }
 
+  /** A robot through another device's web API ("" = Bluetooth from here). */
+  suspend fun setVia(c: RobotController, uid: String, via: String) = update(c, uid) { it.copy(via = via.trim()) }
+
+  /** Desktop: serve the web API or not, and on which port (1024..65535; else unchanged). */
+  suspend fun setApi(c: RobotController, on: Boolean) = c.updateSettings { apiOn = on }
+
+  suspend fun setApiPort(c: RobotController, port: String): String? {
+    val p = port.trim().toIntOrNull()?.takeIf { it in 1024..65535 } ?: return tr.apiPortHelp
+    c.updateSettings { apiPort = p }
+    return null
+  }
+
   suspend fun renameRoute(c: RobotController, uid: String, route: String, name: String) = update(c, uid) { it.withRouteName(route, name) }
 
   suspend fun showRoute(c: RobotController, uid: String, route: String, shown: Boolean) = update(c, uid) { it.withRoute(route, shown) }

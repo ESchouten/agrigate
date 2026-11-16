@@ -4,10 +4,15 @@ The buttons (M5Stack) and the desktop app answer the same small HTTP API on the 
 so apps and other tools (Home Assistant, a script, Siri Shortcuts) can control a robot that is
 out of their own Bluetooth range. The device that serves it holds the Bluetooth connection.
 
-- **Buttons**: with a wifi network set they stay on it and serve on port 80, as
-  `http://scraper-control.local` (a second one on the network: `scraper-control-2.local`). The
-  address is also in Settings > Wifi.
+- **Buttons**: with a wifi network set they stay on it and serve on port 80.
 - **Desktop app**: Settings > Web API, port 8080 by default.
+
+Each device has a fixed name of its own on the network, from its network address:
+`http://scraper-control-1a2b.local` (buttons: Settings > Wifi; desktop: Settings > Web API).
+
+**In the apps**, a robot can go through such a device instead of Bluetooth: in the robot's
+settings, Connection, enter the device's address. Routes, the schedule, the status and the stop
+question work the same; the robot's own panel and manual driving need Bluetooth.
 
 Plain HTTP: use it on your own network only, never forward the port to the internet (use a
 VPN for remote access).
@@ -28,7 +33,7 @@ A device without any PIN set is open.
 | Call | What |
 |---|---|
 | `GET /api/status` | The robot as last seen. `?fresh` reads it now. |
-| `POST /api/route/<A-D>` | Start that route. While a route runs it stops it instead (a safety stop, like a route button). |
+| `POST /api/route/<A-D>` | Start that route. While a route runs it stops it instead (a safety stop, like a route button). `?dryRun`: only the checks, the robot is put back and nothing drives. |
 | `POST /api/stop` | Stop the running route (a safety stop). `Busy` when no route runs. |
 | `POST /api/planning/on`, `/off` | The schedule on or off. |
 | `POST /api/answer/yes`, `/no` | After a stop the robot asks whether to finish the route (`finishQuestion`). Yes drives on, no ends the route and leaves the schedule off. Never answered by itself. |
@@ -60,7 +65,7 @@ unknown call.
 ## Examples
 
 ```bash
-curl -H "Authorization: Bearer 1234" http://scraper-control.local/api/status?fresh
-curl -X POST -H "Authorization: Bearer 1234" http://scraper-control.local/api/route/A
-curl -X POST -H "Authorization: Bearer 1234" http://scraper-control.local/api/planning/off
+curl -H "Authorization: Bearer 1234" http://scraper-control-1a2b.local/api/status?fresh
+curl -X POST -H "Authorization: Bearer 1234" http://scraper-control-1a2b.local/api/route/A
+curl -X POST -H "Authorization: Bearer 1234" http://scraper-control-1a2b.local/api/planning/off
 ```
