@@ -47,7 +47,6 @@ class Tr(val code: String) {
   val bluetooth: String get() = "Bluetooth"
   val on: String get() = t("Aan", "On")
   val off: String get() = t("Uit", "Off")
-  val paused: String get() = t("Pauze", "Paused")
   val busy: String get() = t("Bezig", "Busy")
   val busyDots: String get() = t("Bezig...", "Busy...")
   val connecting: String get() = t("Verbinden", "Connecting")
