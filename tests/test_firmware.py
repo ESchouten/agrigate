@@ -1,4 +1,4 @@
-"""The buttons' firmware on a computer: PIN and text editors, the signed-update manifest, and a
+"""The buttons' firmware on a computer: PIN and text editors, the signed-update manifest, the web API, and a
 syntax check of main.cpp against stand-in M5/Arduino headers.
 Run: python3 tests/test_firmware.py"""
 import os, subprocess, sys, tempfile
@@ -46,6 +46,10 @@ def editors_and_manifest():
         cc = "".join(subprocess.run([exe, b], input=text, capture_output=True, text=True, check=True).stdout
                      for b in ("m5stack-core", "other-board"))
         check("manifest: signer and M5 sign the same text", py == cc, py + cc)
+    exe = BIN + "_api"
+    subprocess.check_call(["g++", "-std=c++17", "-Wall",
+                           os.path.join(ROOT, "firmware", "test_host", "api_test.cpp"), "-o", exe])
+    subprocess.check_call([exe])
     exe = BIN + "_text"
     subprocess.check_call(["g++", "-std=c++17", "-Wall",
                            os.path.join(ROOT, "firmware", "test_host", "text_editor_test.cpp"), "-o", exe])

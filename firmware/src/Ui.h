@@ -344,6 +344,17 @@ static int iconText(const char* icon, const String& s, int x, int y, Font f, Col
 }
 
 // A small round dot (schedule on / off).
+// A QR code of `data`, `size` px square, dark on a white square with a quiet zone of `margin`.
+static void qr(const String& data, int x, int y, int size, int margin = 6) {
+  box(x - margin, y - margin, size + 2 * margin, size + 2 * margin, 4, kWhite);
+  lv_obj_t* q = lv_qrcode_create(parent());
+  lv_qrcode_set_size(q, size);
+  lv_qrcode_set_dark_color(q, col(kInk));
+  lv_qrcode_set_light_color(q, col(kWhite));
+  lv_qrcode_update(q, data.c_str(), (uint32_t)data.length());
+  lv_obj_set_pos(q, x, y);
+}
+
 static void dot(int cx, int cy, int r, Color c) { box(cx - r, cy - r, 2 * r, 2 * r, LV_RADIUS_CIRCLE, c); }
 
 // A busy indicator that turns (LVGL spinner) in brand red on a light ring.

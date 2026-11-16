@@ -7,9 +7,13 @@
 // itself, or WPS) and updates (signed releases from GitHub).
 // A rejected PIN opens the PIN screen by itself.
 // The screen dims after a minute and never goes off, so a press always acts at once.
+// With a wifi network set the M5 stays on it and answers a web API (Api.h): apps and other
+// tools on the same network start routes and switch the planning through the M5.
+#include <ESPmDNS.h>
 #include <M5Unified.h>
 #include <Preferences.h>
 #include <Update.h>
+#include <WebServer.h>
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <esp_wps.h>
@@ -22,6 +26,7 @@
 #include <functional>
 #include <vector>
 
+#include "Api.h"
 #include "HttpLite.h"
 #include "Manifest.h"
 #include "PinEditor.h"
@@ -72,6 +77,23 @@ static void setOwed(int v) {
 static Status seen;
 static uint32_t seenAt = 0, homeDrawnAt = 0;
 static bool haveSeen = false, syncing = false;
+// The same for the web API (also while driving or in a menu), and when it was read.
+static std::string seenJson;
+static uint32_t seenJsonAt = 0;
+
+static void seenForApi(const Status& s) {
+  ApiStatus a;
+  a.planning = s.planning;
+  a.nextRun = s.nextRide;
+  a.batteryMv = s.batteryMv;
+  a.activity = s.action;
+  a.route = s.route;
+  a.busy = s.busy;
+  a.driving = s.driving;
+  a.finishQuestion = s.stopQuestion;
+  seenJson = toJson(a);
+  seenJsonAt = millis();
+}
 
 // Screen: dims after a minute without a press, never off (Erik 2026-11-11), so a press always
 // acts at once (a stop too). The backlight is far from linear: 64 still looked full, so dim low.
@@ -379,10 +401,12 @@ static Result runOnce(const String& title, Kind kind, const Job& job, Status& st
 
   Result r = robot.connect();
   logHeap("session");
+  bool connected = r == Result::Ok;
   if (r == Result::Ok) r = job(robot);
   err = robot.lastError();
   if (r == Result::Ok || r == Result::Unexpected) robot.finish();   // planning as found
   st = robot.status();
+  if (connected) seenForApi(st);
   robot.disconnect();
   if (st.planning == 0 || st.planning == 1) {
     seen = st;
@@ -413,18 +437,8 @@ static void waitForButton() {
   }
 }
 
-// Like runOnce, but a rejected PIN opens the PIN screen and then tries once more.
-static void withRobot(const String& title, Kind kind, const Job& job) {
-  Status st;
-  std::string err;
-  uint32_t t0 = millis();
-  Result r = runOnce(title, kind, job, st, err);
-  if (r == Result::PinRejected) {
-    M5.Speaker.tone(400, 150);
-    if (!editPin(tx->pinRejected)) { idle(); return; }
-    t0 = millis();
-    r = runOnce(title, kind, job, st, err);
-  }
+// What a command did, with a tone; t0 = when it started.
+static void showResult(const String& title, Kind kind, Result r, const Status& st, const std::string& err, uint32_t t0) {
   // How long a route start or a planning switch took, behind the heading: " (3,2 s)".
   String took;
   if (kind == Kind::Planning || (kind == Kind::Route && routeStopped == Stopped::No)) {
@@ -449,6 +463,21 @@ static void withRobot(const String& title, Kind kind, const Job& job) {
     drawResult(title, false, why, st, detail);
   }
   M5.Speaker.tone(r == Result::Ok ? 2000 : 400, 150);
+}
+
+// Like runOnce, but a rejected PIN opens the PIN screen and then tries once more.
+static void withRobot(const String& title, Kind kind, const Job& job) {
+  Status st;
+  std::string err;
+  uint32_t t0 = millis();
+  Result r = runOnce(title, kind, job, st, err);
+  if (r == Result::PinRejected) {
+    M5.Speaker.tone(400, 150);
+    if (!editPin(tx->pinRejected)) { idle(); return; }
+    t0 = millis();
+    r = runOnce(title, kind, job, st, err);
+  }
+  showResult(title, kind, r, st, err, t0);
   waitForButton();
   idle();
 }
@@ -548,23 +577,29 @@ static Result askFinish(Robot& r) {
 }
 
 // A route button while a route runs stops it (Erik 2026-11-05, a safety stop): one tap on
-// Start/Stop on the driving screen, as on the robot, then the robot's question on the M5.
-// If the robot still shows that question (left open earlier), the question again.
-// Otherwise it starts the route.
-static void startRoute(char letter) {
-  if (letter == '-') return;
+// Start/Stop on the driving screen, as on the robot, then the robot's question: asked on the
+// M5 (ask), or left open for whoever called the web API. If the robot still shows that
+// question (left open earlier), the same. Otherwise it starts the route.
+static Job routeJob(char letter, bool ask, bool dryRun = false) {
   routeStopped = Stopped::No;
-  withRobot(String(tx->route) + " " + letter, Kind::Route, [letter](Robot& r) {
-    if (r.drivingRoute() || r.stopQuestion()) {
+  return [letter, ask, dryRun](Robot& r) {
+    if (!dryRun && (r.drivingRoute() || r.stopQuestion())) {
       routeStopped = Stopped::Yes;
       if (r.drivingRoute()) {
         Result res = r.stopRoute();
         if (res != Result::Ok) return res;
       }
-      return r.stopQuestion() ? askFinish(r) : Result::Ok;
+      if (!r.stopQuestion()) return Result::Ok;
+      if (ask) return askFinish(r);
+      routeStopped = Stopped::LeftOpen;
+      return Result::Ok;
     }
-    return r.startRoute(letter);
-  });
+    return r.startRoute(letter, dryRun);
+  };
+}
+
+static void startRoute(char letter) {
+  if (letter != '-') withRobot(String(tx->route) + " " + letter, Kind::Route, routeJob(letter, true));
 }
 
 // ---- screen brightness -------------------------------------------------------------
@@ -683,6 +718,32 @@ static void chooseRobot() {
 // Settings > Wifi: Network = choose from a scan and type the password with the three
 // buttons (TextEditor), WPS = press the router's WPS button. Kept in flash like the PIN.
 static String wifiSsid, wifiPass;
+static WebServer server(80);   // the web API, while the wifi is up (wifiTick)
+static bool serving = false;
+
+// The M5 on the network: http://scraper-control-1a2b.local, a fixed name of its own (the end of
+// its MAC), so two never swap names after a restart (Erik 2026-11-16).
+static String hostName() {
+  uint8_t m[6];
+  WiFi.macAddress(m);
+  char b[24];
+  snprintf(b, sizeof b, "scraper-control-%02x%02x", m[4], m[5]);
+  return b;
+}
+
+static void stopServing() {
+  if (!serving) return;
+  server.stop();
+  MDNS.end();
+  serving = false;
+}
+
+// Before a download over https: the web API and Bluetooth off, so TLS has the memory (Erik
+// 2026-11-16). The API comes back by itself (wifiTick), Bluetooth at the next robot session.
+static void apiOff() {
+  stopServing();
+  BtLink::release();
+}
 
 // Wifi on, after the BLE stack gave its memory back: wifi, TLS and BLE next to the screen do
 // not fit (updates crashed, Erik 2026-11-13). The next robot session starts BLE again.
@@ -693,6 +754,7 @@ static void wifiOn() {
 
 static bool wifiUp(uint32_t ms = 20000) {
   if (wifiSsid.isEmpty()) return false;
+  if (WiFi.status() == WL_CONNECTED) return true;
   wifiOn();
   WiFi.begin(wifiSsid.c_str(), wifiPass.c_str());
   uint32_t t0 = millis();
@@ -917,6 +979,7 @@ static String readLine(WiFiClientSecure& c, uint32_t ms = 15000) {
 // release downloads on to its file servers). On true `client` is at the body, `length` the
 // Content-Length (-1 if not given).
 static bool httpsGet(WiFiClientSecure& client, std::string url, long& length) {
+  apiOff();
   for (int hop = 0; hop < 5; hop++) {
     std::string host, path, value, location;
     if (!parseUrl(url, host, path)) return false;
@@ -1116,22 +1179,17 @@ static bool offerUpdate(bool quiet) {
   return true;   // not reached: ESP.restart() does not return, but the compiler does not know that
 }
 
-// ---- automatic updates (Erik 2026-11-11) ----------------------------------------------
-// An idle M5 tries its saved wifi every 10 minutes, in the background (buttons keep working;
-// a press during the check stops it).
+// ---- wifi, the web API and automatic updates ---------------------------------------------
+// With a network set the M5 stays on it (Erik 2026-11-16) and answers the web API (handleApi):
+// a robot session and wifi side by side are fine, only a download over https needs Bluetooth
+// off (apiOff). A lost connection comes back by itself; if not, it tries again every minute.
 // On every new connection (a phone's hotspot in a barn without wifi) and otherwise once a
 // day it checks the latest release; a newer signed version is installed at once and the M5
-// restarts. Never while in use (2 minutes after the last press), never while a planning is
-// still owed to the robot (that is only in RAM); a button press stops a download.
-static const uint32_t kWifiTryEveryMs = 10UL * 60 * 1000, kCheckEveryMs = 24UL * 3600 * 1000;
-static uint32_t lastWifiTry = 0, lastCheck = 0, autoStarted = 0;
-static bool autoConnecting = false, wifiWasUp = false, checkedOnce = false;
-
-static void autoStop() {
-  if (!autoConnecting) return;
-  wifiDown();
-  autoConnecting = false;
-}
+// restarts. Never while in use (2 minutes after the last press or API command), never while a
+// planning is still owed to the robot (that is only in RAM); a button press stops a download.
+static const uint32_t kWifiTryEveryMs = 60UL * 1000, kCheckEveryMs = 24UL * 3600 * 1000;
+static uint32_t lastWifiTry = 0, lastCheck = 0;
+static bool checkedOnce = false;   // on this connection
 
 static void installIfNewer() {
   String body;
@@ -1156,35 +1214,33 @@ static void installIfNewer() {
   idle();
 }
 
-static void autoUpdateTick() {
+static void wifiTick() {
+  if (wifiSsid.isEmpty()) return;
   uint32_t now = millis();
+  if (WiFi.status() != WL_CONNECTED) {
+    stopServing();
+    checkedOnce = false;
+    if (!lastWifiTry || now - lastWifiTry >= kWifiTryEveryMs || WiFi.getMode() == WIFI_OFF) {
+      lastWifiTry = now | 1;
+      WiFi.mode(WIFI_STA);
+      WiFi.begin(wifiSsid.c_str(), wifiPass.c_str());
+    }
+    return;
+  }
+  if (!serving) {
+    server.begin();
+    serving = true;
+    if (MDNS.begin(hostName().c_str())) MDNS.addService("http", "tcp", 80);
+    Serial.printf("web API: http://%s/api\n", WiFi.localIP().toString().c_str());
+    logHeap("wifi");
+  }
+  server.handleClient();
   bool inUse = now - lastActive < 120000;
   bool owed = owedPlanning >= 0 && now - owedAt < kOwedForMs;
-  if (wifiSsid.isEmpty() || inUse || owed) {
-    autoStop();
-    return;
-  }
-  if (!autoConnecting) {
-    if (lastWifiTry && now - lastWifiTry < kWifiTryEveryMs) return;
-    lastWifiTry = now;
-    wifiOn();
-    WiFi.begin(wifiSsid.c_str(), wifiPass.c_str());
-    autoConnecting = true;
-    autoStarted = now;
-    return;
-  }
-  if (WiFi.status() == WL_CONNECTED) {
-    bool due = !wifiWasUp || !checkedOnce || now - lastCheck >= kCheckEveryMs;
-    wifiWasUp = true;
-    if (due) {
-      lastCheck = now;
-      checkedOnce = true;
-      installIfNewer();   // restarts the M5 when it installed one
-    }
-    autoStop();
-  } else if (now - autoStarted > 20000) {
-    autoStop();
-    wifiWasUp = false;   // the next connection is a new one: check then
+  if (!inUse && !owed && (!checkedOnce || now - lastCheck >= kCheckEveryMs)) {
+    lastCheck = now;
+    checkedOnce = true;
+    installIfNewer();   // restarts the M5 when it installed one
   }
 }
 
@@ -1198,21 +1254,33 @@ static void autoUpdateTick() {
 static const uint32_t kSyncEveryMs = 15UL * 60 * 1000;
 static uint32_t nextSync = 15000;   // the first read soon after starting
 
-static bool readRobotQuietly() {
+static Result readRobotQuietly(std::string& err) {
   BtLink link(savedAddress, savedClassic);
   Robot robot(link, encryptPin(pin.c_str()), storedVersion);
   robot.lang = langFromCode(tx->code);
   robot.log = [](const std::string& s) { Serial.println(s.c_str()); };
   Result r = robot.connect();
   Status st = robot.status();
+  err = robot.lastError();
+  if (r == Result::Ok) seenForApi(st);
   robot.disconnect();
-  if (r != Result::Ok || (st.planning != 0 && st.planning != 1)) return false;
+  if (r != Result::Ok || (st.planning != 0 && st.planning != 1)) return r;
   seen = st;
   seenAt = millis();
   haveSeen = true;
   followRobotLanguage(st);
   if (robot.imageVersionChanged()) prefs.putBytes("imgver", storedVersion, 9);
-  return true;
+  return r;
+}
+
+// The same with the small sync mark on the home screen.
+static Result readRobotOnHome(std::string& err) {
+  syncing = true;
+  idle();
+  Result r = readRobotQuietly(err);
+  syncing = false;
+  idle();
+  return r;
 }
 
 static void syncTick() {
@@ -1220,25 +1288,93 @@ static void syncTick() {
   if ((int32_t)(now - nextSync) < 0) return;
   bool inUse = now - lastActive < 120000;
   bool owed = owedPlanning >= 0 && now - owedAt < kOwedForMs;
-  if (inUse || owed || autoConnecting || pin.isEmpty()) {
+  if (inUse || owed || pin.isEmpty()) {
     nextSync = now + 60000;   // look again in a minute
     return;
   }
-  syncing = true;
-  idle();   // a small sync mark where the age is
-  readRobotQuietly();
-  syncing = false;
+  std::string err;
+  readRobotOnHome(err);
   nextSync = millis() + kSyncEveryMs;
-  idle();
+}
+
+// ---- the web API (Api.h) --------------------------------------------------------------------
+// Served from loop(), between robot sessions, never during one: a call that needs the robot
+// runs its session right there, with the same progress and result screens as a button (the
+// result closes after kResultMs or at a press). A rejected PIN is only reported, the PIN
+// screen is for someone at the M5.
+static PinGate gate;
+static uint32_t resultUntil = 0;   // an API command's result is on screen until then (0 = none)
+
+static void handleApi() {
+  HTTPMethod m = server.method();
+  ApiCall c = parseCall(m == HTTP_GET ? "GET" : m == HTTP_POST ? "POST" : "", server.uri().c_str());
+  if (c.kind == ApiCall::None) return server.send(404, "application/json", "{}");
+  int code = gate.check(server.header("Authorization").c_str(), pin.c_str(), millis());
+  if (code != 200) return server.send(code, "application/json", "{}");
+  Result r = Result::Ok;
+  std::string err;
+  if (c.kind == ApiCall::Status) {
+    if (c.fresh) r = readRobotOnHome(err);
+  } else {
+    wake();
+    bool planning = c.kind == ApiCall::Planning, stop = c.kind == ApiCall::Stop || c.kind == ApiCall::Answer;
+    String title = planning ? String(tx->planning) : stop ? String(tx->routeStopped) : String(tx->route) + " " + c.route;
+    Kind kind = planning ? Kind::Planning : Kind::Route;
+    if (stop) routeStopped = Stopped::Yes;
+    Job job;
+    if (c.kind == ApiCall::Route) {
+      job = routeJob(c.route, false, c.dryRun);
+    } else if (planning) {
+      job = [on = c.yes](Robot& rb) { return rb.status().planning < 0 ? Result::Busy : rb.setPlanning(on); };
+    } else if (c.kind == ApiCall::Stop) {
+      job = [](Robot& rb) {
+        if (!rb.drivingRoute()) return Result::Busy;   // nothing pressed
+        Result res = rb.stopRoute();
+        if (res == Result::Ok && rb.stopQuestion()) routeStopped = Stopped::LeftOpen;
+        return res;
+      };
+    } else {
+      job = [yes = c.yes](Robot& rb) {
+        Result res = rb.answerStop(yes);
+        if (res == Result::Ok) routeStopped = yes ? Stopped::Continues : Stopped::Cancelled;
+        return res;
+      };
+    }
+    Status st;
+    uint32_t t0 = millis();
+    r = runOnce(title, kind, job, st, err);
+    showResult(title, kind, r, st, err, t0);
+    resultUntil = (millis() + kResultMs) | 1;
+    lastActive = millis();
+  }
+  // the fault in the apps' terms (ScraperFault), the message in the M5's language
+  const char* fault = r == Result::Ok                ? ""
+                      : r == Result::ConnectFailed   ? "NotFound"
+                      : r == Result::PinRejected     ? "AuthRejected"
+                      : r == Result::Busy            ? "Busy"
+                      : r == Result::StartedNoAnswer ? "NoConfirmation"
+                                                     : "Failed";
+  std::string message = r == Result::Ok ? "" : resultText(r, langFromCode(tx->code));
+  if (!err.empty() && r != Result::Ok) message += " (" + err + ")";
+  std::string body = apiAnswer(fault, message, seenJson, long((millis() - seenJsonAt) / 1000));
+  server.send(r == Result::Ok ? 200 : 502, "application/json", body.c_str());
 }
 
 // ---- settings > wifi: left = network, middle = WPS, right = update ----------------------
 static void drawWifi() {
   using namespace ui;
   ui::Screen scr(tx->wifiRow);
-  card(10, 56, 300, 136, kCard);
-  settingRow(0, ICON_WIFI, tx->networkWord, wifiSsid.isEmpty() ? String(tx->notSet) : wifiSsid);
-  settingRow(1, ICON_DOWNLOAD, tx->versionRow, FW_VERSION);
+  if (serving) {   // a QR code, as large as fits, that adds this robot to the app (Erik 2026-11-16)
+    qr(String("scraper-control://add?via=") + hostName() + ".local&pin=" + pin, 16, 54, 140, 4);
+    text(tx->linkApp, 172, 60, kBold, kInk);
+    text(hostName(), 172, 88, kSmall, kMuted);
+    text(".local", 172, 106, kSmall, kMuted);
+  } else {
+    card(10, 56, 300, 136, kCard);
+    settingRow(0, ICON_WIFI, tx->networkWord, wifiSsid.isEmpty() ? String(tx->notSet) : wifiSsid);
+    settingRow(1, ICON_DOWNLOAD, tx->versionRow, FW_VERSION);
+    if (!wifiSsid.isEmpty()) settingRow(2, ICON_BOLT, tx->apiRow, tx->apiOffline);
+  }
   String label[3] = {String(ICON_SEARCH) + " " + tx->networkWord, tx->wpsWord, String(ICON_DOWNLOAD) + " " + tx->updateWord};
   Pill style[3] = {Pill::Neutral, Pill::Neutral, Pill::Neutral};
   pills(label, style);
@@ -1277,10 +1413,9 @@ static void drawSettings(const char* line = nullptr) {
 // Not while a planning is still owed to the robot. A button stops the search.
 static void settingsMenu() {
   waitAllReleased();
-  autoStop();
   bool owed = owedPlanning >= 0 && millis() - owedAt < kOwedForMs;
   bool looking = !wifiSsid.isEmpty() && !owed;
-  if (looking) {
+  if (looking && WiFi.status() != WL_CONNECTED) {
     wifiOn();
     WiFi.begin(wifiSsid.c_str(), wifiPass.c_str());
   }
@@ -1296,7 +1431,7 @@ static void settingsMenu() {
     if (looking && WiFi.status() == WL_CONNECTED) {
       looking = false;
       lastCheck = millis();
-      checkedOnce = wifiWasUp = true;
+      checkedOnce = true;
       if (offerUpdate(true)) break;   // an update was offered (installed or not)
       drawSettings(tx->settingsUpToDate);
       start = millis();
@@ -1326,6 +1461,9 @@ void setup() {
   wifiSsid = prefs.getString("wssid", "");
   wifiPass = prefs.getString("wpass", "");
   tx = &textsFor(prefs.getString("lang", "nl").c_str());
+  static const char* headers[] = {"Authorization"};
+  server.collectHeaders(headers, 1);
+  server.onNotFound(handleApi);   // every path: Api.h decides
   M5.Display.setBrightness(kBright);
   wake();
   if (pin.isEmpty() && editPin(tx->enterPin)) M5.Speaker.tone(2000, 150);
@@ -1352,16 +1490,22 @@ void loop() {
   M5.update();
   m5::Button_Class* btn[3] = {&M5.BtnA, &M5.BtnB, &M5.BtnC};
   bool any = M5.BtnA.wasPressed() || M5.BtnB.wasPressed() || M5.BtnC.wasPressed();
-  if (any) {
-    autoStop();   // the robot (Bluetooth) goes first
-    wake();
+  if (any) wake();
+  // a web API command's result: a press or kResultMs closes it, and that press does nothing else
+  if (resultUntil && (any || (int32_t)(millis() - resultUntil) >= 0)) {
+    resultUntil = 0;
+    waitAllReleased();
+    M5.update();
+    for (auto& t : pressedAt) t = 0;
+    idle();
+    return;
   }
   dimWhenIdle();
-  autoUpdateTick();
+  wifiTick();
   syncTick();
   // the age on the home screen ("12 min ago") stays true; not while a button is down
-  if (haveSeen && millis() - homeDrawnAt > 60000 && !M5.BtnA.isPressed() && !M5.BtnB.isPressed() &&
-      !M5.BtnC.isPressed())
+  if (!resultUntil && haveSeen && millis() - homeDrawnAt > 60000 && !M5.BtnA.isPressed() &&
+      !M5.BtnB.isPressed() && !M5.BtnC.isPressed())
     idle();
   for (int i = 0; i < 3; i++) {
     if (btn[i]->wasPressed()) pressedAt[i] = millis();

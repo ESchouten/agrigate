@@ -8,6 +8,7 @@
 //   ScraperException  why something failed, in generic terms (ScraperFault)
 package nl.eschouten.scraper.model
 
+import kotlinx.serialization.Serializable
 import nl.eschouten.scraper.app.RobotProfile
 
 /** What a scraper type supports. The apps show only what is supported. */
@@ -24,7 +25,9 @@ enum class Capability {
  *  (link/LinkSpec kind, "" = the driver's preferred), to be remembered with the robot. */
 data class FoundScraper(val id: String, val name: String, val signal: Int, val link: String = "")
 
-/** Status in generic terms. Fields a type does not report stay null / empty. */
+/** Status in generic terms. Fields a type does not report stay null / empty. Also the web
+ *  API's status (docs/API.md). */
+@Serializable
 data class ScraperStatus(
   val planning: Boolean? = null, // null = unknown right now
   val nextRun: String = "", // as the robot shows it, e.g. "21:00"

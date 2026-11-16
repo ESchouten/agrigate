@@ -2,6 +2,7 @@
 // (models: shared ui/Lists.kt, ui/SettingsScreens.kt, ui/Onboarding.kt).
 package nl.eschouten.scraper.app
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -64,6 +65,9 @@ import nl.eschouten.scraper.ui.deviceScan
 import nl.eschouten.scraper.ui.Section
 import nl.eschouten.scraper.ui.logbookScreen
 import nl.eschouten.scraper.ui.pinDialog
+import nl.eschouten.scraper.ui.viaDialog
+import nl.eschouten.scraper.ui.apiPortDialog
+import nl.eschouten.scraper.api.WebApiHost
 import nl.eschouten.scraper.ui.robotSettingsScreen
 import nl.eschouten.scraper.ui.routeNameDialog
 import nl.eschouten.scraper.ui.settingsScreen
@@ -212,10 +216,13 @@ fun LazyListScope.section(sec: Section, row: @Composable (RowModel) -> Unit) {
 fun SettingsScreen(controller: RobotController, host: AppHost, nav: Nav) {
   val s by controller.state.collectAsState()
   val now by rememberNow()
-  val v = settingsScreen(s, now, host.platform)
+  val api by WebApiHost.state.collectAsState()
+  val v = settingsScreen(s, now, host.platform, api)
   val scope = rememberCoroutineScope()
+  val toast = LocalToast.current
   var pickLanguage by remember { mutableStateOf(false) }
   var askReset by remember { mutableStateOf(false) }
+  var askPort by remember { mutableStateOf(false) }
   PushedScreen(v.title, nav, "settings") {
     for (sec in v.sections) {
       section(sec) { r ->
@@ -225,10 +232,27 @@ fun SettingsScreen(controller: RobotController, host: AppHost, nav: Nav) {
           r.id == RowId.LOGBOOK -> ({ nav.push(Route.Logbook) })
           r.id == RowId.LANGUAGE -> ({ pickLanguage = true })
           r.id == RowId.RESET -> ({ askReset = true })
+          r.id == RowId.API -> ({ scope.launch { Actions.setApi(controller, !s.apiOn) } })
+          r.id == RowId.API_PORT -> ({ askPort = true })
           else -> null
         }
-        SettingsRow(r, tap)
+        SettingsRow(
+          r, tap,
+          trailing = r.toggle?.let { on ->
+            { Switch(on, { scope.launch { Actions.setApi(controller, it) } }, Modifier.testTag(r.testId + "-switch")) }
+          },
+        )
       }
+      val qr = api?.qr
+      if (qr != null && s.apiOn && sec.rows.any { it.id == RowId.API }) {
+        item(key = "api-qr") { QrCode(qr) }
+      }
+    }
+  }
+  if (askPort) {
+    TextInputDialog(apiPortDialog(s), help = tr.apiPortHelp, onDismiss = { askPort = false }) { x ->
+      askPort = false
+      scope.launch { Actions.setApiPort(controller, x)?.let { toast(it) } }
     }
   }
   if (pickLanguage) {
@@ -283,6 +307,7 @@ fun RobotSettingsScreen(controller: RobotController, nav: Nav, uid: String) {
           r.id == RowId.NAME -> ({ dialog = "name" })
           r.id == RowId.DEVICE -> ({ nav.push(Route.ChooseDevice(uid)) })
           r.id == RowId.PIN -> ({ dialog = "pin" })
+          r.id == RowId.VIA -> ({ dialog = "via" })
           r.id == RowId.TEST -> ({ scope.launch { toast(Actions.testConnection(controller, uid)) } })
           r.id == RowId.READ_ROUTES -> ({ scope.launch { toast(Actions.readRoutes(controller, uid)) } })
           r.route != null -> ({ dialog = r.id })
@@ -318,6 +343,10 @@ fun RobotSettingsScreen(controller: RobotController, nav: Nav, uid: String) {
     "pin" -> TextInputDialog(pinDialog(p), help = p.type.pinHelp, onDismiss = { dialog = null }) { x ->
       dialog = null
       scope.launch { Actions.setPin(controller, uid, x) }
+    }
+    "via" -> TextInputDialog(viaDialog(p), help = tr.viaHelp, onDismiss = { dialog = null }) { x ->
+      dialog = null
+      scope.launch { Actions.setVia(controller, uid, x) }
     }
     else -> {
       val r = d.removePrefix("route-")
@@ -396,6 +425,23 @@ fun AddRobotScreen(controller: RobotController, host: AppHost, nav: Nav) {
         scope.launch {
           toast(flow.save())
           nav.home()
+        }
+      }
+    }
+  }
+}
+
+/** A QR code (rows of dark modules), for a phone's camera. */
+@Composable
+fun QrCode(modules: List<BooleanArray>) {
+  Column(Modifier.fillMaxWidth().padding(top = Space.l), horizontalAlignment = Alignment.CenterHorizontally) {
+    androidx.compose.foundation.Canvas(
+      Modifier.size(300.dp).background(Color.White, RoundedCornerShape(8.dp)).padding(16.dp).testTag("api-qr"),
+    ) {
+      val cell = size.minDimension / modules.size
+      modules.forEachIndexed { y, row ->
+        row.forEachIndexed { x, dark ->
+          if (dark) drawRect(Color.Black, androidx.compose.ui.geometry.Offset(x * cell, y * cell), androidx.compose.ui.geometry.Size(cell + 0.5f, cell + 0.5f))
         }
       }
     }

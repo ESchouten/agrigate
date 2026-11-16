@@ -104,6 +104,11 @@ jobs:
       - name: Scenario tests on the Compose app (desktop, demo robot) + screenshots
         working-directory: native
         run: ./gradlew :composeApp:jvmTest --console=plain
+      - name: Web API of the packaged desktop app (demo robot)
+        working-directory: native
+        run: |
+          ./gradlew :composeApp:createDistributable --console=plain
+          xvfb-run -a scenarios/web-api.sh "composeApp/build/compose/binaries/main/app/Scraper Control/bin/Scraper Control"
       - name: Android app (Compose, core via the NDK)
         working-directory: native
         run: ./gradlew :androidApp:assembleDebug --console=plain

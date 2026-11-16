@@ -2,18 +2,22 @@ package nl.eschouten.scraper
 
 import android.Manifest
 import android.os.Build
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import nl.eschouten.scraper.app.App
 import nl.eschouten.scraper.app.AppHost
 import nl.eschouten.scraper.app.Nav
+import nl.eschouten.scraper.ui.Actions
 import nl.eschouten.scraper.ui.Platform
 
 class MainActivity : ComponentActivity(), AppHost {
@@ -49,6 +53,19 @@ class MainActivity : ComponentActivity(), AppHost {
       },
     )
     setContent { App(controller, this, nav) }
+    open(intent)
+  }
+
+  override fun onNewIntent(intent: Intent) {
+    super.onNewIntent(intent)
+    open(intent)
+  }
+
+  /** A scraper-control://add link (a QR code scanned by the camera): add that robot. */
+  private fun open(intent: Intent?) {
+    val link = intent?.data?.toString() ?: return
+    val controller = (application as ScraperApp).controller(null)
+    lifecycleScope.launch { if (Actions.openLink(controller, link)) nav.home() }
   }
 
   override fun onStart() {

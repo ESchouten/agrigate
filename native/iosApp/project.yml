@@ -36,6 +36,17 @@ targets:
     sources: [ScraperControl, Intents]
     dependencies:
       - target: ScraperWidgets
+    # merged with the keys below (GENERATE_INFOPLIST_FILE): plain http to a device on the own
+    # network, for a robot through another device's web API (docs/API.md)
+    info:
+      path: ScraperControl/Info.plist
+      properties:
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+        NSLocalNetworkUsageDescription: Om de robot te bedienen via een ander apparaat in je netwerk.
+        CFBundleURLTypes:   # scraper-control://add?... from the QR code of the buttons or a computer
+          - CFBundleURLName: nl.eschouten.scraper.add
+            CFBundleURLSchemes: [scraper-control]
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: nl.eschouten.scraper
@@ -57,6 +68,9 @@ targets:
       properties:
         CFBundleDisplayName: Scraper Control
         NSBluetoothAlwaysUsageDescription: Om de robot te bedienen via Bluetooth.   # a tap connects from here
+        NSLocalNetworkUsageDescription: Om de robot te bedienen via een ander apparaat in je netwerk.
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     settings:
