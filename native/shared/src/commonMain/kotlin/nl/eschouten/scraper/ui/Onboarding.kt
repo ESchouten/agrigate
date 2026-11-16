@@ -8,7 +8,7 @@ import nl.eschouten.scraper.app.Cancellable
 import nl.eschouten.scraper.app.ControllerState
 import nl.eschouten.scraper.app.Outcome
 import nl.eschouten.scraper.app.Problem
-import nl.eschouten.scraper.app.RobotController
+import nl.eschouten.scraper.app.Controller
 import nl.eschouten.scraper.app.RobotProfile
 import nl.eschouten.scraper.model.RunIntent
 import nl.eschouten.scraper.model.scraperModels
@@ -48,7 +48,7 @@ data class PinPage(
   val done: Action?,
 )
 
-class OnboardingFlow(private val controller: RobotController, val platform: Platform) {
+class OnboardingFlow(private val controller: Controller, val platform: Platform) {
   private val scope = newScope()
 
   private val _state = MutableStateFlow(OnboardingState(pin = controller.state.value.robot.pin))
@@ -56,7 +56,7 @@ class OnboardingFlow(private val controller: RobotController, val platform: Plat
 
   /** The scan on the "find robot" page. */
   val scan = ScanFlow(
-    controller.state.value.model, selectedId = controller.state.value.robot.robotId,
+    controller, controller.state.value.model, selectedId = controller.state.value.robot.robotId,
     initialName = controller.state.value.robot.robotName, platform = platform, scope = scope,
   )
 
@@ -101,7 +101,7 @@ class OnboardingFlow(private val controller: RobotController, val platform: Plat
   /** "Done" or "test later": save the PIN and finish. */
   suspend fun finish() {
     controller.updateRobot(controller.state.value.robot.copy(pin = _state.value.pin.trim()))
-    controller.updateSettings { onboarded = true }
+    controller.updateSettings { it.copy(onboarded = true) }
   }
 
   private fun header(i: Int) = StepHeader(tr.stepOf(i, 2), i / 2f, tr.back)
@@ -164,7 +164,7 @@ data class AddRobotPage(
 
 data class AddRobotState(val modelId: String = scraperModels.first().id, val label: String = "", val pin: String = "", val saving: Boolean = false)
 
-class AddRobotFlow(private val controller: RobotController, platform: Platform) {
+class AddRobotFlow(private val controller: Controller, platform: Platform) {
   private val scope = newScope()
 
   private val _state = MutableStateFlow(AddRobotState())
@@ -173,7 +173,7 @@ class AddRobotFlow(private val controller: RobotController, platform: Platform) 
   fun watch(onChange: (AddRobotState) -> Unit): Cancellable = _state.watchIn(scope, onChange)
 
   val scan = ScanFlow(
-    scraperModels.first(), exclude = controller.state.value.robots.map { it.robotId }.toSet(),
+    controller, scraperModels.first(), exclude = controller.state.value.robots.map { it.robotId }.toSet(),
     platform = platform, scope = scope,
   )
 

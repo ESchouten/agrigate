@@ -7,6 +7,8 @@ Python script.
   settings. Wifi is set up on the device itself, and it updates itself from the signed releases.
 - **Apps** for Android, iOS and desktop: routes, schedule, live status, logbook, the robot's own
   panel, home-screen widgets, Siri/Shortcuts. Dutch and English.
+- **Web page**: a computer in the barn keeps the robot connection and serves the same app to
+  phones and computers on the local network (desktop app, Settings > Web page).
 - **Python**: the same robot API for scripts.
 - **Safety**: a route button during a route stops it; a "finish the route?" question after a
   stop is always answered by a person; the schedule is left the way it was found.

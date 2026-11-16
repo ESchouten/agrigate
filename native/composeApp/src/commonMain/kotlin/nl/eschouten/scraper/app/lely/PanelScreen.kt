@@ -85,7 +85,7 @@ import nl.eschouten.scraper.texts.tr
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PanelScreen(controller: RobotController, host: AppHost, nav: Nav) {
+fun PanelScreen(controller: Controller, host: AppHost, nav: Nav) {
   val flow = remember { PanelFlow(controller) }
   val cs by controller.state.collectAsState()
   val st by flow.state.collectAsState()

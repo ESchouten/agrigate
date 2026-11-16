@@ -7,6 +7,7 @@ import nl.eschouten.scraper.AppVersion
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import nl.eschouten.scraper.app.Cancellable
+import nl.eschouten.scraper.app.Controller
 import nl.eschouten.scraper.app.ControllerState
 import nl.eschouten.scraper.app.RobotProfile
 import nl.eschouten.scraper.app.Settings
@@ -58,6 +59,7 @@ object RowId {
   const val PIN = "pin"
   const val TEST = "test"
   const val READ_ROUTES = "read-routes"
+  const val WEB_PAGE = "web-page"
   fun robot(uid: String) = "robot-$uid"
   fun route(r: String) = "route-$r"
 }
@@ -104,6 +106,18 @@ fun settingsScreen(s: ControllerState, now: Long, platform: Platform): SettingsS
     Confirm(Glyph.Restart, tr.resetSetupQ, tr.resetSetupBody, tr.resetSetup, tr.cancel),
   )
 }
+
+/** The web page this computer serves to browsers on the network (the desktop app, app/Remote.kt). */
+data class WebPageState(val on: Boolean = false, val address: String = "", val code: String = "", val error: String? = null)
+
+/** Settings with the web page section, before "about" (only where the app can serve it). */
+fun SettingsScreen.withWebPage(w: WebPageState): SettingsScreen = copy(
+  sections = sections.dropLast(1) + Section(
+    tr.webPage,
+    listOf(Row(RowId.WEB_PAGE, Glyph.Phone, tr.webPageRow, if (w.on) tr.webPageOn(w.address) else tr.off, toggle = w.on)),
+    footer = w.error?.let { tr.webPageFailed(it) } ?: if (w.on) tr.webPageOnFooter(w.address, w.code) else tr.webPageOffFooter,
+  ) + sections.last(),
+)
 
 data class RobotSettingsScreen(
   val title: String,
@@ -197,6 +211,7 @@ data class ScanView(
 )
 
 class ScanFlow(
+  private val controller: Controller,
   private val model: ScraperModel,
   /** Robots that are already added. */
   private val exclude: Set<String?> = emptySet(),
@@ -225,7 +240,7 @@ class ScanFlow(
     _state.value = _state.value.copy(scanning = true, error = null)
     return try {
       val n = _state.value.name.trim()
-      val f = model.discover(n.ifEmpty { null }).filterNot { it.id in exclude }
+      val f = controller.discover(model, n.ifEmpty { null }).filterNot { it.id in exclude }
       _state.value = _state.value.copy(found = f, selectedId = _state.value.selectedId ?: f.singleOrNull()?.id)
       f
     } catch (e: Exception) {
@@ -275,9 +290,10 @@ class ScanFlow(
 }
 
 /** The device picker of robot [uid]; the other robots' devices are left out. */
-fun deviceScan(s: ControllerState, uid: String, platform: Platform): ScanFlow? {
+fun deviceScan(c: Controller, uid: String, platform: Platform): ScanFlow? {
+  val s = c.state.value
   val p = s.robots.firstOrNull { it.uid == uid } ?: return null
-  return ScanFlow(p.type, s.robots.filter { it.uid != uid }.map { it.robotId }.toSet(), p.robotId, p.robotName, platform)
+  return ScanFlow(c, p.type, s.robots.filter { it.uid != uid }.map { it.robotId }.toSet(), p.robotId, p.robotName, platform)
 }
 
 /** Save the chosen device on a robot (the device picker in robot settings). */

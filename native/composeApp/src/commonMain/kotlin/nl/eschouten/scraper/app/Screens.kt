@@ -67,6 +67,7 @@ import nl.eschouten.scraper.ui.pinDialog
 import nl.eschouten.scraper.ui.robotSettingsScreen
 import nl.eschouten.scraper.ui.routeNameDialog
 import nl.eschouten.scraper.ui.settingsScreen
+import nl.eschouten.scraper.ui.withWebPage
 import nl.eschouten.scraper.ui.Row as RowModel
 
 /** App bar + centred, width-limited list: the frame of every pushed screen. */
@@ -105,7 +106,7 @@ fun PushedScreen(
 // ---- logbook ----
 
 @Composable
-fun LogbookScreen(controller: RobotController, nav: Nav) {
+fun LogbookScreen(controller: Controller, nav: Nav) {
   val s by controller.state.collectAsState()
   val now by rememberNow()
   val v = logbookScreen(s, now)
@@ -209,11 +210,13 @@ fun LazyListScope.section(sec: Section, row: @Composable (RowModel) -> Unit) {
 }
 
 @Composable
-fun SettingsScreen(controller: RobotController, host: AppHost, nav: Nav) {
+fun SettingsScreen(controller: Controller, host: AppHost, nav: Nav) {
   val s by controller.state.collectAsState()
   val now by rememberNow()
-  val v = settingsScreen(s, now, host.platform)
+  val web = host.webPage?.state?.collectAsState()?.value
+  val v = settingsScreen(s, now, host.platform).let { if (web != null) it.withWebPage(web) else it }
   val scope = rememberCoroutineScope()
+  val c = MaterialTheme.colorScheme
   var pickLanguage by remember { mutableStateOf(false) }
   var askReset by remember { mutableStateOf(false) }
   PushedScreen(v.title, nav, "settings") {
@@ -225,9 +228,20 @@ fun SettingsScreen(controller: RobotController, host: AppHost, nav: Nav) {
           r.id == RowId.LOGBOOK -> ({ nav.push(Route.Logbook) })
           r.id == RowId.LANGUAGE -> ({ pickLanguage = true })
           r.id == RowId.RESET -> ({ askReset = true })
+          r.id == RowId.WEB_PAGE -> ({ host.webPage?.switch(r.toggle != true) })
           else -> null
         }
-        SettingsRow(r, tap)
+        SettingsRow(
+          r, tap,
+          trailing = r.toggle?.let { on ->
+            {
+              Switch(
+                on, { host.webPage?.switch(it) }, Modifier.testTag(r.testId + "-switch"),
+                colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = c.primary),
+              )
+            }
+          },
+        )
       }
     }
   }
@@ -267,7 +281,7 @@ fun SettingsScreen(controller: RobotController, host: AppHost, nav: Nav) {
 // ---- one robot ----
 
 @Composable
-fun RobotSettingsScreen(controller: RobotController, nav: Nav, uid: String) {
+fun RobotSettingsScreen(controller: Controller, nav: Nav, uid: String) {
   val s by controller.state.collectAsState()
   val v = robotSettingsScreen(s, uid) ?: return
   val p = s.robots.first { it.uid == uid }
@@ -337,8 +351,8 @@ fun RobotSettingsScreen(controller: RobotController, nav: Nav, uid: String) {
 }
 
 @Composable
-fun ChooseDeviceScreen(controller: RobotController, host: AppHost, nav: Nav, uid: String) {
-  val flow = remember(uid) { deviceScan(controller.state.value, uid, host.platform) } ?: return
+fun ChooseDeviceScreen(controller: Controller, host: AppHost, nav: Nav, uid: String) {
+  val flow = remember(uid) { deviceScan(controller, uid, host.platform) } ?: return
   val scope = rememberCoroutineScope()
   PushedScreen(tr.bluetooth, nav, "choose-device") {
     item {
@@ -357,7 +371,7 @@ fun ChooseDeviceScreen(controller: RobotController, host: AppHost, nav: Nav, uid
 // ---- add a robot ----
 
 @Composable
-fun AddRobotScreen(controller: RobotController, host: AppHost, nav: Nav) {
+fun AddRobotScreen(controller: Controller, host: AppHost, nav: Nav) {
   val flow = remember { AddRobotFlow(controller, host.platform) }
   val st by flow.state.collectAsState()
   val scan by flow.scan.state.collectAsState()

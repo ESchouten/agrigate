@@ -447,4 +447,27 @@ class Tr(val code: String) {
   )
   val remove: String get() = t("Verwijderen", "Remove")
   val removeRobot: String get() = t("Robot verwijderen", "Remove robot")
+
+  // ---- the web page (a barn computer serves the app to browsers) -----------------
+  val webPage: String get() = t("Webpagina", "Web page")
+  val webPageRow: String get() = t("Bedienen via de browser", "Control from a browser")
+  fun webPageOn(address: String): String = t("Aan · $address", "On · $address")
+  val webPageOffFooter: String get() = t(
+    "Zet dit aan op de computer in de stal: telefoons en computers in hetzelfde netwerk bedienen de robot dan via een webpagina, en deze computer houdt de verbinding met de robot.",
+    "Switch this on on the barn computer: phones and computers on the same network then control the robot through a web page, and this computer keeps the connection to the robot.",
+  )
+  fun webPageOnFooter(address: String, code: String): String = t(
+    "Open $address in de browser van een telefoon of computer in hetzelfde netwerk en vul code $code in. Laat deze computer aan en de app open.",
+    "Open $address in the browser of a phone or computer on the same network and enter code $code. Keep this computer on and the app open.",
+  )
+  fun webPageFailed(why: String): String = t("De webpagina start niet: $why", "The web page does not start: $why")
+  val barnComputerGone: String get() = t("Geen verbinding met de staldcomputer", "No connection to the barn computer")
+  val connectingBarn: String get() = t("Verbinden met de staldcomputer...", "Connecting to the barn computer...")
+  val accessCode: String get() = t("Toegangscode", "Access code")
+  val accessCodeHelp: String get() = t(
+    "De code staat op de staldcomputer, in de app bij Instellingen > Webpagina.",
+    "The code is on the barn computer, in the app under Settings > Web page.",
+  )
+  val wrongCode: String get() = t("Onjuiste code", "Wrong code")
+  val connect: String get() = t("Verbinden", "Connect")
 }

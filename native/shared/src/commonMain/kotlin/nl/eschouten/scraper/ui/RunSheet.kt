@@ -10,7 +10,7 @@ import nl.eschouten.scraper.app.ControllerState
 import nl.eschouten.scraper.app.LinkState
 import nl.eschouten.scraper.app.Outcome
 import nl.eschouten.scraper.app.Problem
-import nl.eschouten.scraper.app.RobotController
+import nl.eschouten.scraper.app.Controller
 import nl.eschouten.scraper.app.Widgets
 import nl.eschouten.scraper.model.RunIntent
 import nl.eschouten.scraper.model.RunStep
@@ -70,7 +70,7 @@ data class RunSheetView(
   val actions: List<Action> = emptyList(),
 )
 
-class RunFlow(private val controller: RobotController, val route: String) {
+class RunFlow(private val controller: Controller, val route: String) {
   private val scope = newScope()
 
   private val _state = MutableStateFlow(RunFlowState())

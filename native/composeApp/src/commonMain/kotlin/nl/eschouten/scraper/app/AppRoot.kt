@@ -38,8 +38,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlin.time.Clock
-import nl.eschouten.scraper.app.RobotController
 import nl.eschouten.scraper.ui.Platform
+import nl.eschouten.scraper.ui.WebPageState
 
 /** What the platform gives the UI. */
 interface AppHost {
@@ -50,6 +50,14 @@ interface AppHost {
 
   /** True while the app is in front (the panel connects only then). */
   val foreground: StateFlow<Boolean> get() = alwaysForeground
+
+  /** The web page this computer can serve to browsers (the desktop app), else null. */
+  val webPage: WebPageHost? get() = null
+}
+
+interface WebPageHost {
+  val state: StateFlow<WebPageState>
+  fun switch(on: Boolean)
 }
 
 private val alwaysForeground = MutableStateFlow(true)
@@ -99,7 +107,7 @@ fun rememberNow(): State<Long> {
 }
 
 @Composable
-fun App(controller: RobotController, host: AppHost, nav: Nav = remember { Nav() }) {
+fun App(controller: Controller, host: AppHost, nav: Nav = remember { Nav() }) {
   val s by controller.state.collectAsState()
   val snack = remember { SnackbarHostState() }
   val scope = rememberCoroutineScope()

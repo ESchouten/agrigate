@@ -101,6 +101,9 @@ jobs:
       - name: Desktop app (Compose)
         working-directory: native
         run: ./gradlew :composeApp:packageUberJarForCurrentOS --console=plain
+      - name: Web page (Compose for Web), as the desktop app serves it
+        working-directory: native
+        run: ./gradlew :composeApp:wasmJsBrowserDistribution --console=plain
       - name: Scenario tests on the Compose app (desktop, demo robot) + screenshots
         working-directory: native
         run: ./gradlew :composeApp:jvmTest --console=plain

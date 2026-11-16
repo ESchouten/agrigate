@@ -3,6 +3,7 @@
 //   ./gradlew :composeApp:run --args="--demo"          the in-app demo robot
 //   ./gradlew :composeApp:run --args="--demo 'planning=off setup=done'"
 //   SCRAPER_SIMULATOR=<simulator script> ./gradlew :composeApp:run   a simulated robot (see the driver)
+// Settings > Web page lets browsers on the network use this computer's robot connection (WebServer.kt).
 package nl.eschouten.scraper.app
 
 import androidx.compose.ui.graphics.painter.BitmapPainter
@@ -17,7 +18,7 @@ import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import nl.eschouten.scraper.ui.Platform
 
-object DesktopHost : AppHost {
+class DesktopHost(override val webPage: WebPageHost? = null) : AppHost {
   override val platform = Platform.Desktop
 }
 
@@ -36,11 +37,15 @@ private fun appIcon(): BitmapPainter? =
 fun main(args: Array<String>) {
   val icon = appIcon()
   val demo = demoWords(args)
-  val controller = AppStart.controller(FileStore(), demo)
+  val store = FileStore()
+  val controller = AppStart.controller(store, demo)
+  val web = WebServer(controller, store)
+  val host = DesktopHost(web)
   val nav = Nav()
   application {
     Window(
       onCloseRequest = {
+        web.stop()
         controller.dispose()
         exitApplication()
       },
@@ -49,7 +54,7 @@ fun main(args: Array<String>) {
       state = rememberWindowState(width = 420.dp, height = 820.dp),
       onPreviewKeyEvent = { e -> e.type == KeyEventType.KeyDown && e.key == Key.Escape && nav.back() },
     ) {
-      App(controller, DesktopHost, nav)
+      App(controller, host, nav)
     }
   }
 }

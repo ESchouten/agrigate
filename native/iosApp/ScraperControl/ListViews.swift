@@ -249,7 +249,7 @@ struct ChooseDeviceView: View {
 
   init(controller: RobotController, uid: String) {
     self.uid = uid
-    _held = StateObject(wrappedValue: Held(SettingsScreensKt.deviceScan(s: controller.state.value as! ControllerState, uid: uid, platform: .ios)))
+    _held = StateObject(wrappedValue: Held(SettingsScreensKt.deviceScan(c: controller, uid: uid, platform: .ios)))
   }
 
   var body: some View {
