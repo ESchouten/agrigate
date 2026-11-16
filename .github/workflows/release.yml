@@ -233,7 +233,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          rm -f dist/artifact.tar   # the installer page's own package (job installer), not a download
           ls -laR dist
           gh release create "v$VERSION" dist/* \
             --title "Scraper Control $VERSION" \
