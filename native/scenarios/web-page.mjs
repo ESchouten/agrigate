@@ -25,14 +25,14 @@ async function phone(tag = '', c = ctx) {
 let p = await phone()
 
 let failed = false
-async function check(name, what, timeout = 30_000) {
+async function check(name, what, timeout = 30_000, show = false) {
   const end = Date.now() + timeout
   while (!seen.some(what) && Date.now() < end) await p.waitForTimeout(250)
   const ok = seen.some(what)
   const png = await p.screenshot({ path: `web-page/${name}.png` })
   console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}`)
   if (!ok) seen.slice(-15).forEach(s => console.log(`     ${s.slice(0, 300)}`))
-  if (!ok || process.env.SHOW_SCREENS) console.log(`     screen ${png.toString('base64')}`)
+  if (!ok || show) console.log(`     screen ${png.toString('base64')}`)
   failed ||= !ok
   seen.length = 0
 }
@@ -61,8 +61,10 @@ const finger = await ctx.newCDPSession(p)
 const touch = (type, x, y) => finger.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y }] })
 await p.setViewportSize({ width: 390, height: 1200 })
 await p.waitForTimeout(1_000)
+await p.mouse.click(195, 1148) // "Sluiten" (the dry run's sheet)
+await p.waitForTimeout(1_500)
 await p.mouse.click(195, 860) // "Bedieningspaneel"
-await check('panel-connects', s => s.startsWith('<- ') && s.includes('connected\\":true'))
+await check('panel-connects', s => s.startsWith('<- ') && s.includes('connected\\":true'), 30_000, true)
 const [kx, ky] = [195, 900] // Down
 await touch('touchStart', kx, ky)
 await check('key-down', s => s.startsWith('-> ') && s.includes('input') && s.includes('Down'), 5_000)
