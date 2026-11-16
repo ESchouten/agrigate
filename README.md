@@ -27,12 +27,12 @@ Everything is in the [latest release](https://github.com/ESchouten/scraper-contr
 
 | Device | File | How |
 |---|---|---|
-| Android | `.apk` | Open it on the phone and allow installing from your browser or files app. A newer version installs over the old one. |
+| Android | `.apk` | Open it on the phone and allow installing from your browser or files app. A newer version installs over the old one; [Obtainium](https://github.com/ImranR98/Obtainium) with this repository keeps it up to date. |
 | Windows | `.exe` | Not signed: at the blue warning choose More info > Run anyway. |
 | macOS | `.dmg` | Not signed: drag the app to Applications, then right-click > Open the first time and allow Bluetooth. |
 | Linux | `.deb` | `sudo apt install ./scraper-control_*.deb` |
 | iOS | none yet | Build it with Xcode ([native/README.md](native/README.md)). |
-| Buttons | M5Stack Basic v2.7 (16 MB) | The first time over USB from the source (see Build). After that it updates itself over wifi. |
+| Buttons | M5Stack Basic v2.7 (16 MB) | The first time with the [browser installer](https://eschouten.github.io/scraper-control/) (Chrome or Edge on a computer, USB-C data cable), or `esptool write-flash 0x0 scraper-control-m5stack-core-<version>-full.bin`. That erases the M5Stack; after that it updates itself over wifi. |
 
 ### First connection
 
@@ -86,7 +86,8 @@ cd native && ./gradlew :shared:jvmTest :composeApp:jvmTest
 ```
 
 GitHub Actions runs them on every push. A release (Actions > release) puts the signed firmware,
-the Android APK and the desktop apps in one GitHub release; the buttons install it themselves.
+its first-install image, the Android APK and the desktop apps in one GitHub release, and the
+buttons' browser installer (`docs/install`) on GitHub Pages; the buttons install it themselves.
 
 ## Licence and disclaimer
 
