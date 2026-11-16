@@ -1,0 +1,46 @@
+name: web-shots
+# TEMPORARY (removed before merge): the desktop app with the demo robot serves the web page;
+# a phone-sized Chromium opens it and the screenshots go to branch web-shots.
+on:
+  push:
+    branches: [claude/project-thread-ojh7zy]
+    paths: [.github/workflows/web-shots.yml, tools/webshots/**]
+permissions:
+  contents: write
+jobs:
+  shots:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install cryptography
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Settings with the web page on
+        run: |
+          mkdir -p ~/.config/scraper-control
+          echo '{"web.on":"1","web.code":"123456"}' > ~/.config/scraper-control/settings.json
+      - name: Desktop app with the demo robot (serves the page)
+        working-directory: native
+        run: |
+          (xvfb-run -a ./gradlew :composeApp:run --args="--demo" --console=plain > ../app.log 2>&1 &)
+          for i in $(seq 1 120); do curl -sf http://localhost:8080/ > /dev/null && break; sleep 5; done
+          curl -sI http://localhost:8080/composeApp.wasm | head -5 || true
+      - name: Browser
+        run: |
+          cd tools/webshots && npm init -y > /dev/null && npm i playwright@1 > /dev/null && npx playwright install --with-deps chromium > /dev/null
+          node shots.mjs
+      - if: always()
+        run: tail -50 app.log
+      - name: Screenshots to branch web-shots
+        if: always()
+        run: |
+          git config user.name ci && git config user.email ci@example.invalid
+          git checkout --orphan web-shots && git rm -rfq . && mv tools/webshots/out/* . && git add *.png *.txt && git commit -qm shots && git push -f origin web-shots
