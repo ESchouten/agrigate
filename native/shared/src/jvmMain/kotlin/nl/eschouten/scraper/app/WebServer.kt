@@ -1,10 +1,10 @@
 // The web page (Settings > Web page): this computer keeps the connection to the robot and serves
-// the same app to browsers on the local network (the page's half: app/Remote.kt, WebLink.kt).
-// The page comes with the desktop app (build.gradle.kts); a code keeps other people out.
+// the same app to browsers on the local network. The page (composeApp's wasmJs target, in the
+// desktop app's resources) calls this computer's RobotController through kotlinx.rpc
+// (Controller.kt; the page's end is WebLink.kt). A code in the address keeps other people out.
 // Port 8080 unless chosen in Settings.
 package nl.eschouten.scraper.app
 
-import io.ktor.http.ContentType
 import io.ktor.server.application.Application
 import io.ktor.server.application.install
 import io.ktor.server.cio.CIO
@@ -15,19 +15,16 @@ import io.ktor.server.routing.routing
 import io.ktor.server.websocket.WebSockets
 import io.ktor.server.websocket.pingPeriod
 import io.ktor.server.websocket.timeout
-import io.ktor.server.websocket.webSocket
-import io.ktor.websocket.CloseReason
-import io.ktor.websocket.Frame
-import io.ktor.websocket.close
-import io.ktor.websocket.readText
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.launch
+import kotlinx.rpc.krpc.ktor.server.Krpc
+import kotlinx.rpc.krpc.ktor.server.rpc
+import kotlinx.rpc.krpc.serialization.json.json
 import nl.eschouten.scraper.ui.DEFAULT_WEB_PORT
+import nl.eschouten.scraper.ui.WebPageHost
 import nl.eschouten.scraper.ui.WebPageState
 import java.io.File
 import java.net.Inet4Address
@@ -35,13 +32,16 @@ import java.net.NetworkInterface
 import kotlin.random.Random
 import kotlin.time.Duration.Companion.seconds
 
-class WebServer(private val controller: RobotController, private val store: Store) : WebPageHost {
+/** [files]: the page, by default from the app's resources (compose.application.resources.dir). */
+class WebServer(
+  private val controller: RobotController,
+  private val store: Store,
+  private val files: File? = System.getProperty("compose.application.resources.dir")?.let { File(it, "web") },
+) : WebPageHost {
   private val _state = MutableStateFlow(WebPageState(port = port()))
   override val state: StateFlow<WebPageState> = _state
   private var server: EmbeddedServer<*, *>? = null
-
-  /** Pages' commands run here, so one that is under way finishes even when its page goes away. */
-  private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+  private val scope = CoroutineScope(Dispatchers.Default)
 
   init {
     if (store.getString(ON) == "1") switch(true)
@@ -58,7 +58,7 @@ class WebServer(private val controller: RobotController, private val store: Stor
     val code = store.getString(CODE) ?: (1..6).joinToString("") { Random.nextInt(10).toString() }.also { store.putString(CODE, it) }
     _state.value = try {
       server = embeddedServer(CIO, port = port) { page(code) }.start(wait = false)
-      WebPageState(on = true, port = port, address = "http://${lanAddress()}:$port", code = code)
+      WebPageState(on = true, port = port, address = "http://${lanAddress()}:$port/?$code")
     } catch (e: Exception) {
       store.putString(ON, null)
       WebPageState(port = port, error = e.message ?: e.toString())
@@ -78,46 +78,44 @@ class WebServer(private val controller: RobotController, private val store: Stor
   }
 
   private fun Application.page(code: String) {
-    // a page that drops without closing (a phone off the network) is noticed within seconds
+    // a page that drops without closing (a phone off the network) is noticed within seconds:
+    // its held key and its hold on the robot connection end
     install(WebSockets) {
-      pingPeriod = 2.seconds
-      timeout = 5.seconds
+      pingPeriod = 1.seconds
+      timeout = 3.seconds
     }
+    install(Krpc)
     routing {
-      webSocket("/ws") {
-        if (call.request.queryParameters["code"] != code) {
-          close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "code"))
-          return@webSocket
-        }
-        val host = RemoteHost(controller, { send(Frame.Text(it)) }, scope)
-        try {
-          for (f in incoming) if (f is Frame.Text) host.receive(f.readText())
-        } finally {
-          withContext(NonCancellable) { host.close() }
-        }
+      rpc("/rpc/$code") {
+        rpcConfig { serialization { json() } }
+        val page = Page(controller)
+        registerService<RobotApi> { page }
+        closeReason.invokeOnCompletion { scope.launch { page.close() } }
       }
-      pageFiles()?.let { dir ->
-        staticFiles("/", dir) {
-          contentType { f ->
-            when (f.extension) {
-              "wasm" -> ContentType("application", "wasm")
-              "mjs" -> ContentType.Text.JavaScript
-              else -> null
-            }
-          }
-        }
+      files?.takeIf { it.isDirectory }?.let { staticFiles("/", it) }
+    }
+  }
+
+  /** One page's calls. Its hold on the robot connection (the panel) ends with the page. */
+  private class Page(private val c: RobotController) : RobotApi by c {
+    private var holds = 0
+
+    override suspend fun hold() = c.hold().also { if (it.ok) holds++ }
+
+    override suspend fun release() {
+      if (holds > 0) {
+        holds--
+        c.release()
       }
     }
+
+    suspend fun close() = repeat(holds) { c.release() }
   }
 
   private companion object {
     const val ON = "web.on"
     const val PORT = "web.port"
     const val CODE = "web.code"
-
-    /** The page's files, in the app's resources (compose.application.resources.dir). */
-    fun pageFiles(): File? =
-      System.getProperty("compose.application.resources.dir")?.let { File(it, "web") }?.takeIf { it.isDirectory }
 
     /** This computer's address on the local network, as the other devices reach it. */
     fun lanAddress(): String =

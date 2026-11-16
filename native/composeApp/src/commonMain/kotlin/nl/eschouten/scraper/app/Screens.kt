@@ -112,6 +112,7 @@ fun LogbookScreen(controller: Controller, nav: Nav) {
   val s by controller.state.collectAsState()
   val now by rememberNow()
   val v = logbookScreen(s, now)
+  val scope = rememberCoroutineScope()
   var ask by remember { mutableStateOf(false) }
   val c = MaterialTheme.colorScheme
   PushedScreen(
@@ -166,7 +167,7 @@ fun LogbookScreen(controller: Controller, nav: Nav) {
   if (ask) {
     ConfirmDialog(v.clearConfirm, { ask = false }) {
       ask = false
-      Actions.clearLogbook(controller)
+      scope.launch { Actions.clearLogbook(controller) }
     }
   }
 }

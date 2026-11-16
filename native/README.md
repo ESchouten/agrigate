@@ -8,7 +8,7 @@ a native UI per platform that only draws what the shared module says:
 | Android | Jetpack Compose (`composeApp`, `androidApp`) | Kable | JNI (`../core`, built by the NDK) |
 | Desktop (macOS, Windows, Linux) | Compose Desktop (`composeApp`) | Kable (btleplug) | JNI (built by CMake) |
 | iOS | SwiftUI (`iosApp`) | Kable (CoreBluetooth) | cinterop (`libcore.a`) |
-| Web page | Compose for Web, wasm (`composeApp`) | WebSocket to a desktop app | none: the desktop app's |
+| Web page | Compose for Web, wasm (`composeApp`) | kotlinx.rpc to a desktop app | none: the desktop app's |
 
 The driver is chosen in `gradle.properties` (`scraper.driver`), its Kotlin side is listed in
 `shared/.../model/Registry.kt`.
@@ -60,11 +60,12 @@ iosApp/run-ui-tests.sh                    # iOS scenarios + screenshots (/tmp/sh
 
 One computer in the barn runs the desktop app with **Settings > Web page** on. It keeps the
 connection to the robot and serves the same app to browsers on the local network, on port 8080
-(or the one chosen there) behind a 6-digit code shown there. The page's screens use a `RemoteController`
-(`shared/.../app/Remote.kt`) instead of the `RobotController`: every command goes to the barn
-computer's controller, which sends its state back after every change. So there is one robot
-connection however many pages are open, and every rule stays in one place. A key held on the
-page (manual driving) is let go when the page lets go, goes quiet for a second or drops.
+(or the one chosen there), at the address shown there (it ends in a code that keeps others out).
+The page's screens call the barn computer's `RobotController` through
+[kotlinx.rpc](https://github.com/Kotlin/kotlinx-rpc) (`shared/.../app/Controller.kt`), which
+sends its state back after every change. So there is one robot connection however many pages
+are open, and every rule stays in one place. A key held on the page (manual driving) is let go
+when the page lets go or drops.
 
 ```sh
 ./gradlew :composeApp:run --args="--demo"        # the desktop app with the page, Settings > Web page

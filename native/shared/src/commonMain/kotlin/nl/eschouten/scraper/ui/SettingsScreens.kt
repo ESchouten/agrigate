@@ -108,20 +108,27 @@ fun settingsScreen(s: ControllerState, now: Long, platform: Platform): SettingsS
   )
 }
 
-/** The web page this computer serves to browsers on the network (the desktop app, app/Remote.kt). */
-data class WebPageState(val on: Boolean = false, val port: Int = DEFAULT_WEB_PORT, val address: String = "", val code: String = "", val error: String? = null)
+/** The web page this computer serves to browsers on the network, at [address] (the desktop app). */
+data class WebPageState(val on: Boolean = false, val port: Int = DEFAULT_WEB_PORT, val address: String = "", val error: String? = null)
 
 const val DEFAULT_WEB_PORT = 8080
+
+/** The platform's side of it (the desktop app: WebServer). */
+interface WebPageHost {
+  val state: StateFlow<WebPageState>
+  fun switch(on: Boolean)
+  fun setPort(port: Int)
+}
 
 /** Settings with the web page section, before "about" (only where the app can serve it). */
 fun SettingsScreen.withWebPage(w: WebPageState): SettingsScreen = copy(
   sections = sections.dropLast(1) + Section(
     tr.webPage,
     listOf(
-      Row(RowId.WEB_PAGE, Glyph.Phone, tr.webPageRow, if (w.on) tr.webPageOn(w.address) else tr.off, toggle = w.on),
+      Row(RowId.WEB_PAGE, Glyph.Phone, tr.webPageRow, if (w.on) tr.on else tr.off, toggle = w.on),
       Row(RowId.WEB_PORT, Glyph.Dialpad, tr.port, w.port.toString()),
     ),
-    footer = w.error?.let { tr.webPageFailed(it) } ?: if (w.on) tr.webPageOnFooter(w.address, w.code) else tr.webPageOffFooter,
+    footer = w.error?.let { tr.webPageFailed(it) } ?: if (w.on) tr.webPageOnFooter(w.address) else tr.webPageOffFooter,
   ) + sections.last(),
 )
 
@@ -251,7 +258,7 @@ class ScanFlow(
     _state.value = _state.value.copy(scanning = true, error = null)
     return try {
       val n = _state.value.name.trim()
-      val f = controller.discover(model, n.ifEmpty { null }).filterNot { it.id in exclude }
+      val f = controller.discover(model.id, n.ifEmpty { null }).filterNot { it.id in exclude }
       _state.value = _state.value.copy(found = f, selectedId = _state.value.selectedId ?: f.singleOrNull()?.id)
       f
     } catch (e: Exception) {

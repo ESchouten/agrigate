@@ -39,7 +39,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlin.time.Clock
 import nl.eschouten.scraper.ui.Platform
-import nl.eschouten.scraper.ui.WebPageState
+import nl.eschouten.scraper.ui.WebPageHost
 
 /** What the platform gives the UI. */
 interface AppHost {
@@ -55,11 +55,6 @@ interface AppHost {
   val webPage: WebPageHost? get() = null
 }
 
-interface WebPageHost {
-  val state: StateFlow<WebPageState>
-  fun switch(on: Boolean)
-  fun setPort(port: Int)
-}
 
 private val alwaysForeground = MutableStateFlow(true)
 
@@ -149,7 +144,7 @@ fun App(controller: Controller, host: AppHost, nav: Nav = remember { Nav() }) {
             }
           }
           // After a stop the robot asks whether to finish the route: the user decides.
-          finishQuestion(s)?.let { q -> ChoiceDialog(q) { controller.answerFinish(it) } }
+          finishQuestion(s)?.let { q -> ChoiceDialog(q) { scope.launch { controller.answerFinish(it) } } }
           SnackbarHost(snack, Modifier.align(Alignment.BottomCenter).padding(16.dp)) { d ->
             Snackbar(
               shape = MaterialTheme.shapes.small,

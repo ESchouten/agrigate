@@ -10,6 +10,7 @@ import nl.eschouten.scraper.app.Outcome
 import nl.eschouten.scraper.app.Problem
 import nl.eschouten.scraper.app.Controller
 import nl.eschouten.scraper.app.RobotProfile
+import nl.eschouten.scraper.app.flags
 import nl.eschouten.scraper.model.RunIntent
 import nl.eschouten.scraper.model.scraperModels
 import nl.eschouten.scraper.texts.tr
@@ -101,7 +102,7 @@ class OnboardingFlow(private val controller: Controller, val platform: Platform)
   /** "Done" or "test later": save the PIN and finish. */
   suspend fun finish() {
     controller.updateRobot(controller.state.value.robot.copy(pin = _state.value.pin.trim()))
-    controller.updateSettings { it.copy(onboarded = true) }
+    controller.updateSettings(controller.state.value.flags.copy(onboarded = true))
   }
 
   private fun header(i: Int) = StepHeader(tr.stepOf(i, 2), i / 2f, tr.back)

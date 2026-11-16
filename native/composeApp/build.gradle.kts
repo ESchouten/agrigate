@@ -35,8 +35,6 @@ kotlin {
     jvmMain.dependencies {
       implementation(compose.desktop.currentOs)
       implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.11.0")
-      implementation("io.ktor:ktor-server-cio:3.6.1")
-      implementation("io.ktor:ktor-server-websockets:3.6.1")
     }
     wasmJsMain.dependencies {
       implementation("org.jetbrains.kotlinx:kotlinx-browser:0.5.0")

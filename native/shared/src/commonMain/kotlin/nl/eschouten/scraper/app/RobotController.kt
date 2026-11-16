@@ -5,7 +5,11 @@
 // Screens read [state] (a StateFlow; Swift: watch {}) and call the suspend functions.
 package nl.eschouten.scraper.app
 
-import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.collect
+import nl.eschouten.scraper.model.modelFor
 import kotlinx.serialization.Serializable
 import nl.eschouten.scraper.model.FoundScraper
 import nl.eschouten.scraper.ui.newScope
@@ -154,7 +158,6 @@ class RobotController(
     set(LinkState.Idle)
   }
 
-  /** ... and save. */
   override suspend fun updateRobot(p: RobotProfile) = mutex.withLock {
     settings.update(p)
     save()
@@ -162,11 +165,10 @@ class RobotController(
     emit()
   }
 
-  override suspend fun updateSettings(change: (AppFlags) -> AppFlags) = mutex.withLock {
-    val f = change(AppFlags(settings.onboarded, settings.widgetTipSeen, settings.language))
-    settings.onboarded = f.onboarded
-    settings.widgetTipSeen = f.widgetTipSeen
-    settings.language = f.language
+  override suspend fun updateSettings(flags: AppFlags) = mutex.withLock {
+    settings.onboarded = flags.onboarded
+    settings.widgetTipSeen = flags.widgetTipSeen
+    settings.language = flags.language
     nl.eschouten.scraper.texts.useLanguage(settings.language)
     save()
     publish()
@@ -184,7 +186,7 @@ class RobotController(
     emit()
   }
 
-  override fun clearHistory() {
+  override suspend fun clearHistory() {
     History.clear(store)
     history = emptyList()
     emit()
@@ -265,12 +267,9 @@ class RobotController(
     return Outcome(true, if (finish) tr.routeContinuesMsg else tr.routeCancelledMsg, stopped = true)
   }
 
-  override fun answerFinish(finish: Boolean?) {
+  override suspend fun answerFinish(finish: Boolean?) {
     finishAnswer?.complete(finish)
   }
-
-  /** Swift: [answerFinish] without a nullable Boolean. */
-  fun finishLater() = answerFinish(null)
 
   override suspend fun setPlanning(on: Boolean): Outcome = job(
     work = {
@@ -319,19 +318,24 @@ class RobotController(
     }
   }
 
-  override suspend fun input(name: String, until: Deferred<*>?): Outcome = mutex.withLock {
+  override suspend fun input(name: String, until: Flow<Unit>?): Outcome = mutex.withLock {
     val r = robot
     if (r == null || !r.isConnected) return@withLock Outcome(false, tr.notConnected)
-    try {
-      r.input(name, until)
-      readStatus()
-      Outcome(true, "")
-    } catch (e: ScraperException) {
-      Outcome(false, e.message ?: "")
+    coroutineScope {
+      val up = until?.let { async { runCatching { it.collect() } } }   // a flow that breaks (the page dropped) is a let-go too
+      try {
+        r.input(name, up)
+        readStatus()
+        Outcome(true, "")
+      } catch (e: ScraperException) {
+        Outcome(false, e.message ?: "")
+      } finally {
+        up?.cancel()
+      }
     }
   }
 
-  override suspend fun discover(model: ScraperModel, name: String?): List<FoundScraper> = model.discover(name)
+  override suspend fun discover(model: String, name: String?): List<FoundScraper> = modelFor(model).discover(name)
 
   /** Stops polling and closes the link (app goes away). */
   fun dispose() {
@@ -343,7 +347,13 @@ class RobotController(
 
   // ---- internals ----
 
-  private suspend fun job(work: suspend () -> Outcome, record: ((Outcome) -> HistoryEvent)? = null): Outcome = mutex.withLock {
+  /** One command, start to end. It runs in the controller's own scope: once begun it finishes
+   *  (and leaves the robot as it should), also when whoever asked for it goes away. */
+  private suspend fun job(work: suspend () -> Outcome, record: ((Outcome) -> HistoryEvent)? = null): Outcome = scope.async {
+    mutex.withLock { run(work, record) }
+  }.await()
+
+  private suspend fun run(work: suspend () -> Outcome, record: ((Outcome) -> HistoryEvent)?): Outcome {
     steps = emptyList()
     last = null
     val began = now()
@@ -378,7 +388,7 @@ class RobotController(
     }
     if (holds == 0 || (!out.ok && !isConnected)) close()
     set(if (isConnected) LinkState.Connected else LinkState.Idle)
-    out
+    return out
   }
 
   private class NoRobot : Exception()

@@ -4,6 +4,7 @@ package nl.eschouten.scraper.ui
 
 import nl.eschouten.scraper.app.Controller
 import nl.eschouten.scraper.app.RobotProfile
+import nl.eschouten.scraper.app.flags
 import nl.eschouten.scraper.model.FoundScraper
 import nl.eschouten.scraper.texts.tr
 
@@ -17,14 +18,14 @@ object Actions {
     return c.setPlanning(!on).message
   }
 
-  suspend fun dismissWidgetTip(c: Controller) = c.updateSettings { it.copy(widgetTipSeen = true) }
+  suspend fun dismissWidgetTip(c: Controller) = c.updateSettings(c.state.value.flags.copy(widgetTipSeen = true))
 
   suspend fun setLanguage(c: Controller, code: String) {
-    if (code != c.state.value.language) c.updateSettings { it.copy(language = code) }
+    if (code != c.state.value.language) c.updateSettings(c.state.value.flags.copy(language = code))
   }
 
   /** Back to the welcome screen (the robots stay). */
-  suspend fun resetSetup(c: Controller) = c.updateSettings { it.copy(onboarded = false) }
+  suspend fun resetSetup(c: Controller) = c.updateSettings(c.state.value.flags.copy(onboarded = false))
 
   /** "Test connection" in a robot's settings: makes it the active robot first. */
   suspend fun testConnection(c: Controller, uid: String): String {
@@ -59,5 +60,5 @@ object Actions {
   /** The device picker in a robot's settings. */
   suspend fun chooseDevice(c: Controller, uid: String, f: FoundScraper) = update(c, uid) { it.withDevice(f) }
 
-  fun clearLogbook(c: Controller) = c.clearHistory()
+  suspend fun clearLogbook(c: Controller) = c.clearHistory()
 }

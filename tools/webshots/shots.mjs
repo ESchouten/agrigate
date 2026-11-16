@@ -5,17 +5,17 @@ const log = []
 const b = await chromium.launch()
 async function phone(code) {
   const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, locale: 'nl-NL', isMobile: true, hasTouch: true })
-  if (code) await ctx.addInitScript(c => localStorage.setItem('scraper.code', c), code)
   const p = await ctx.newPage()
   p.on('console', m => { if (m.type() !== 'warning') log.push(`[${m.type()}] ${m.text()}`) })
   p.on('pageerror', e => log.push(`[pageerror] ${e}`))
+  p.on('response', r => { if (/wasm/.test(r.url())) log.push(`${r.status()} ${r.headers()['content-type']} ${r.url()}`) })
   p.on('websocket', ws => {
     log.push(`ws open ${ws.url()}`)
     ws.on('framereceived', f => log.push(`<- ${String(f.payload).slice(0, 300)}`))
     ws.on('framesent', f => log.push(`-> ${String(f.payload).slice(0, 300)}`))
     ws.on('close', () => log.push('ws close'))
   })
-  await p.goto('http://localhost:8080/')
+  await p.goto(`http://localhost:8080/?${code}`)
   return p
 }
 const shot = async (p, name) => { await p.waitForTimeout(2500); await p.screenshot({ path: `out/${name}.png` }) }

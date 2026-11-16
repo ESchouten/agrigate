@@ -3,8 +3,11 @@
 plugins {
   id("org.jetbrains.kotlin.multiplatform")
   id("org.jetbrains.kotlin.plugin.serialization")
+  id("org.jetbrains.kotlinx.rpc.plugin")   // the web page's calls to the barn computer (app/Controller.kt)
 }
 
+val ktor = "3.6.1"
+val rpc = "0.10.4"
 val hasAndroid = findProject(":androidApp") != null   // settings.gradle.kts: an Android SDK is there
 // The robot driver (gradle.properties scraper.driver): drivers/<name>/src, built with the C API in core/
 val driver = providers.gradleProperty("scraper.driver").get()
@@ -36,7 +39,7 @@ kotlin {
   jvm {
     compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) }
   }
-  // the web page (composeApp): the screens and flows, talking to the barn computer (app/Remote.kt);
+  // the web page (composeApp): the screens and flows, talking to the barn computer (app/Controller.kt);
   // no core and no Bluetooth there (wasmJsMain)
   @OptIn(org.jetbrains.kotlin.gradle.ExperimentalWasmDsl::class)
   wasmJs { browser() }
@@ -61,9 +64,23 @@ kotlin {
       implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.12.0")
       implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
       api("com.juul.kable:kable-core:0.45.0")
+      api("org.jetbrains.kotlinx:kotlinx-rpc-core:$rpc")
+      implementation(project.dependencies.platform("io.ktor:ktor-bom:$ktor"))   // one Ktor version, also below kotlinx.rpc
     }
-    wasmJsMain.dependencies {
+    jvmMain.dependencies {   // the desktop app serves the web page (WebServer.kt)
+      implementation("io.ktor:ktor-server-cio:$ktor")
+      implementation("org.jetbrains.kotlinx:kotlinx-rpc-krpc-ktor-server:$rpc")
+      implementation("org.jetbrains.kotlinx:kotlinx-rpc-krpc-serialization-json:$rpc")
+    }
+    jvmTest.dependencies {
+      implementation("io.ktor:ktor-client-cio:$ktor")
+      implementation("org.jetbrains.kotlinx:kotlinx-rpc-krpc-ktor-client:$rpc")
+    }
+    wasmJsMain.dependencies {   // the web page (WebLink.kt)
       implementation("org.jetbrains.kotlinx:kotlinx-browser:0.5.0")
+      implementation("io.ktor:ktor-client-js:$ktor")
+      implementation("org.jetbrains.kotlinx:kotlinx-rpc-krpc-ktor-client:$rpc")
+      implementation("org.jetbrains.kotlinx:kotlinx-rpc-krpc-serialization-json:$rpc")
     }
     commonTest.dependencies {
       implementation(kotlin("test"))

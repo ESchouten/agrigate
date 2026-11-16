@@ -11,6 +11,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import nl.eschouten.scraper.app.Cancellable
 import nl.eschouten.scraper.app.ControllerState
@@ -80,7 +81,7 @@ class PanelFlow(private val controller: Controller) {
     downSent = key
     val u = CompletableDeferred<Unit>().also { up = it }
     scope.launch(Dispatchers.Main.immediateOrDefault()) {
-      val o = controller.input(key.name, u)
+      val o = controller.input(key.name, flow { u.await() })
       if (!o.ok) onError(o.message)
     }
   }

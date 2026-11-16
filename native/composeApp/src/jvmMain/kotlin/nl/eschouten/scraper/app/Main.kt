@@ -17,6 +17,7 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import nl.eschouten.scraper.ui.Platform
+import nl.eschouten.scraper.ui.WebPageHost
 
 class DesktopHost(override val webPage: WebPageHost? = null) : AppHost {
   override val platform = Platform.Desktop

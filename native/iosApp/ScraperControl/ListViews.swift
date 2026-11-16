@@ -70,7 +70,7 @@ struct LogbookView: View {
         Button { ask = true } label: { Image(systemName: "trash") }.accessibilityLabel(v.clearLabel).testId("logbook-clear")
       }
     }
-    .confirm(v.clearConfirm, isPresented: $ask) { Actions.shared.clearLogbook(c: app.controller) }
+    .confirm(v.clearConfirm, isPresented: $ask) { Task { try? await Actions.shared.clearLogbook(c: app.controller) } }
   }
 }
 
