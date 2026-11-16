@@ -5,7 +5,7 @@
 #include <string>
 
 struct ApiCall {
-  enum Kind { None, Status, Route, Planning, Answer } kind = None;
+  enum Kind { None, Status, Route, Stop, Planning, Answer } kind = None;
   char route = 0;      // Route: 'A'..'D'
   bool yes = false;    // Planning: on, Answer: yes (finish the route)
   bool fresh = false;  // Status: read the robot now
@@ -23,16 +23,20 @@ inline ApiCall parseCall(const std::string& method, const std::string& path, con
   if (method == "GET" && path == "/api/status") {
     c.kind = ApiCall::Status;
     c.fresh = query.find("fresh") != std::string::npos;
-  } else if (method == "POST" && path.size() == 12 && path.rfind("/api/route/", 0) == 0) {
+  } else if (method != "POST") {
+    return c;   // everything else changes something: never from a link opened in a browser
+  } else if (path.size() == 12 && path.rfind("/api/route/", 0) == 0) {
     char r = path[11];
     if (r >= 'a' && r <= 'd') r = char(r - 'a' + 'A');
     if (r >= 'A' && r <= 'D') {
       c.kind = ApiCall::Route;
       c.route = r;
     }
-  } else if (method == "POST" && path.rfind("/api/planning/", 0) == 0) {
+  } else if (path == "/api/stop") {
+    c.kind = ApiCall::Stop;
+  } else if (path.rfind("/api/planning/", 0) == 0) {
     onOff(path.substr(14), "on", "off", ApiCall::Planning);
-  } else if (method == "POST" && path.rfind("/api/answer/", 0) == 0) {
+  } else if (path.rfind("/api/answer/", 0) == 0) {
     onOff(path.substr(12), "yes", "no", ApiCall::Answer);
   }
   return c;
@@ -64,10 +68,38 @@ class PinGate {
   uint32_t lockedUntil_ = 0;
 };
 
-// The answer's body. error: a JSON string (driver::jsonString), status: JSON or "" (not read
-// yet), age: seconds since it was read.
-inline std::string apiAnswer(int result, const std::string& error, const std::string& status, long age) {
-  return "{\"result\":" + std::to_string(result) + ",\"error\":" + error +
+// The robot's status in the apps' generic terms (ScraperStatus in native/.../model/Scraper.kt).
+struct ApiStatus {
+  int planning = -1;   // 1 on, 0 off, -1 unknown
+  std::string nextRun, activity, route;
+  int batteryMv = -1;  // -1 unknown
+  bool busy = false, driving = false, finishQuestion = false;
+};
+
+inline std::string jsonText(const std::string& s) {
+  std::string o = "\"";
+  for (char c : s) {
+    if (c == '"' || c == '\\') o += '\\';
+    o += (unsigned char)c < 0x20 || (unsigned char)c >= 0x80 ? ' ' : c;   // the robot's text is ASCII
+  }
+  return o + "\"";
+}
+
+inline std::string toJson(const ApiStatus& s) {
+  auto flag = [](bool b) { return b ? "true" : "false"; };
+  return std::string("{\"planning\":") + (s.planning < 0 ? "null" : flag(s.planning == 1)) +
+         ",\"nextRun\":" + jsonText(s.nextRun) +
+         ",\"batteryMv\":" + (s.batteryMv < 0 ? "null" : std::to_string(s.batteryMv)) +
+         ",\"activity\":" + jsonText(s.activity) + ",\"route\":" + jsonText(s.route) +
+         ",\"busy\":" + flag(s.busy) + ",\"driving\":" + flag(s.driving) +
+         ",\"finishQuestion\":" + flag(s.finishQuestion) + "}";
+}
+
+// The answer's body. fault: "" when it worked, else a ScraperFault name ("Busy", ...);
+// status: toJson() or "" (not read yet); age: seconds since it was read.
+inline std::string apiAnswer(const std::string& fault, const std::string& message, const std::string& status, long age) {
+  return std::string("{\"ok\":") + (fault.empty() ? "true" : "false") +
+         ",\"fault\":" + (fault.empty() ? "null" : jsonText(fault)) + ",\"message\":" + jsonText(message) +
          ",\"age\":" + (status.empty() ? "null" : std::to_string(age)) +
          ",\"status\":" + (status.empty() ? "null" : status) + "}";
 }

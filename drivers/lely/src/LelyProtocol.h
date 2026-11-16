@@ -130,9 +130,4 @@ struct Status {
 };
 Status parseStatus(const Screen& s);
 
-// The status as JSON, the same for every host: the C API (scraper_status_json) and the M5's
-// web API. sync: percent of the first sync, -1 unknown.
-std::string statusJson(const Status& st, const Screen& scr, int sync = -1);
-std::string jsonString(const std::string& s);   // a JSON string literal of s
-
 }  // namespace lely

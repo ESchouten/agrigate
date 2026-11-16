@@ -65,6 +65,54 @@ class HostTransport : public Transport {
   bool up_ = true, stop_ = false;
 };
 
+std::string jsonString(const std::string& s) {
+  std::string o = "\"";
+  for (char c : s) {
+    switch (c) {
+      case '"': o += "\\\""; break;
+      case '\\': o += "\\\\"; break;
+      case '\n': o += "\\n"; break;
+      case '\r': o += "\\r"; break;
+      case '\t': o += "\\t"; break;
+      default:
+        if ((unsigned char)c < 0x20) { char b[8]; snprintf(b, sizeof b, "\\u%04x", c); o += b; }
+        else if ((unsigned char)c >= 0x80) o += '?';   // robot font is ASCII; keep JSON valid UTF-8
+        else o += c;
+    }
+  }
+  return o + "\"";
+}
+
+// [manual]: the HANDBEDIENING screen's motors and direction (1 / 0 / -1 unknown), null elsewhere.
+std::string statusJson(const Status& st, const Screen& scr, int sync) {
+  std::string highlighted = scr.isManual() ? "" : scr.highlighted();   // there the boxes are the motors
+  std::string screen = scr.text();
+  std::string o = "{";
+  o += "\"planning\":" + std::to_string(st.planning);
+  o += ",\"clock\":" + jsonString(st.clock);
+  o += ",\"nextRide\":" + jsonString(st.nextRide);
+  o += ",\"route\":" + jsonString(st.route);
+  o += ",\"action\":" + jsonString(st.action);
+  o += ",\"actionNo\":" + jsonString(st.actionNo);
+  o += ",\"rideNo\":" + jsonString(st.rideNo);
+  o += ",\"batteryMv\":" + std::to_string(st.batteryMv);
+  o += std::string(",\"busy\":") + (st.busy ? "true" : "false");
+  o += std::string(",\"driving\":") + (st.driving ? "true" : "false");
+  o += std::string(",\"stopQuestion\":") + (st.stopQuestion ? "true" : "false");
+  o += ",\"screen\":" + jsonString(screen);
+  o += ",\"highlighted\":" + jsonString(highlighted);
+  o += ",\"language\":" + jsonString(st.language);
+  o += ",\"sync\":" + std::to_string(sync);
+  if (scr.isManual()) {
+    ManualState m = scr.manual();
+    o += ",\"manual\":{\"left\":" + std::to_string(m.left) + ",\"right\":" + std::to_string(m.right) +
+         ",\"forward\":" + std::to_string(m.forward) + "}";
+  } else {
+    o += ",\"manual\":null";
+  }
+  return o + "}";
+}
+
 int32_t copyOut(const std::string& s, char* buf, int32_t size) {
   if (buf && size > 0) {
     size_t n = s.size() < (size_t)size - 1 ? s.size() : (size_t)size - 1;

@@ -28,35 +28,39 @@ A device without any PIN set is open.
 | Call | What |
 |---|---|
 | `GET /api/status` | The robot as last seen. `?fresh` reads it now. |
-| `POST /api/route/<A-D>` | Start that route. While a route runs it stops it instead (a safety stop, like a route button), and the robot asks whether to finish the route. |
+| `POST /api/route/<A-D>` | Start that route. While a route runs it stops it instead (a safety stop, like a route button). |
+| `POST /api/stop` | Stop the running route (a safety stop). `Busy` when no route runs. |
 | `POST /api/planning/on`, `/off` | The schedule on or off. |
-| `POST /api/answer/yes`, `/no` | The answer to "finish the route?" after a stop: yes drives on, no ends the route and leaves the schedule off. Never answered by itself. |
+| `POST /api/answer/yes`, `/no` | After a stop the robot asks whether to finish the route (`finishQuestion`). Yes drives on, no ends the route and leaves the schedule off. Never answered by itself. |
 
 One call at a time: the device runs it to the end, connecting and disconnecting the robot, and
 then answers.
 
 ## Answers
 
-JSON, for every call:
+JSON, the same for every call, in the apps' generic terms (any robot type):
 
 ```json
-{"result": 0, "error": "", "age": 4, "status": {"planning": 1, "clock": "14:02", "nextRide": "15:00", "batteryMv": 25300, "busy": false, "driving": false, "stopQuestion": false, "...": "..."}}
+{"ok": true, "fault": null, "message": "", "age": 4,
+ "status": {"planning": true, "nextRun": "15:00", "batteryMv": 25300, "activity": "",
+            "route": "", "busy": false, "driving": false, "finishQuestion": false}}
 ```
 
 | Field | What |
 |---|---|
-| `result` | `0` done, `1` no connection, `2` PIN rejected by the robot, `3` no screen, `4` busy (the robot is not on its home screen, nothing pressed), `5` unexpected screen (put back), `6` started without the expected answer (the same codes as `core/scraper_c.h`) |
-| `error` | What went wrong, in words |
+| `ok` | The robot did it |
+| `fault` | Why not: `NotFound` (robot not reachable), `AuthRejected` (the robot refused the PIN), `Busy` (not ready, nothing was pressed), `NoConfirmation` (sent, but the robot's confirmation was not seen), `Failed` |
+| `message` | What happened, in words |
 | `age` | Seconds since `status` was read, `null` before the first read |
-| `status` | The robot's status as the core reports it (`scraper_status_json`), `null` before the first read. `planning`: 1 on, 0 off, -1 unknown; `driving`: a route runs; `stopQuestion`: the robot waits for `/api/answer` |
+| `status` | The robot as last seen, `null` before the first read: `planning` on/off (`null` unknown), `nextRun` as the robot shows it, `batteryMv` (`null` unknown), `activity` and `route` while driving, `busy` (not ready for a command), `driving` (a route runs), `finishQuestion` (waiting for `/api/answer`) |
 
-HTTP `200` when the robot did it, `502` when it did not (see `result`), `404` for an unknown
-call.
+HTTP `200` when the robot did it, `502` when it did not, `401`/`429` see Access, `404` for an
+unknown call.
 
 ## Examples
 
 ```bash
 curl -H "Authorization: Bearer 1234" http://scraper-control.local/api/status?fresh
-curl -X POST -H "Authorization: Bearer 1234" http://192.168.1.20/api/route/A
-curl -X POST -H "Authorization: Bearer 1234" http://192.168.1.20/api/planning/off
+curl -X POST -H "Authorization: Bearer 1234" http://scraper-control.local/api/route/A
+curl -X POST -H "Authorization: Bearer 1234" http://scraper-control.local/api/planning/off
 ```

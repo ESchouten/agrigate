@@ -43,8 +43,19 @@ int main() {
   assert(wrap.check("Bearer 1", "1", 0xFFFFFFF0u + 30000) == 429);
   assert(wrap.check("Bearer 1", "1", 0xFFFFFFF0u + 61000) == 200);
 
-  assert(apiAnswer(0, "\"\"", "", 0) == "{\"result\":0,\"error\":\"\",\"age\":null,\"status\":null}");
-  assert(apiAnswer(4, "\"busy\"", "{\"planning\":1}", 12) ==
-         "{\"result\":4,\"error\":\"busy\",\"age\":12,\"status\":{\"planning\":1}}");
+  assert(parseCall("POST", "/api/stop", "").kind == ApiCall::Stop);
+  assert(parseCall("GET", "/api/stop", "").kind == ApiCall::None);
+  ApiStatus st;
+  assert(toJson(st) == "{\"planning\":null,\"nextRun\":\"\",\"batteryMv\":null,\"activity\":\"\",\"route\":\"\","
+                       "\"busy\":false,\"driving\":false,\"finishQuestion\":false}");
+  st.planning = 1;
+  st.nextRun = "21:00";
+  st.batteryMv = 25300;
+  st.activity = "say \"hi\"\n";
+  st.driving = true;
+  assert(toJson(st) == "{\"planning\":true,\"nextRun\":\"21:00\",\"batteryMv\":25300,\"activity\":\"say \\\"hi\\\" \","
+                       "\"route\":\"\",\"busy\":false,\"driving\":true,\"finishQuestion\":false}");
+  assert(apiAnswer("", "", "", 0) == "{\"ok\":true,\"fault\":null,\"message\":\"\",\"age\":null,\"status\":null}");
+  assert(apiAnswer("Busy", "busy", "{}", 12) == "{\"ok\":false,\"fault\":\"Busy\",\"message\":\"busy\",\"age\":12,\"status\":{}}");
   printf("ok   web API\n");
 }

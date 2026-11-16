@@ -77,9 +77,23 @@ static void setOwed(int v) {
 static Status seen;
 static uint32_t seenAt = 0, homeDrawnAt = 0;
 static bool haveSeen = false, syncing = false;
-// The same, as the web API gives it (also while driving or in a menu), and when it was read.
+// The same for the web API (also while driving or in a menu), and when it was read.
 static std::string seenJson;
 static uint32_t seenJsonAt = 0;
+
+static void seenForApi(const Status& s) {
+  ApiStatus a;
+  a.planning = s.planning;
+  a.nextRun = s.nextRide;
+  a.batteryMv = s.batteryMv;
+  a.activity = s.action;
+  a.route = s.route;
+  a.busy = s.busy;
+  a.driving = s.driving;
+  a.finishQuestion = s.stopQuestion;
+  seenJson = toJson(a);
+  seenJsonAt = millis();
+}
 
 // Screen: dims after a minute without a press, never off (Erik 2026-11-11), so a press always
 // acts at once (a stop too). The backlight is far from linear: 64 still looked full, so dim low.
@@ -392,10 +406,7 @@ static Result runOnce(const String& title, Kind kind, const Job& job, Status& st
   err = robot.lastError();
   if (r == Result::Ok || r == Result::Unexpected) robot.finish();   // planning as found
   st = robot.status();
-  if (connected) {
-    seenJson = statusJson(st, robot.screen);
-    seenJsonAt = millis();
-  }
+  if (connected) seenForApi(st);
   robot.disconnect();
   if (st.planning == 0 || st.planning == 1) {
     seen = st;
@@ -1242,10 +1253,7 @@ static Result readRobotQuietly(std::string& err) {
   Result r = robot.connect();
   Status st = robot.status();
   err = robot.lastError();
-  if (r == Result::Ok) {
-    seenJson = statusJson(st, robot.screen);
-    seenJsonAt = millis();
-  }
+  if (r == Result::Ok) seenForApi(st);
   robot.disconnect();
   if (r != Result::Ok || (st.planning != 0 && st.planning != 1)) return r;
   seen = st;
@@ -1306,7 +1314,16 @@ static void handleApi() {
     Job job;
     if (c.kind == ApiCall::Route) job = routeJob(c.route, false);
     else if (c.kind == ApiCall::Planning) job = [on = c.yes](Robot& rb) { return rb.status().planning < 0 ? Result::Busy : rb.setPlanning(on); };
-    else {
+    else if (c.kind == ApiCall::Stop) {
+      title = tx->routeStopped;
+      routeStopped = Stopped::Yes;
+      job = [](Robot& rb) {
+        if (!rb.drivingRoute()) return Result::Busy;   // nothing pressed
+        Result res = rb.stopRoute();
+        if (res == Result::Ok && rb.stopQuestion()) routeStopped = Stopped::LeftOpen;
+        return res;
+      };
+    } else {
       title = tx->routeStopped;
       routeStopped = Stopped::Yes;
       job = [yes = c.yes](Robot& rb) {
@@ -1322,7 +1339,16 @@ static void handleApi() {
     resultUntil = (millis() + kResultMs) | 1;
     lastActive = millis();
   }
-  std::string body = apiAnswer(int(r), jsonString(err), seenJson, long((millis() - seenJsonAt) / 1000));
+  // the fault in the apps' terms (ScraperFault), the message in the M5's language
+  const char* fault = r == Result::Ok                ? ""
+                      : r == Result::ConnectFailed   ? "NotFound"
+                      : r == Result::PinRejected     ? "AuthRejected"
+                      : r == Result::Busy            ? "Busy"
+                      : r == Result::StartedNoAnswer ? "NoConfirmation"
+                                                     : "Failed";
+  std::string message = r == Result::Ok ? "" : resultText(r, langFromCode(tx->code));
+  if (!err.empty() && r != Result::Ok) message += " (" + err + ")";
+  std::string body = apiAnswer(fault, message, seenJson, long((millis() - seenJsonAt) / 1000));
   server.send(r == Result::Ok ? 200 : 502, "application/json", body.c_str());
 }
 
