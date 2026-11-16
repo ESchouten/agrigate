@@ -64,8 +64,10 @@ await p.waitForTimeout(1_000)
 await p.mouse.click(195, 1148) // "Sluiten" (the dry run's sheet)
 await p.waitForTimeout(1_500)
 await p.mouse.click(195, 860) // "Bedieningspaneel"
-await check('panel-connects', s => s.startsWith('<- ') && s.includes('connected\\":true'), 30_000, true)
-const [kx, ky] = [195, 900] // Down
+await p.waitForTimeout(1_500)
+await p.mouse.click(195, 602) // "Verbinden met het paneel"
+await check('panel-connects', s => s.startsWith('<- ') && s.includes('connected\\":true'))
+const [kx, ky] = [78, 510] // Down
 await touch('touchStart', kx, ky)
 await check('key-down', s => s.startsWith('-> ') && s.includes('input') && s.includes('Down'), 5_000)
 await p.waitForTimeout(1_000)
