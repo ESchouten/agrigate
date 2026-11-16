@@ -1367,7 +1367,7 @@ static void drawWifi() {
   ui::Screen scr(tx->wifiRow);
   if (serving) {   // a QR code, as large as fits, that adds this robot to the app (Erik 2026-11-16)
     qr(String("scraper-control://add?via=") + hostName() + ".local&pin=" + pin, 16, 54, 140, 4);
-    text(tx->apiRow, 172, 60, kBold, kInk);
+    text(tx->linkApp, 172, 60, kBold, kInk);
     text(hostName(), 172, 88, kSmall, kMuted);
     text(".local", 172, 106, kSmall, kMuted);
   } else {

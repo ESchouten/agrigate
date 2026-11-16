@@ -44,7 +44,7 @@ struct Texts {
   // home screen: the robot as last seen, read every 15 minutes (printf formats: %d)
   const char *notReadYet, *readEvery, *justNow, *minAgo, *hourAgo;
   // settings > wifi: where apps and other tools reach the M5's web API (Api.h)
-  const char *apiRow, *apiOffline;
+  const char *apiRow, *apiOffline, *linkApp;
 };
 
 static const Texts kNl = {
@@ -78,7 +78,7 @@ static const Texts kNl = {
     "Zoekt wifi voor update...", "Geen bekende wifi in de buurt.", "Nieuwste versie, geen update.",
     "Nog niet gelezen", "Leest de robot elke 15 min", "zojuist",
     "%d min geleden", "%d uur geleden",
-    "Web-API", "zodra de wifi verbonden is",
+    "Web-API", "zodra de wifi verbonden is", "App koppelen",
 };
 
 static const Texts kEn = {
@@ -112,7 +112,7 @@ static const Texts kEn = {
     "Finding wifi for update...", "No known wifi nearby.", "Latest version, no update.",
     "Not read yet", "Reads the robot every 15 min", "just now",
     "%d min ago", "%d h ago",
-    "Web API", "once Wi-Fi is connected",
+    "Web API", "once Wi-Fi is connected", "Link the app",
 };
 
 // "nl" -> Dutch, anything else -> English.
