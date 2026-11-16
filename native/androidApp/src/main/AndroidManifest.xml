@@ -10,13 +10,16 @@
   <!-- a failed start from a home-screen widget is shown as a notification -->
   <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
   <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
+  <!-- a robot through another device's web API (docs/API.md): plain http on the own network -->
+  <uses-permission android:name="android.permission.INTERNET" />
 
   <application
       android:name=".ScraperApp"
       android:label="Scraper Control"
       android:icon="@mipmap/ic_launcher"
       android:theme="@style/Theme.Scraper"
-      android:enableOnBackInvokedCallback="true">
+      android:enableOnBackInvokedCallback="true"
+      android:usesCleartextTraffic="true">
     <activity
         android:name=".MainActivity"
         android:exported="true"
@@ -26,6 +29,13 @@
       <intent-filter>
         <action android:name="android.intent.action.MAIN" />
         <category android:name="android.intent.category.LAUNCHER" />
+      </intent-filter>
+      <!-- the QR code on the buttons or a computer with the web API (docs/API.md), opened by the camera -->
+      <intent-filter>
+        <action android:name="android.intent.action.VIEW" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <category android:name="android.intent.category.BROWSABLE" />
+        <data android:scheme="scraper-control" android:host="add" />
       </intent-filter>
     </activity>
     <receiver android:name=".RoutesWidget" android:label="@string/widget_routes_label" android:exported="true">

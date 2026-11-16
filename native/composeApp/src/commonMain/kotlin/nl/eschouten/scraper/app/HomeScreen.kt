@@ -82,7 +82,7 @@ import nl.eschouten.scraper.ui.planningConfirm
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(controller: Controller, host: AppHost, nav: Nav) {
+fun HomeScreen(controller: RobotController, host: AppHost, nav: Nav) {
   val s by controller.state.collectAsState()
   val now by rememberNow()
   val h = homeScreen(s, now, host.platform)

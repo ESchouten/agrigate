@@ -90,7 +90,7 @@ import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun RunSheet(controller: Controller, route: String, onClose: () -> Unit) {
+fun RunSheet(controller: RobotController, route: String, onClose: () -> Unit) {
   val flow = remember(route) { RunFlow(controller, route) }
   val cs by controller.state.collectAsState()
   val st by flow.state.collectAsState()
@@ -313,7 +313,7 @@ fun SlideToConfirm(label: String, modifier: Modifier = Modifier, enabled: Boolea
 /** Pick the robot to work with, or add one. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun RobotSwitcher(controller: Controller, nav: Nav, onClose: () -> Unit) {
+fun RobotSwitcher(controller: RobotController, nav: Nav, onClose: () -> Unit) {
   val s by controller.state.collectAsState()
   val now by rememberNow()
   val v = switcherSheet(s, now)

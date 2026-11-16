@@ -14,7 +14,6 @@ buildscript {
     classpath("org.jetbrains.kotlin:kotlin-serialization:$kotlin")
     classpath("org.jetbrains.kotlin:compose-compiler-gradle-plugin:$kotlin")
     classpath("org.jetbrains.compose:compose-gradle-plugin:1.12.2")
-    classpath("org.jetbrains.kotlinx:kotlinx-rpc-gradle-plugin:0.10.4")
     if (hasAndroid) classpath("com.android.tools.build:gradle:9.1.0")
   }
 }

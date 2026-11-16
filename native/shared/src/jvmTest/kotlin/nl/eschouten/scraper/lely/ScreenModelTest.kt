@@ -157,22 +157,6 @@ class ScreenModelTest {
     c.dispose()
   }
 
-  @Test fun webPageSection() {
-    val c = demo()
-    val off = settingsScreen(c.state.value, now, Platform.Desktop).withWebPage(WebPageState(port = 8090))
-    assertEquals(listOf("Robots", "Activiteit", "Taal", "Webpagina", "Over"), off.sections.map { it.title })
-    val web = off.sections[3]
-    assertEquals(listOf(RowId.WEB_PAGE, RowId.WEB_PORT), web.rows.map { it.id })
-    assertEquals(false, web.rows[0].toggle)
-    assertEquals("8090", web.rows[1].subtitle)
-    val on = settingsScreen(c.state.value, now, Platform.Desktop).withWebPage(WebPageState(true, 8090, "http://192.168.1.20:8090"))
-    assertTrue("http://192.168.1.20:8090" in on.sections[3].footer!!)
-    assertEquals(8081, webPort(" 8081 "))
-    assertNull(webPort("80"))
-    assertNull(webPort("abc"))
-    c.dispose()
-  }
-
   @Test fun addRobotPicksTheSecondDemo() = runBlocking {
     val c = demo()
     val a = AddRobotFlow(c, Platform.Desktop)

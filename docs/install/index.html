@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Install the buttons</title>
+<!-- The browser installer for the M5Stack buttons (ESP Web Tools). The release workflow puts
+     this page on GitHub Pages with manifest.json and the latest full firmware image. -->
+<script type="module" src="https://unpkg.com/esp-web-tools@10.4.0/dist/web/install-button.js?module"></script>
+<style>
+  :root { --bg: #f6f4f3; --card: #fff; --text: #1c1b1b; --muted: #5e5857; --red: #c8102e; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #161414; --card: #1e1c1c; --text: #f2edec; --muted: #b9b0ae; --red: #e8364f; } }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 640px; margin: 0 auto; padding: 32px 16px 48px; }
+  h1 { font-size: 28px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 24px; }
+  .card { background: var(--card); border-radius: 16px; padding: 20px 24px; margin-bottom: 16px; }
+  ol { margin: 0; padding-left: 20px; }
+  li { margin: 6px 0; }
+  .muted { color: var(--muted); font-size: 14px; }
+  esp-web-install-button button[slot="activate"] { background: var(--red); color: #fff; border: 0; border-radius: 12px; padding: 12px 22px; font: 600 16px system-ui, sans-serif; cursor: pointer; }
+  a { color: var(--red); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Install the buttons</h1>
+  <p class="sub">Scraper Control on an M5Stack Basic (16 MB), straight from your browser.</p>
+
+  <div class="card">
+    <ol>
+      <li>Use Chrome or Edge on a computer (not a phone).</li>
+      <li>Connect the M5Stack with a USB-C data cable.</li>
+      <li>Click <b>Install</b>, choose the M5Stack's port and confirm.</li>
+    </ol>
+    <p style="margin:20px 0 4px">
+      <esp-web-install-button manifest="manifest.json">
+        <button slot="activate">Install</button>
+        <span slot="unsupported">This browser cannot install: use Chrome or Edge on a computer.</span>
+        <span slot="not-allowed">Open this page over https.</span>
+      </esp-web-install-button>
+    </p>
+    <p class="muted">This is for the first install: it erases the M5Stack, including a saved PIN and wifi.
+      After that the buttons update themselves over wifi.</p>
+  </div>
+
+  <div class="card">
+    <b>Then on the M5Stack</b>
+    <ol>
+      <li>Hold the right button 1.5 s for the settings: enter the robot's PIN, choose the robot and set up wifi.</li>
+      <li>Left, middle and right start route A, B and C. Hold left for the schedule, hold middle for manual driving.</li>
+    </ol>
+  </div>
+
+  <p class="muted">Unofficial software, use at your own risk and keep the robot in sight.
+    More in the <a href="https://github.com/ESchouten/scraper-control#install">README</a>.</p>
+</main>
+</body>
+</html>

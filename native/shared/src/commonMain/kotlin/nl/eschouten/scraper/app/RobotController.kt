@@ -5,20 +5,11 @@
 // Screens read [state] (a StateFlow; Swift: watch {}) and call the suspend functions.
 package nl.eschouten.scraper.app
 
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.collect
-import nl.eschouten.scraper.model.modelFor
-import kotlinx.serialization.Serializable
-import nl.eschouten.scraper.model.FoundScraper
 import nl.eschouten.scraper.ui.newScope
 import nl.eschouten.scraper.ui.watchIn
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -35,6 +26,7 @@ import nl.eschouten.scraper.model.ScraperFault
 import nl.eschouten.scraper.model.ScraperModel
 import nl.eschouten.scraper.model.ScraperSession
 import nl.eschouten.scraper.model.ScraperStatus
+import nl.eschouten.scraper.api.ApiSession
 import nl.eschouten.scraper.texts.tr
 import kotlin.concurrent.Volatile
 import kotlin.time.Clock
@@ -44,7 +36,6 @@ enum class LinkState { Idle, Searching, Connecting, Connected, Working }
 /** What went wrong, so the UI can offer the right way out. */
 enum class Problem { None, BluetoothOff, NotFound, PinRejected, Busy, NoAnswer, Failed }
 
-@Serializable
 data class Outcome(
   val ok: Boolean,
   val message: String,
@@ -54,7 +45,6 @@ data class Outcome(
 )
 
 /** Everything a screen needs, as one immutable value. */
-@Serializable
 data class ControllerState(
   val link: LinkState = LinkState.Idle,
   /** Planning was switched off for a route and comes back on after it ("Pauze"). */
@@ -71,6 +61,9 @@ data class ControllerState(
   val onboarded: Boolean = false,
   val widgetTipSeen: Boolean = false,
   val language: String = "",
+  /** Desktop: serve the web API (docs/API.md) on [apiPort]. */
+  val apiOn: Boolean = false,
+  val apiPort: Int = Settings.API_PORT,
   /** A stopped route asks "finish it?": show [nl.eschouten.scraper.ui.finishQuestion] and
    *  call [RobotController.answerFinish]. The link stays open meanwhile. */
   val finishQuestion: Boolean = false,
@@ -102,7 +95,7 @@ class RobotController(
   /** Keep the home-screen widgets in step (robots, names, visible routes). Platform sets it. */
   var onPublish: ((Settings) -> Unit)? = null,
   private val now: () -> Long = { Clock.System.now().toEpochMilliseconds() },
-) : Controller {
+) {
   private val mutex = Mutex()
   private var robot: ScraperSession? = null
   private var holds = 0
@@ -116,20 +109,29 @@ class RobotController(
   @Volatile private var revision = 0L
   @Volatile private var finishAnswer: CompletableDeferred<Boolean?>? = null
 
+  /** The robot in use as last read, also on a driving or menu screen, with when (the web API). */
+  @Volatile var lastSeen: Pair<ScraperStatus, Long>? = null
+    private set
+
   private val _state = MutableStateFlow(build())
-  override val state: StateFlow<ControllerState> = _state
+  val state: StateFlow<ControllerState> = _state
 
   /** Swift: observe the state without Flow. Called at once with the current state. */
   fun watch(onChange: (ControllerState) -> Unit): Cancellable = _state.watchIn(scope, onChange)
 
   val isConnected get() = robot?.isConnected ?: false
 
+  /** The open connection, for a type's own screens (null when not connected). */
+  val session: ScraperSession? get() = if (isConnected) robot else null
+
   // ---- robots ----
 
-  override suspend fun selectRobot(uid: String) = mutex.withLock {
+  /** Switch to another robot (closes the connection to the current one). */
+  suspend fun selectRobot(uid: String) = mutex.withLock {
     if (uid == settings.robot.uid) return@withLock
     holds = 0
     close()
+    lastSeen = null
     settings.select(uid)
     planningResumes = false
     steps = emptyList()
@@ -139,7 +141,7 @@ class RobotController(
     set(LinkState.Idle)
   }
 
-  override suspend fun addRobot(p: RobotProfile) = mutex.withLock {
+  suspend fun addRobot(p: RobotProfile) = mutex.withLock {
     holds = 0
     close()
     settings.add(p)
@@ -149,7 +151,7 @@ class RobotController(
     set(LinkState.Idle)
   }
 
-  override suspend fun removeRobot(uid: String) = mutex.withLock {
+  suspend fun removeRobot(uid: String) = mutex.withLock {
     if (uid == settings.robot.uid) {
       holds = 0
       close()
@@ -160,17 +162,17 @@ class RobotController(
     set(LinkState.Idle)
   }
 
-  override suspend fun updateRobot(p: RobotProfile) = mutex.withLock {
+  /** Change a robot's profile (names, routes, PIN, ...) and save. */
+  suspend fun updateRobot(p: RobotProfile) = mutex.withLock {
     settings.update(p)
     save()
     publish()
     emit()
   }
 
-  override suspend fun updateSettings(flags: AppFlags) = mutex.withLock {
-    settings.onboarded = flags.onboarded
-    settings.widgetTipSeen = flags.widgetTipSeen
-    settings.language = flags.language
+  /** Change app flags (onboarded, widget tip, language) and save. */
+  suspend fun updateSettings(change: Settings.() -> Unit) = mutex.withLock {
+    settings.change()
     nl.eschouten.scraper.texts.useLanguage(settings.language)
     save()
     publish()
@@ -188,7 +190,7 @@ class RobotController(
     emit()
   }
 
-  override suspend fun clearHistory() {
+  fun clearHistory() {
     History.clear(store)
     history = emptyList()
     emit()
@@ -198,8 +200,9 @@ class RobotController(
 
   /** [route] "A".."D". One tap: connect, start, disconnect (unless the panel holds the link).
    *  A safety stop when a route already runs (Erik 2026-11-05): a route button pressed during
-   *  a route stops it instead (not for a dry run). */
-  override suspend fun startRoute(route: String, dryRun: Boolean): Outcome {
+   *  a route stops it instead (not for a dry run). [ask]: ask the user whether to finish the
+   *  stopped route; false leaves the question on the robot (the web API answers it apart). */
+  suspend fun startRoute(route: String, dryRun: Boolean = false, ask: Boolean = true): Outcome {
     var stopped = false
     return job(
       work = {
@@ -210,11 +213,11 @@ class RobotController(
           r.stopRoute()
           stopped = true
           planningResumes = false
-          return@job askFinish(r)
+          return@job askFinish(r, ask)
         }
         if (!dryRun && r.status().finishQuestion) {   // stopped earlier, question still open
           stopped = true
-          return@job askFinish(r)
+          return@job askFinish(r, ask)
         }
         val wasOn = r.status().planning == true
         r.startRoute(route, dryRun)
@@ -252,9 +255,9 @@ class RobotController(
   /** The robot asks whether to finish the stopped route: the user decides (Erik 2026-11-11),
    *  the answer goes to the robot 1:1. No answer within 2 minutes (or from the widget, which
    *  cannot ask): the question stays on the robot and nothing is pressed. */
-  private suspend fun askFinish(r: ScraperSession): Outcome {
+  private suspend fun askFinish(r: ScraperSession, ask: Boolean): Outcome {
     if (!r.status().finishQuestion) return Outcome(true, tr.routeStoppedMsg, stopped = true)
-    if (viaWidget) return Outcome(true, tr.finishLeftOpenMsg, stopped = true)
+    if (viaWidget || !ask) return Outcome(true, tr.finishLeftOpenMsg, stopped = true)
     val answer = CompletableDeferred<Boolean?>()
     finishAnswer = answer
     emit()
@@ -269,11 +272,50 @@ class RobotController(
     return Outcome(true, if (finish) tr.routeContinuesMsg else tr.routeCancelledMsg, stopped = true)
   }
 
-  override suspend fun answerFinish(finish: Boolean?) {
+  /** A safety stop of the running route, from outside the app (the web API); the robot's
+   *  question after it is left open for [answerStop]. Busy when no route runs. */
+  suspend fun stopRoute(): Outcome = job(
+    work = {
+      val r = robot!!
+      if (!settings.robot.type.can(Capability.Stop) || !r.status().driving) throw ScraperException(ScraperFault.Busy, tr.robotBusyNothingPressed)
+      r.stopRoute()
+      planningResumes = false
+      askFinish(r, ask = false)
+    },
+    record = { o -> stopEvent(o, tr.routeStoppedTitle) },
+  )
+
+  /** The answer to the robot's question after a stop, from outside the app (the web API):
+   *  true = finish the route, false = it ends. Busy when the robot does not ask. */
+  suspend fun answerStop(finish: Boolean): Outcome = job(
+    work = {
+      val r = robot!!
+      if (!r.status().finishQuestion) throw ScraperException(ScraperFault.Busy, tr.robotBusyNothingPressed)
+      r.answerStop(finish)
+      Outcome(true, if (finish) tr.routeContinuesMsg else tr.routeCancelledMsg, stopped = true)
+    },
+    record = { o -> stopEvent(o, o.message) },
+  )
+
+  private fun stopEvent(o: Outcome, title: String) = HistoryEvent(
+    at = now(),
+    kind = if (o.ok) EventKind.Stopped else EventKind.Failed,
+    title = title,
+    detail = if (o.ok) "" else o.message,
+    viaWidget = viaWidget,
+    robot = settings.robot.uid,
+  )
+
+  /** The user's answer to [ControllerState.finishQuestion]: true = finish, false = don't,
+   *  null = later (leave the question on the robot). */
+  fun answerFinish(finish: Boolean?) {
     finishAnswer?.complete(finish)
   }
 
-  override suspend fun setPlanning(on: Boolean): Outcome = job(
+  /** Swift: [answerFinish] without a nullable Boolean. */
+  fun finishLater() = answerFinish(null)
+
+  suspend fun setPlanning(on: Boolean): Outcome = job(
     work = {
       robot!!.setPlanning(on)
       Outcome(true, tr.planningIs(on))
@@ -290,9 +332,11 @@ class RobotController(
     },
   )
 
-  override suspend fun refresh(): Outcome = job(work = { Outcome(true, tr.statusUpdated) })
+  /** Connect, read the home screen, disconnect. */
+  suspend fun refresh(): Outcome = job(work = { Outcome(true, tr.statusUpdated) })
 
-  override suspend fun readRoutes(): Outcome = job(
+  /** Read what each route consists of on the robot and remember it with the robot. */
+  suspend fun readRoutes(): Outcome = job(
     work = {
       if (!settings.robot.type.can(Capability.RouteContents)) return@job Outcome(false, tr.notSupported, problem = Problem.Failed)
       val parts = robot!!.readRoutes()
@@ -303,7 +347,7 @@ class RobotController(
   )
 
   /** Panel: keep the connection open until [release]. Shows the live screen. */
-  override suspend fun hold(): Outcome {
+  suspend fun hold(): Outcome {
     holds++
     if (isConnected) return Outcome(true, tr.connected)
     val o = job(work = { Outcome(true, tr.connected) })
@@ -311,10 +355,8 @@ class RobotController(
     return o
   }
 
-  /** Once asked, the connection is let go also when the caller goes away meanwhile (a web
-   *  page whose tab closes while a key is still being let go). */
-  override suspend fun release() = withContext(NonCancellable) {
-    if (holds == 0) return@withContext
+  suspend fun release() {
+    if (holds == 0) return
     holds--
     if (holds == 0) mutex.withLock {
       close()
@@ -322,24 +364,18 @@ class RobotController(
     }
   }
 
-  override suspend fun input(name: String, until: Flow<Unit>?): Outcome = mutex.withLock {
+  /** A type-specific action on the open connection (its own screens, while held). */
+  suspend fun custom(action: suspend (ScraperSession) -> Unit): Outcome = mutex.withLock {
     val r = robot
     if (r == null || !r.isConnected) return@withLock Outcome(false, tr.notConnected)
-    coroutineScope {
-      val up = until?.let { async { runCatching { it.collect() } } }   // a flow that breaks (the page dropped) is a let-go too
-      try {
-        r.input(name, up)
-        readStatus()
-        Outcome(true, "")
-      } catch (e: ScraperException) {
-        Outcome(false, e.message ?: "")
-      } finally {
-        up?.cancel()
-      }
+    try {
+      action(r)
+      readStatus()
+      Outcome(true, "")
+    } catch (e: ScraperException) {
+      Outcome(false, e.message ?: "")
     }
   }
-
-  override suspend fun discover(model: String, name: String?): List<FoundScraper> = modelFor(model).discover(name)
 
   /** Stops polling and closes the link (app goes away). */
   fun dispose() {
@@ -351,13 +387,7 @@ class RobotController(
 
   // ---- internals ----
 
-  /** One command, start to end. It runs in the controller's own scope: once begun it finishes
-   *  (and leaves the robot as it should), also when whoever asked for it goes away. */
-  private suspend fun job(work: suspend () -> Outcome, record: ((Outcome) -> HistoryEvent)? = null): Outcome = scope.async {
-    mutex.withLock { run(work, record) }
-  }.await()
-
-  private suspend fun run(work: suspend () -> Outcome, record: ((Outcome) -> HistoryEvent)?): Outcome {
+  private suspend fun job(work: suspend () -> Outcome, record: ((Outcome) -> HistoryEvent)? = null): Outcome = mutex.withLock {
     steps = emptyList()
     last = null
     val began = now()
@@ -392,14 +422,14 @@ class RobotController(
     }
     if (holds == 0 || (!out.ok && !isConnected)) close()
     set(if (isConnected) LinkState.Connected else LinkState.Idle)
-    return out
+    out
   }
 
   private class NoRobot : Exception()
 
   private suspend fun open() {
     var p = settings.robot
-    if (p.robotId == null) {
+    if (p.robotId == null && p.via.isEmpty()) {
       set(LinkState.Searching)
       val found = p.type.discover(p.robotName.ifEmpty { null })
       if (found.isEmpty()) throw NoRobot()
@@ -413,7 +443,7 @@ class RobotController(
     var r: ScraperSession
     var tries = 0
     while (true) {
-      r = settings.robot.type.openSession(
+      r = if (settings.robot.via.isNotEmpty()) ApiSession(settings.robot) else settings.robot.type.openSession(
         settings.robot,
         onStep = { s ->
           steps = steps.filter { it.percent == null } + s
@@ -470,6 +500,7 @@ class RobotController(
     if (onlyIfChanged && rev == seen) return
     seen = rev
     val st = r.status()
+    lastSeen = st to now()
     if (st.planning == true || (st.planning == false && !st.busy && link != LinkState.Working)) planningResumes = false
     if (st.planning != null) {
       val before = settings.robot.snapshot
@@ -509,6 +540,8 @@ class RobotController(
     onboarded = settings.onboarded,
     widgetTipSeen = settings.widgetTipSeen,
     language = settings.language,
+    apiOn = settings.apiOn,
+    apiPort = settings.apiPort,
     finishQuestion = finishAnswer != null,
     revision = revision++,
   )

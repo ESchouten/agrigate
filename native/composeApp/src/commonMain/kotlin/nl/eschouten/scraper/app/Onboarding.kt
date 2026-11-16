@@ -86,7 +86,7 @@ import nl.eschouten.scraper.ui.Tone
 import kotlin.math.min
 
 @Composable
-fun OnboardingScreen(controller: Controller, host: AppHost, nav: Nav) {
+fun OnboardingScreen(controller: RobotController, host: AppHost, nav: Nav) {
   val flow = remember { OnboardingFlow(controller, host.platform) }
   val st by flow.state.collectAsState()
   val cs by controller.state.collectAsState()

@@ -6,8 +6,8 @@ import kotlinx.coroutines.CoroutineScope
 import nl.eschouten.scraper.AppVersion
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import nl.eschouten.scraper.api.WebApiState
 import nl.eschouten.scraper.app.Cancellable
-import nl.eschouten.scraper.app.Controller
 import nl.eschouten.scraper.app.ControllerState
 import nl.eschouten.scraper.app.RobotProfile
 import nl.eschouten.scraper.app.Settings
@@ -57,10 +57,11 @@ object RowId {
   const val NAME = "name"
   const val DEVICE = "device"
   const val PIN = "pin"
+  const val VIA = "via"
+  const val API = "api"
+  const val API_PORT = "api-port"
   const val TEST = "test"
   const val READ_ROUTES = "read-routes"
-  const val WEB_PAGE = "web-page"
-  const val WEB_PORT = "web-port"
   fun robot(uid: String) = "robot-$uid"
   fun route(r: String) = "route-$r"
 }
@@ -71,7 +72,8 @@ fun languageName(code: String) = when (code) {
   else -> tr.languagePhone
 }
 
-fun settingsScreen(s: ControllerState, now: Long, platform: Platform): SettingsScreen {
+/** [api]: where this app serves the web API (desktop), null where it does not. */
+fun settingsScreen(s: ControllerState, now: Long, platform: Platform, api: WebApiState? = null): SettingsScreen {
   val robots = Section(
     tr.robots,
     s.robots.map { r ->
@@ -91,6 +93,14 @@ fun settingsScreen(s: ControllerState, now: Long, platform: Platform): SettingsS
     tr.widgets,
     listOf(Row(RowId.WIDGETS, Glyph.Widgets, tr.routesOnHome, if (platform == Platform.Ios) tr.widgetHelpIos(APP_NAME) else tr.widgetHelpAndroid(APP_NAME), enabled = false)),
   )
+  val webApi = if (platform != Platform.Desktop) null else Section(
+    tr.webApi,
+    listOf(
+      Row(RowId.API, Glyph.Phone, tr.webApi, if (s.apiOn) tr.on else tr.off, toggle = s.apiOn),
+      Row(RowId.API_PORT, Glyph.Dialpad, tr.apiPort, s.apiPort.toString()),
+    ),
+    footer = if (!s.apiOn) null else api?.error?.let { tr.apiFailed(it) } ?: api?.address?.takeIf { it.isNotEmpty() }?.let { tr.apiFooter(it) },
+  )
   val language = Section(tr.language, listOf(Row(RowId.LANGUAGE, Glyph.Translate, tr.language, languageName(s.language))))
   val about = Section(
     tr.about,
@@ -101,41 +111,12 @@ fun settingsScreen(s: ControllerState, now: Long, platform: Platform): SettingsS
   )
   return SettingsScreen(
     tr.settings,
-    listOfNotNull(robots, activity, widgets, language, about),
+    listOfNotNull(robots, activity, widgets, webApi, language, about),
     tr.language,
     (listOf("") + appLanguages).map { Choice(it, languageName(it), it == s.language) },
     Confirm(Glyph.Restart, tr.resetSetupQ, tr.resetSetupBody, tr.resetSetup, tr.cancel),
   )
 }
-
-/** The web page this computer serves to browsers on the network, at [address] (the desktop app). */
-data class WebPageState(val on: Boolean = false, val port: Int = DEFAULT_WEB_PORT, val address: String = "", val error: String? = null)
-
-const val DEFAULT_WEB_PORT = 8080
-
-/** The platform's side of it (the desktop app: WebServer). */
-interface WebPageHost {
-  val state: StateFlow<WebPageState>
-  fun switch(on: Boolean)
-  fun setPort(port: Int)
-}
-
-/** Settings with the web page section, before "about" (only where the app can serve it). */
-fun SettingsScreen.withWebPage(w: WebPageState): SettingsScreen = copy(
-  sections = sections.dropLast(1) + Section(
-    tr.webPage,
-    listOf(
-      Row(RowId.WEB_PAGE, Glyph.Phone, tr.webPageRow, if (w.on) tr.on else tr.off, toggle = w.on),
-      Row(RowId.WEB_PORT, Glyph.Dialpad, tr.port, w.port.toString()),
-    ),
-    footer = w.error?.let { tr.webPageFailed(it) } ?: if (w.on) tr.webPageOnFooter(w.address) else tr.webPageOffFooter,
-  ) + sections.last(),
-)
-
-fun portDialog(w: WebPageState) = TextDialog(tr.port, DEFAULT_WEB_PORT.toString(), w.port.toString(), tr.save, tr.cancel)
-
-/** The port typed in [portDialog], or null when it is not one (1024-65535: lower ones need an administrator). */
-fun webPort(text: String): Int? = text.trim().toIntOrNull()?.takeIf { it in 1024..65535 }
 
 data class RobotSettingsScreen(
   val title: String,
@@ -154,13 +135,14 @@ fun robotSettingsScreen(s: ControllerState, uid: String): RobotSettingsScreen? {
   val active = p.uid == s.robot.uid
   val robot = Section(
     tr.robot,
-    listOf(
+    listOfNotNull(
       Row(RowId.NAME, Glyph.Badge, tr.name, p.displayName),
+      Row(RowId.VIA, if (p.via.isEmpty()) Glyph.Bluetooth else Glyph.Phone, tr.connection, if (p.via.isEmpty()) tr.viaBluetooth else tr.viaDevice(p.via), enabled = !s.isBusy),
       Row(
         RowId.DEVICE, Glyph.Bluetooth, tr.bluetooth,
         if (p.robotId == null) tr.searchedAutomatically else "${p.robotName.ifEmpty { p.type.fullName }} · ${p.robotId}",
         enabled = !s.isBusy,
-      ),
+      ).takeIf { p.via.isEmpty() },
       Row(RowId.PIN, Glyph.Lock, tr.pin, if (p.pin.isEmpty()) tr.noPin else "•".repeat(p.pin.length)),
       Row(RowId.TEST, Glyph.BluetoothSearching, tr.testConnection, if (active) tr.testConnectionSub else tr.makeActive, enabled = !s.isBusy, busy = s.isBusy),
     ),
@@ -175,7 +157,7 @@ fun robotSettingsScreen(s: ControllerState, uid: String): RobotSettingsScreen? {
         route = r, routeShown = r in p.routes, toggle = r in p.routes,
       )
     } + listOfNotNull(
-      if (p.type.can(Capability.RouteContents)) {
+      if (p.type.can(Capability.RouteContents) && p.via.isEmpty()) {   // the web API reads no route contents
         Row(RowId.READ_ROUTES, Glyph.Refresh, tr.readRoutes, if (active) tr.readRoutesSub else tr.makeActive, enabled = !s.isBusy, busy = s.isBusy)
       } else null,
     ),
@@ -191,6 +173,8 @@ fun robotSettingsScreen(s: ControllerState, uid: String): RobotSettingsScreen? {
 
 fun routeNameDialog(p: RobotProfile, r: String) = TextDialog(tr.routeNameTitle(r), tr.routeNameHint, p.routeName(r), tr.save, tr.cancel)
 fun pinDialog(p: RobotProfile) = TextDialog(tr.pin, tr.pin, p.pin, tr.save, tr.cancel, secret = true)
+fun viaDialog(p: RobotProfile) = TextDialog(tr.viaTitle, "scraper-control-1a2b.local", p.via, tr.save, tr.cancel)
+fun apiPortDialog(s: ControllerState) = TextDialog(tr.apiPort, Settings.API_PORT.toString(), s.apiPort.toString(), tr.save, tr.cancel)
 
 /** Show or hide a route on the home screen; keeps the order A..D. */
 fun RobotProfile.withRoute(r: String, shown: Boolean): RobotProfile {
@@ -229,7 +213,6 @@ data class ScanView(
 )
 
 class ScanFlow(
-  private val controller: Controller,
   private val model: ScraperModel,
   /** Robots that are already added. */
   private val exclude: Set<String?> = emptySet(),
@@ -258,7 +241,7 @@ class ScanFlow(
     _state.value = _state.value.copy(scanning = true, error = null)
     return try {
       val n = _state.value.name.trim()
-      val f = controller.discover(model.id, n.ifEmpty { null }).filterNot { it.id in exclude }
+      val f = model.discover(n.ifEmpty { null }).filterNot { it.id in exclude }
       _state.value = _state.value.copy(found = f, selectedId = _state.value.selectedId ?: f.singleOrNull()?.id)
       f
     } catch (e: Exception) {
@@ -308,10 +291,9 @@ class ScanFlow(
 }
 
 /** The device picker of robot [uid]; the other robots' devices are left out. */
-fun deviceScan(c: Controller, uid: String, platform: Platform): ScanFlow? {
-  val s = c.state.value
+fun deviceScan(s: ControllerState, uid: String, platform: Platform): ScanFlow? {
   val p = s.robots.firstOrNull { it.uid == uid } ?: return null
-  return ScanFlow(c, p.type, s.robots.filter { it.uid != uid }.map { it.robotId }.toSet(), p.robotId, p.robotName, platform)
+  return ScanFlow(p.type, s.robots.filter { it.uid != uid }.map { it.robotId }.toSet(), p.robotId, p.robotName, platform)
 }
 
 /** Save the chosen device on a robot (the device picker in robot settings). */

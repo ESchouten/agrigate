@@ -2,6 +2,7 @@
 // (models: shared ui/Lists.kt, ui/SettingsScreens.kt, ui/Onboarding.kt).
 package nl.eschouten.scraper.app
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -64,12 +65,12 @@ import nl.eschouten.scraper.ui.deviceScan
 import nl.eschouten.scraper.ui.Section
 import nl.eschouten.scraper.ui.logbookScreen
 import nl.eschouten.scraper.ui.pinDialog
+import nl.eschouten.scraper.ui.viaDialog
+import nl.eschouten.scraper.ui.apiPortDialog
+import nl.eschouten.scraper.api.WebApiHost
 import nl.eschouten.scraper.ui.robotSettingsScreen
 import nl.eschouten.scraper.ui.routeNameDialog
 import nl.eschouten.scraper.ui.settingsScreen
-import nl.eschouten.scraper.ui.portDialog
-import nl.eschouten.scraper.ui.webPort
-import nl.eschouten.scraper.ui.withWebPage
 import nl.eschouten.scraper.ui.Row as RowModel
 
 /** App bar + centred, width-limited list: the frame of every pushed screen. */
@@ -108,11 +109,10 @@ fun PushedScreen(
 // ---- logbook ----
 
 @Composable
-fun LogbookScreen(controller: Controller, nav: Nav) {
+fun LogbookScreen(controller: RobotController, nav: Nav) {
   val s by controller.state.collectAsState()
   val now by rememberNow()
   val v = logbookScreen(s, now)
-  val scope = rememberCoroutineScope()
   var ask by remember { mutableStateOf(false) }
   val c = MaterialTheme.colorScheme
   PushedScreen(
@@ -167,7 +167,7 @@ fun LogbookScreen(controller: Controller, nav: Nav) {
   if (ask) {
     ConfirmDialog(v.clearConfirm, { ask = false }) {
       ask = false
-      scope.launch { Actions.clearLogbook(controller) }
+      Actions.clearLogbook(controller)
     }
   }
 }
@@ -213,17 +213,16 @@ fun LazyListScope.section(sec: Section, row: @Composable (RowModel) -> Unit) {
 }
 
 @Composable
-fun SettingsScreen(controller: Controller, host: AppHost, nav: Nav) {
+fun SettingsScreen(controller: RobotController, host: AppHost, nav: Nav) {
   val s by controller.state.collectAsState()
   val now by rememberNow()
-  val web = host.webPage?.state?.collectAsState()?.value
-  val v = settingsScreen(s, now, host.platform).let { if (web != null) it.withWebPage(web) else it }
+  val api by WebApiHost.state.collectAsState()
+  val v = settingsScreen(s, now, host.platform, api)
   val scope = rememberCoroutineScope()
-  val c = MaterialTheme.colorScheme
+  val toast = LocalToast.current
   var pickLanguage by remember { mutableStateOf(false) }
   var askReset by remember { mutableStateOf(false) }
   var askPort by remember { mutableStateOf(false) }
-  val toast = LocalToast.current
   PushedScreen(v.title, nav, "settings") {
     for (sec in v.sections) {
       section(sec) { r ->
@@ -233,22 +232,27 @@ fun SettingsScreen(controller: Controller, host: AppHost, nav: Nav) {
           r.id == RowId.LOGBOOK -> ({ nav.push(Route.Logbook) })
           r.id == RowId.LANGUAGE -> ({ pickLanguage = true })
           r.id == RowId.RESET -> ({ askReset = true })
-          r.id == RowId.WEB_PAGE -> ({ host.webPage?.switch(r.toggle != true) })
-          r.id == RowId.WEB_PORT -> ({ askPort = true })
+          r.id == RowId.API -> ({ scope.launch { Actions.setApi(controller, !s.apiOn) } })
+          r.id == RowId.API_PORT -> ({ askPort = true })
           else -> null
         }
         SettingsRow(
           r, tap,
           trailing = r.toggle?.let { on ->
-            {
-              Switch(
-                on, { host.webPage?.switch(it) }, Modifier.testTag(r.testId + "-switch"),
-                colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = c.primary),
-              )
-            }
+            { Switch(on, { scope.launch { Actions.setApi(controller, it) } }, Modifier.testTag(r.testId + "-switch")) }
           },
         )
       }
+      val qr = api?.qr
+      if (qr != null && s.apiOn && sec.rows.any { it.id == RowId.API }) {
+        item(key = "api-qr") { QrCode(qr) }
+      }
+    }
+  }
+  if (askPort) {
+    TextInputDialog(apiPortDialog(s), help = tr.apiPortHelp, onDismiss = { askPort = false }) { x ->
+      askPort = false
+      scope.launch { Actions.setApiPort(controller, x)?.let { toast(it) } }
     }
   }
   if (pickLanguage) {
@@ -275,12 +279,6 @@ fun SettingsScreen(controller: Controller, host: AppHost, nav: Nav) {
       containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
     )
   }
-  if (askPort && web != null) {
-    TextInputDialog(portDialog(web), onDismiss = { askPort = false }) { x ->
-      askPort = false
-      webPort(x)?.let { host.webPage?.setPort(it) } ?: toast(tr.portInvalid)
-    }
-  }
   if (askReset) {
     ConfirmDialog(v.resetConfirm, { askReset = false }) {
       askReset = false
@@ -293,7 +291,7 @@ fun SettingsScreen(controller: Controller, host: AppHost, nav: Nav) {
 // ---- one robot ----
 
 @Composable
-fun RobotSettingsScreen(controller: Controller, nav: Nav, uid: String) {
+fun RobotSettingsScreen(controller: RobotController, nav: Nav, uid: String) {
   val s by controller.state.collectAsState()
   val v = robotSettingsScreen(s, uid) ?: return
   val p = s.robots.first { it.uid == uid }
@@ -309,6 +307,7 @@ fun RobotSettingsScreen(controller: Controller, nav: Nav, uid: String) {
           r.id == RowId.NAME -> ({ dialog = "name" })
           r.id == RowId.DEVICE -> ({ nav.push(Route.ChooseDevice(uid)) })
           r.id == RowId.PIN -> ({ dialog = "pin" })
+          r.id == RowId.VIA -> ({ dialog = "via" })
           r.id == RowId.TEST -> ({ scope.launch { toast(Actions.testConnection(controller, uid)) } })
           r.id == RowId.READ_ROUTES -> ({ scope.launch { toast(Actions.readRoutes(controller, uid)) } })
           r.route != null -> ({ dialog = r.id })
@@ -345,6 +344,10 @@ fun RobotSettingsScreen(controller: Controller, nav: Nav, uid: String) {
       dialog = null
       scope.launch { Actions.setPin(controller, uid, x) }
     }
+    "via" -> TextInputDialog(viaDialog(p), help = tr.viaHelp, onDismiss = { dialog = null }) { x ->
+      dialog = null
+      scope.launch { Actions.setVia(controller, uid, x) }
+    }
     else -> {
       val r = d.removePrefix("route-")
       TextInputDialog(routeNameDialog(p, r), onDismiss = { dialog = null }) { x ->
@@ -363,8 +366,8 @@ fun RobotSettingsScreen(controller: Controller, nav: Nav, uid: String) {
 }
 
 @Composable
-fun ChooseDeviceScreen(controller: Controller, host: AppHost, nav: Nav, uid: String) {
-  val flow = remember(uid) { deviceScan(controller, uid, host.platform) } ?: return
+fun ChooseDeviceScreen(controller: RobotController, host: AppHost, nav: Nav, uid: String) {
+  val flow = remember(uid) { deviceScan(controller.state.value, uid, host.platform) } ?: return
   val scope = rememberCoroutineScope()
   PushedScreen(tr.bluetooth, nav, "choose-device") {
     item {
@@ -383,7 +386,7 @@ fun ChooseDeviceScreen(controller: Controller, host: AppHost, nav: Nav, uid: Str
 // ---- add a robot ----
 
 @Composable
-fun AddRobotScreen(controller: Controller, host: AppHost, nav: Nav) {
+fun AddRobotScreen(controller: RobotController, host: AppHost, nav: Nav) {
   val flow = remember { AddRobotFlow(controller, host.platform) }
   val st by flow.state.collectAsState()
   val scan by flow.scan.state.collectAsState()
@@ -422,6 +425,23 @@ fun AddRobotScreen(controller: Controller, host: AppHost, nav: Nav) {
         scope.launch {
           toast(flow.save())
           nav.home()
+        }
+      }
+    }
+  }
+}
+
+/** A QR code (rows of dark modules), for a phone's camera. */
+@Composable
+fun QrCode(modules: List<BooleanArray>) {
+  Column(Modifier.fillMaxWidth().padding(top = Space.l), horizontalAlignment = Alignment.CenterHorizontally) {
+    androidx.compose.foundation.Canvas(
+      Modifier.size(300.dp).background(Color.White, RoundedCornerShape(8.dp)).padding(16.dp).testTag("api-qr"),
+    ) {
+      val cell = size.minDimension / modules.size
+      modules.forEachIndexed { y, row ->
+        row.forEachIndexed { x, dark ->
+          if (dark) drawRect(Color.Black, androidx.compose.ui.geometry.Offset(x * cell, y * cell), androidx.compose.ui.geometry.Size(cell + 0.5f, cell + 0.5f))
         }
       }
     }

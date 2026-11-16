@@ -11,12 +11,11 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import nl.eschouten.scraper.app.Cancellable
 import nl.eschouten.scraper.app.ControllerState
 import nl.eschouten.scraper.app.Outcome
-import nl.eschouten.scraper.app.Controller
+import nl.eschouten.scraper.app.RobotController
 import nl.eschouten.scraper.app.immediateOrDefault
 import nl.eschouten.scraper.texts.tr
 import nl.eschouten.scraper.ui.Action
@@ -27,7 +26,7 @@ import nl.eschouten.scraper.ui.watchIn
 
 data class PanelState(val held: Boolean = false, val error: String? = null, val resume: Boolean = false)
 
-class PanelFlow(private val controller: Controller) {
+class PanelFlow(private val controller: RobotController) {
   private val scope = newScope()
 
   private val _state = MutableStateFlow(PanelState())
@@ -67,7 +66,7 @@ class PanelFlow(private val controller: Controller) {
 
   /** A tap on a key; the message for a toast when it failed, else null. */
   suspend fun press(key: RobotKey): String? {
-    val o: Outcome = controller.input(key.name)
+    val o: Outcome = controller.custom { (it as LelySession).press(key) }
     return if (o.ok) null else o.message
   }
 
@@ -81,7 +80,7 @@ class PanelFlow(private val controller: Controller) {
     downSent = key
     val u = CompletableDeferred<Unit>().also { up = it }
     scope.launch(Dispatchers.Main.immediateOrDefault()) {
-      val o = controller.input(key.name, flow { u.await() })
+      val o = controller.custom { (it as LelySession).hold(key, u) }
       if (!o.ok) onError(o.message)
     }
   }
@@ -103,22 +102,8 @@ class PanelFlow(private val controller: Controller) {
   }
 
   fun view(cs: ControllerState, st: PanelState = _state.value): PanelScreen {
-    val live = cs.live
-    return panelScreen(cs, st.held, st.error, live?.screen, live?.highlighted, live?.extra?.let(Manual::read))
-  }
-}
-
-/** The manual control screen's motors and direction in [ScraperStatus.extra]: "manual" -> left,
- *  right, forward as 1 / 0 / ? (not known), e.g. "10?". */
-internal object Manual {
-  private const val KEY = "manual"
-
-  fun write(m: ManualState): Map<String, String> =
-    mapOf(KEY to listOf(m.left, m.right, m.forward).joinToString("") { when (it) { true -> "1"; false -> "0"; null -> "?" } })
-
-  fun read(extra: Map<String, String>): ManualState? = extra[KEY]?.let { v ->
-    fun b(i: Int) = when (v.getOrNull(i)) { '1' -> true; '0' -> false; else -> null }
-    ManualState(b(0), b(1), b(2))
+    val live = (controller.session as? LelySession)?.live
+    return panelScreen(cs, st.held, st.error, live?.screen, live?.highlighted, live?.manual)
   }
 }
 

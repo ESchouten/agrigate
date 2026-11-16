@@ -447,25 +447,29 @@ class Tr(val code: String) {
   val remove: String get() = t("Verwijderen", "Remove")
   val removeRobot: String get() = t("Robot verwijderen", "Remove robot")
 
-  // ---- the web page (a barn computer serves the app to browsers) -----------------
-  val webPage: String get() = t("Webpagina", "Web page")
-  val webPageRow: String get() = t("Bedienen via de browser", "Control from a browser")
-  val webPageOffFooter: String get() = t(
-    "Zet dit aan op de computer in de stal: telefoons en computers in hetzelfde netwerk bedienen de robot dan via een webpagina, en deze computer houdt de verbinding met de robot.",
-    "Switch this on on the barn computer: phones and computers on the same network then control the robot through a web page, and this computer keeps the connection to the robot.",
+  // ---- the web API (docs/API.md): a robot through another device, and the desktop serving it ----
+  val connection: String get() = t("Verbinding", "Connection")
+  val viaBluetooth: String get() = t("Rechtstreeks via Bluetooth", "Directly over Bluetooth")
+  fun viaDevice(address: String): String = t("Via $address", "Through $address")
+  val viaTitle: String get() = t("Via een ander apparaat", "Through another device")
+  val viaHelp: String get() = t(
+    "Het adres van de knoppen of de computer die de robot via Bluetooth bereikt, bijvoorbeeld scraper-control-1a2b.local. Leeg: rechtstreeks via Bluetooth.",
+    "The address of the buttons or the computer that reaches the robot over Bluetooth, for example scraper-control-1a2b.local. Empty: directly over Bluetooth.",
   )
-  fun webPageOnFooter(address: String): String = t(
-    "Open $address in de browser van een telefoon of computer in hetzelfde netwerk en vul de pincode van een van je robots in. Laat deze computer aan en de app open.",
-    "Open $address in the browser of a phone or computer on the same network and enter the PIN of one of your robots. Keep this computer on and the app open.",
+  fun deviceUnreachable(address: String): String = t(
+    "Kan $address niet bereiken. Staat het apparaat aan en zit je op hetzelfde netwerk?",
+    "Cannot reach $address. Is the device on, and are you on the same network?",
   )
-  val port: String get() = t("Poort", "Port")
-  val portInvalid: String get() = t("Kies een poort van 1024 tot en met 65535", "Choose a port from 1024 to 65535")
-  fun webPageFailed(why: String): String = t("De webpagina start niet: $why", "The web page does not start: $why")
-  val connectingBarn: String get() = t("Verbinden met de stalcomputer...", "Connecting to the barn computer...")
-  val webPinHelp: String get() = t(
-    "De pincode van een van je robots, dezelfde als in de app van de fabrikant.",
-    "The PIN of one of your robots, the same as in the maker's app.",
+  val tooManyTries: String get() = t(
+    "Te vaak een verkeerde pincode. Probeer het over een minuut opnieuw.",
+    "Too many wrong PINs. Try again in a minute.",
   )
-  val tooManyTries: String get() = t("Te vaak een foute pincode. Probeer het over een minuut opnieuw.", "Wrong PIN too often. Try again in a minute.")
-  val connect: String get() = t("Verbinden", "Connect")
+  val webApi: String get() = t("Web-API", "Web API")
+  val apiPort: String get() = t("Poort", "Port")
+  fun apiFooter(address: String): String = t(
+    "$address, met de pincode van de robot. Alleen voor je eigen netwerk, zet de poort nooit open naar internet.",
+    "$address, with the robot's PIN. Your own network only, never open the port to the internet.",
+  )
+  fun apiFailed(detail: String): String = t("De web-API kon niet starten: $detail", "The web API could not start: $detail")
+  val apiPortHelp: String get() = t("Een getal van 1024 tot 65535", "A number from 1024 to 65535")
 }

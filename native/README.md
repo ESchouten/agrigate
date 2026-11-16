@@ -8,7 +8,6 @@ a native UI per platform that only draws what the shared module says:
 | Android | Jetpack Compose (`composeApp`, `androidApp`) | Kable | JNI (`../core`, built by the NDK) |
 | Desktop (macOS, Windows, Linux) | Compose Desktop (`composeApp`) | Kable (btleplug) | JNI (built by CMake) |
 | iOS | SwiftUI (`iosApp`) | Kable (CoreBluetooth) | cinterop (`libcore.a`) |
-| Web page | Compose for Web, wasm (`composeApp`) | kotlinx.rpc to a desktop app | none: the desktop app's |
 
 The driver is chosen in `gradle.properties` (`scraper.driver`), its Kotlin side is listed in
 `shared/.../model/Registry.kt`.
@@ -17,7 +16,7 @@ The driver is chosen in `gradle.properties` (`scraper.driver`), its Kotlin side 
 shared/      Kotlin Multiplatform: the robot API (core/), links (link/), robot controller,
              settings, logbook, texts (NL/EN), screen models (ui/), widget data, and the
              drivers' Kotlin side (model, own screens, demo robot)
-composeApp/  Compose screens (Android, desktop, web page) and the scenario tests
+composeApp/  Compose screens (Android + desktop) and the scenario tests
 androidApp/  Android app: activity, widgets, the NDK build of the core
 iosApp/      SwiftUI app, WidgetKit widgets, Siri/Shortcuts intent, XCUITests (XcodeGen)
 scenarios/   the user scenarios both apps must pass, and the checks around them
@@ -54,24 +53,6 @@ python3 ../tools/secrets.py               # optional: the build secrets (a real 
 ./gradlew :androidApp:assembleDebug       # Android APK
 cd iosApp && xcodegen && open ScraperControl.xcodeproj   # iOS app
 iosApp/run-ui-tests.sh                    # iOS scenarios + screenshots (/tmp/shots/<lang>)
-```
-
-## The web page
-
-One computer in the barn runs the desktop app with **Settings > Web page** on. It keeps the
-connection to the robot and serves the same app to browsers on the local network, on port 8080
-(or the one chosen there). A page gets in with the PIN of one of the robots (a minute's pause
-after 5 wrong tries) and never sees the PINs themselves.
-The page's screens call the barn computer's `RobotController` through
-[kotlinx.rpc](https://github.com/Kotlin/kotlinx-rpc) (`shared/.../app/Controller.kt`), which
-sends its state back after every change. So there is one robot connection however many pages
-are open, and every rule stays in one place. A key held on the page (manual driving) is let go
-when the page lets go or drops.
-
-```sh
-./gradlew :composeApp:run --args="--demo"        # the desktop app with the page, Settings > Web page
-./gradlew :composeApp:wasmJsBrowserDistribution  # only the page (build/dist/wasmJs/productionExecutable)
-cd scenarios && node web-page.mjs                 # the page in a browser, against the app run with --demo setup=done
 ```
 
 ## The demo robot

@@ -1,6 +1,5 @@
-// The Compose UI, one code base for Android, the desktop and the web page (Compose Multiplatform).
-// iOS has its own SwiftUI app (iosApp/) on top of the same :shared module. The web page is
-// served by the desktop app (WebServer.kt), so it is built into the desktop app's resources.
+// The Compose UI, one code base for Android and the desktop (Compose Multiplatform).
+// iOS has its own SwiftUI app (iosApp/) on top of the same :shared module.
 plugins {
   id("org.jetbrains.kotlin.multiplatform")
   id("org.jetbrains.kotlin.plugin.compose")
@@ -12,13 +11,7 @@ kotlin {
   jvm {
     compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) }
   }
-  @OptIn(org.jetbrains.kotlin.gradle.ExperimentalWasmDsl::class)
-  wasmJs {
-    browser()
-    binaries.executable()
-  }
   sourceSets {
-    wasmJsMain { resources.srcDir("src/jvmMain/resources") }   // the icon
     commonMain.dependencies {
       api(project(":shared"))
       implementation(compose.runtime)
@@ -36,9 +29,6 @@ kotlin {
       implementation(compose.desktop.currentOs)
       implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.11.0")
     }
-    wasmJsMain.dependencies {
-      implementation("org.jetbrains.kotlinx:kotlinx-browser:0.5.0")
-    }
   }
 }
 
@@ -47,6 +37,7 @@ compose.desktop {
     mainClass = "nl.eschouten.scraper.app.MainKt"
     nativeDistributions {
       packageName = "Scraper Control"
+      modules("jdk.httpserver")   // the web API (api/ApiServer)
       // the app icon (from the iOS/Android icon), per system
       macOS {
         iconFile.set(project.file("icons/icon.icns"))
@@ -75,13 +66,5 @@ compose.desktop {
     }
   }
 }
-
-// The web page goes into the desktop app's resources (common/web), where WebServer.kt finds it.
-val webPage by tasks.registering(Sync::class) {
-  from(tasks.named("wasmJsBrowserDistribution"))
-  into(layout.buildDirectory.dir("app-resources/common/web"))
-}
-compose.desktop.application.nativeDistributions.appResourcesRootDir.set(layout.buildDirectory.dir("app-resources"))
-tasks.matching { it.name == "prepareAppResources" }.configureEach { dependsOn(webPage) }
 
 if (findProject(":androidApp") != null) apply(from = "android.gradle")   // an Android SDK is there

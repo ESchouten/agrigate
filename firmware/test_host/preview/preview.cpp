@@ -12,6 +12,12 @@ SerialT Serial;
 WiFiT WiFi;
 EspT ESP;
 UpdateT Update;
+MDNSResponder MDNS;
+WebServer::WebServer(int) {}
+void WiFiT::macAddress(uint8_t* m) {   // the name on the screen: scraper-control-1a2b
+  const uint8_t mac[6] = {0x24, 0x0a, 0xc4, 0x00, 0x1a, 0x2b};
+  for (int i = 0; i < 6; i++) m[i] = mac[i];
+}
 
 static uint32_t now = 0;
 uint32_t millis() { return now; }
@@ -73,6 +79,9 @@ static void all() {
   drawList(tx->robotWord, robotLines(found), 1); shot("10-choose-robot");
   wifiSsid = "Stal-wifi";
   drawWifi(); shot("11-wifi");
+  serving = true; pin = "4321";
+  drawWifi(); shot("11b-wifi-api");
+  serving = false;
   drawList(tx->networkWord, {String("Stal-wifi  -48 dBm"), String("Thuis  -67 dBm"), String("Gast  -80 dBm")}, 0); shot("12-network");
   TextEditor te("geheim");
   te.next(); te.next(); te.next();

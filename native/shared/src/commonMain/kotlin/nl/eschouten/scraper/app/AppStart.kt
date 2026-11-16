@@ -6,6 +6,7 @@
 //   planning=on|off  mode=home|menu|manual|driving|question|abort  lang=nl|en (robot)
 //   delay=<ms per answer>  scan=<ms>   setup=done (skip onboarding: demo robot, PIN 4321)
 //   ui=nl|en (app language)  routes=ABC  names=A:Voergang,B:Stal+2 (+ is a space)
+//   api=on (desktop: serve the web API on port 8080)
 // The UI tests of both apps start the same way, with the same words.
 package nl.eschouten.scraper.app
 
@@ -21,6 +22,7 @@ object AppStart {
     val mem = MemoryStore()
     val settings = Settings.load(mem)
     kv["ui"]?.let { settings.language = it }
+    settings.apiOn = kv["api"] == "on"
     if (kv["setup"] == "done") {
       val r = scraperModels.first().demoRobots.first()
       settings.updateRobot {

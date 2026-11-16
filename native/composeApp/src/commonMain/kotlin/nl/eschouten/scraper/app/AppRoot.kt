@@ -38,8 +38,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlin.time.Clock
+import nl.eschouten.scraper.app.RobotController
 import nl.eschouten.scraper.ui.Platform
-import nl.eschouten.scraper.ui.WebPageHost
 
 /** What the platform gives the UI. */
 interface AppHost {
@@ -50,11 +50,7 @@ interface AppHost {
 
   /** True while the app is in front (the panel connects only then). */
   val foreground: StateFlow<Boolean> get() = alwaysForeground
-
-  /** The web page this computer can serve to browsers (the desktop app), else null. */
-  val webPage: WebPageHost? get() = null
 }
-
 
 private val alwaysForeground = MutableStateFlow(true)
 
@@ -103,7 +99,7 @@ fun rememberNow(): State<Long> {
 }
 
 @Composable
-fun App(controller: Controller, host: AppHost, nav: Nav = remember { Nav() }) {
+fun App(controller: RobotController, host: AppHost, nav: Nav = remember { Nav() }) {
   val s by controller.state.collectAsState()
   val snack = remember { SnackbarHostState() }
   val scope = rememberCoroutineScope()
@@ -144,7 +140,7 @@ fun App(controller: Controller, host: AppHost, nav: Nav = remember { Nav() }) {
             }
           }
           // After a stop the robot asks whether to finish the route: the user decides.
-          finishQuestion(s)?.let { q -> ChoiceDialog(q) { scope.launch { controller.answerFinish(it) } } }
+          finishQuestion(s)?.let { q -> ChoiceDialog(q) { controller.answerFinish(it) } }
           SnackbarHost(snack, Modifier.align(Alignment.BottomCenter).padding(16.dp)) { d ->
             Snackbar(
               shape = MaterialTheme.shapes.small,

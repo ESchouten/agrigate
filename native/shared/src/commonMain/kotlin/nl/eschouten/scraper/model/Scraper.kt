@@ -8,10 +8,8 @@
 //   ScraperException  why something failed, in generic terms (ScraperFault)
 package nl.eschouten.scraper.model
 
-import kotlinx.coroutines.Deferred
 import kotlinx.serialization.Serializable
 import nl.eschouten.scraper.app.RobotProfile
-import nl.eschouten.scraper.texts.tr
 
 /** What a scraper type supports. The apps show only what is supported. */
 enum class Capability {
@@ -25,10 +23,10 @@ enum class Capability {
 
 /** A robot found nearby. [signal] is RSSI in dBm, -127 if unknown. [link]: how it was found
  *  (link/LinkSpec kind, "" = the driver's preferred), to be remembered with the robot. */
-@Serializable
 data class FoundScraper(val id: String, val name: String, val signal: Int, val link: String = "")
 
-/** Status in generic terms. Fields a type does not report stay null / empty. */
+/** Status in generic terms. Fields a type does not report stay null / empty. Also the web
+ *  API's status (docs/API.md). */
 @Serializable
 data class ScraperStatus(
   val planning: Boolean? = null, // null = unknown right now
@@ -39,16 +37,10 @@ data class ScraperStatus(
   val busy: Boolean = false, // not ready for a new command (driving, in a menu, ...)
   val driving: Boolean = false, // a route runs: stopRoute() can stop it
   val finishQuestion: Boolean = false, // a stopped route asks "finish it?": answerStop()
-  // the robot's own display, for a type's own screens (its panel): the text, the selected row,
-  // and what else the type reads there (its own keys)
-  val screen: String = "",
-  val highlighted: String = "",
-  val extra: Map<String, String> = emptyMap(),
 )
 
 /** One step of a running command, for the progress bar. [id] is defined by the type. */
 /** [percent]: a step still under way (e.g. a sync), reported again as it goes; replaced by the next step. */
-@Serializable
 data class RunStep(val id: String, val percent: Int? = null)
 
 /** What a command is about to do, so the type can describe its steps. */
@@ -138,10 +130,4 @@ interface ScraperSession {
   /** [Capability.RouteContents]: route slot -> what it consists of, as the robot shows it,
    *  e.g. "C" -> "1 2 3". Only reads; the robot is left as it was. */
   suspend fun readRoutes(): Map<String, String> = emptyMap()
-
-  /** An input on a type's own screen, by name (e.g. a panel key): held until [until]
-   *  completes, or a tap when null. */
-  suspend fun input(name: String, until: Deferred<*>? = null) {
-    throw ScraperException(ScraperFault.Failed, tr.notSupported)
-  }
 }

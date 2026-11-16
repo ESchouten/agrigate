@@ -89,6 +89,15 @@ jobs:
           echo "# Scraper Control $VERSION: one block per board" > out/update.ini
           python3 firmware/sign_release.py "$BIN" --board m5stack-core --key "$FIRMWARE_SIGNING_KEY" --version "$VERSION" --build "$BUILD" >> out/update.ini
           cat out/update.ini
+      - name: First-install image (bootloader, partitions and app in one file, from address 0)
+        run: |
+          pip install "esptool>=5"
+          B=firmware/.pio/build/m5stack-core
+          esptool --chip esp32 merge-bin -o "out/scraper-control-m5stack-core-$VERSION-full.bin" \
+            --flash-mode dio --flash-freq 80m --flash-size 16MB \
+            0x1000 $B/bootloader.bin 0x8000 $B/partitions.bin \
+            0xe000 ~/.platformio/packages/framework-arduinoespressif32/tools/partitions/boot_app0.bin \
+            0x10000 $B/firmware.bin
       - uses: actions/upload-artifact@v4
         with:
           name: firmware
@@ -175,6 +184,39 @@ jobs:
           path: out/
           if-no-files-found: error
 
+  # The browser installer for the buttons (docs/install) on GitHub Pages, with this release's
+  # first-install image. Pages must be set to "GitHub Actions" once (Settings > Pages).
+  installer:
+    needs: [version, firmware]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: firmware
+          path: fw
+      - name: Page, manifest and image
+        run: |
+          mkdir site
+          cp docs/install/index.html site/
+          cp "fw/scraper-control-m5stack-core-$VERSION-full.bin" site/scraper-control-m5stack-core-full.bin
+          cat > site/manifest.json <<JSON
+          {"name": "Scraper Control buttons", "version": "$VERSION", "new_install_prompt_erase": true,
+           "builds": [{"chipFamily": "ESP32", "parts": [{"path": "scraper-control-m5stack-core-full.bin", "offset": 0}]}]}
+          JSON
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - uses: actions/deploy-pages@v4
+
   publish:
     needs: [version, firmware, android, desktop]
     runs-on: ubuntu-latest
@@ -184,6 +226,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
+          pattern: "{firmware,android,desktop-*}" # not the installer's github-pages
           path: dist
           merge-multiple: true
       - name: Release

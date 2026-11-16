@@ -120,6 +120,9 @@ class LelySession(
 
   override val isConnected get() = robot?.isConnected ?: false
 
+  /** The robot's display as the core sees it (for the panel screen). */
+  val live: CoreStatus? get() = if (isConnected) robot!!.status() else null
+
   override suspend fun awaitClosed() {
     robot?.link?.awaitClosed()
   }
@@ -164,7 +167,6 @@ class LelySession(
     return ScraperStatus(
       planning = s.planning, nextRun = s.nextRide, batteryMv = s.batteryMv, activity = s.action,
       route = s.route, busy = s.busy, driving = s.driving, finishQuestion = s.stopQuestion,
-      screen = s.screen, highlighted = s.highlighted, extra = s.manual?.let { Manual.write(it) } ?: emptyMap(),
     )
   }
 
@@ -181,12 +183,11 @@ class LelySession(
     return out
   }
 
-  /** A panel key by its RobotKey name, held down until [until] completes (manual control:
-   *  drives while Start/Stop is held), or a tap. */
-  override suspend fun input(name: String, until: Deferred<*>?) {
-    val key = RobotKey.entries.firstOrNull { it.name == name } ?: throw ScraperException(ScraperFault.Failed, tr.notSupported)
-    guard { if (until == null) robot!!.press(key) else robot!!.hold(key, until) }
-  }
+  /** A raw panel key (panel screen). */
+  suspend fun press(key: RobotKey) = guard { robot!!.press(key) }
+
+  /** A raw panel key held down until [up] completes (manual control: drives while Start/Stop is held). */
+  suspend fun hold(key: RobotKey, up: Deferred<*>) = guard { robot!!.hold(key, up) }
 
   /** Planning owed by a session whose link dropped, as "1@<epoch ms>"; too old = forgotten
    *  (someone may have changed the robot on purpose since). */

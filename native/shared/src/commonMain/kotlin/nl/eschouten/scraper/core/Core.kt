@@ -3,8 +3,6 @@
 package nl.eschouten.scraper.core
 
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
@@ -224,11 +222,7 @@ class CoreSession(
       try {
         d.await()
       } finally {
-        // a cancelled hold lets go of the key: wait until the core has done that
-        if (w != null) withContext(NonCancellable) {
-          w.cancelAndJoin()
-          d.await()
-        }
+        w?.cancel()
       }
     }
   }

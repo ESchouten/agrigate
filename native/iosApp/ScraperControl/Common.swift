@@ -230,9 +230,9 @@ extension View {
   func finishQuestion(_ app: AppModel, active: Bool = true) -> some View {
     let q = HomeKt.finishQuestion(s: app.state)
     return alert(q?.title ?? "", isPresented: Binding(get: { active && q != nil }, set: { _ in })) {
-      Button(q?.yes ?? "") { Task { try? await app.controller.answerFinish(finish: KotlinBoolean(bool: true)) } }.testId("choice-yes")
-      Button(q?.no ?? "", role: .destructive) { Task { try? await app.controller.answerFinish(finish: KotlinBoolean(bool: false)) } }.testId("choice-no")
-      Button(q?.later ?? "", role: .cancel) { Task { try? await app.controller.answerFinish(finish: nil) } }.testId("choice-later")
+      Button(q?.yes ?? "") { app.controller.answerFinish(finish: KotlinBoolean(bool: true)) }.testId("choice-yes")
+      Button(q?.no ?? "", role: .destructive) { app.controller.answerFinish(finish: KotlinBoolean(bool: false)) }.testId("choice-no")
+      Button(q?.later ?? "", role: .cancel) { app.controller.finishLater() }.testId("choice-later")
     } message: {
       Text(q?.body ?? "")
     }
