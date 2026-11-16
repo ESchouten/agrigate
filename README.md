@@ -19,7 +19,7 @@ Python script.
 
 | Robot | Connection | Driver |
 |---|---|---|
-| Lely Discovery | Bluetooth LE | [`drivers/lely`](drivers/lely) |
+| Lely Discovery | Bluetooth LE, or classic Bluetooth on older robots (not on iOS) | [`drivers/lely`](drivers/lely) |
 
 ## Install
 
@@ -29,7 +29,7 @@ Everything is in the [latest release](https://github.com/ESchouten/scraper-contr
 |---|---|---|
 | Android | `.apk` | Open it on the phone and allow installing from your browser or files app. A newer version installs over the old one. |
 | Windows | `.exe` | Not signed: at the blue warning choose More info > Run anyway. |
-| macOS | `.dmg` | Not signed: drag the app to Applications, then right-click > Open the first time. |
+| macOS | `.dmg` | Not signed: drag the app to Applications, then right-click > Open the first time and allow Bluetooth. |
 | Linux | `.deb` | `sudo apt install ./scraper-control_*.deb` |
 | iOS | none yet | Build it with Xcode ([native/README.md](native/README.md)). |
 | Buttons | M5Stack Basic v2.7 (16 MB) | The first time over USB from the source (see Build). After that it updates itself over wifi. |
