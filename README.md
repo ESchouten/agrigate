@@ -91,7 +91,7 @@ buttons' browser installer (`docs/install`) on GitHub Pages; the buttons install
 
 ## Licence and disclaimer
 
-GNU GPL v3 (`LICENSE`). Copyright (C) 2026 Erik Schouten.
+GNU AGPL v3 (`LICENSE`). Copyright (C) 2026 Erik Schouten.
 
 Unofficial software: not made, endorsed or supported by the makers of the robots it controls.
 Brand and product names belong to their owners. Use at your own risk and keep the robot in sight.
