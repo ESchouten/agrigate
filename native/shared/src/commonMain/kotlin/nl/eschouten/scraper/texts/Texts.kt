@@ -460,6 +460,8 @@ class Tr(val code: String) {
     "Open $address in de browser van een telefoon of computer in hetzelfde netwerk en vul code $code in. Laat deze computer aan en de app open.",
     "Open $address in the browser of a phone or computer on the same network and enter code $code. Keep this computer on and the app open.",
   )
+  val port: String get() = t("Poort", "Port")
+  val portInvalid: String get() = t("Kies een poort van 1024 tot en met 65535", "Choose a port from 1024 to 65535")
   fun webPageFailed(why: String): String = t("De webpagina start niet: $why", "The web page does not start: $why")
   val barnComputerGone: String get() = t("Geen verbinding met de staldcomputer", "No connection to the barn computer")
   val connectingBarn: String get() = t("Verbinden met de staldcomputer...", "Connecting to the barn computer...")

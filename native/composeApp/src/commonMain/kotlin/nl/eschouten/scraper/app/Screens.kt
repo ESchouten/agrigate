@@ -67,6 +67,8 @@ import nl.eschouten.scraper.ui.pinDialog
 import nl.eschouten.scraper.ui.robotSettingsScreen
 import nl.eschouten.scraper.ui.routeNameDialog
 import nl.eschouten.scraper.ui.settingsScreen
+import nl.eschouten.scraper.ui.portDialog
+import nl.eschouten.scraper.ui.webPort
 import nl.eschouten.scraper.ui.withWebPage
 import nl.eschouten.scraper.ui.Row as RowModel
 
@@ -219,6 +221,8 @@ fun SettingsScreen(controller: Controller, host: AppHost, nav: Nav) {
   val c = MaterialTheme.colorScheme
   var pickLanguage by remember { mutableStateOf(false) }
   var askReset by remember { mutableStateOf(false) }
+  var askPort by remember { mutableStateOf(false) }
+  val toast = LocalToast.current
   PushedScreen(v.title, nav, "settings") {
     for (sec in v.sections) {
       section(sec) { r ->
@@ -229,6 +233,7 @@ fun SettingsScreen(controller: Controller, host: AppHost, nav: Nav) {
           r.id == RowId.LANGUAGE -> ({ pickLanguage = true })
           r.id == RowId.RESET -> ({ askReset = true })
           r.id == RowId.WEB_PAGE -> ({ host.webPage?.switch(r.toggle != true) })
+          r.id == RowId.WEB_PORT -> ({ askPort = true })
           else -> null
         }
         SettingsRow(
@@ -268,6 +273,12 @@ fun SettingsScreen(controller: Controller, host: AppHost, nav: Nav) {
       confirmButton = {},
       containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
     )
+  }
+  if (askPort && web != null) {
+    TextInputDialog(portDialog(web), onDismiss = { askPort = false }) { x ->
+      askPort = false
+      webPort(x)?.let { host.webPage?.setPort(it) } ?: toast(tr.portInvalid)
+    }
   }
   if (askReset) {
     ConfirmDialog(v.resetConfirm, { askReset = false }) {

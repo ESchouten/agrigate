@@ -58,6 +58,7 @@ interface AppHost {
 interface WebPageHost {
   val state: StateFlow<WebPageState>
   fun switch(on: Boolean)
+  fun setPort(port: Int)
 }
 
 private val alwaysForeground = MutableStateFlow(true)

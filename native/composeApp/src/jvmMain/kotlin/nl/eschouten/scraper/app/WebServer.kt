@@ -1,6 +1,7 @@
 // The web page (Settings > Web page): this computer keeps the connection to the robot and serves
 // the same app to browsers on the local network (the page's half: app/Remote.kt, WebLink.kt).
 // The page comes with the desktop app (build.gradle.kts); a code keeps other people out.
+// Port 8080 unless chosen in Settings.
 package nl.eschouten.scraper.app
 
 import io.ktor.http.ContentType
@@ -26,6 +27,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.withContext
+import nl.eschouten.scraper.ui.DEFAULT_WEB_PORT
 import nl.eschouten.scraper.ui.WebPageState
 import java.io.File
 import java.net.Inet4Address
@@ -34,7 +36,7 @@ import kotlin.random.Random
 import kotlin.time.Duration.Companion.seconds
 
 class WebServer(private val controller: RobotController, private val store: Store) : WebPageHost {
-  private val _state = MutableStateFlow(WebPageState())
+  private val _state = MutableStateFlow(WebPageState(port = port()))
   override val state: StateFlow<WebPageState> = _state
   private var server: EmbeddedServer<*, *>? = null
 
@@ -48,19 +50,27 @@ class WebServer(private val controller: RobotController, private val store: Stor
   override fun switch(on: Boolean) {
     stop()
     store.putString(ON, if (on) "1" else null)
+    val port = port()
     if (!on) {
-      _state.value = WebPageState()
+      _state.value = WebPageState(port = port)
       return
     }
     val code = store.getString(CODE) ?: (1..6).joinToString("") { Random.nextInt(10).toString() }.also { store.putString(CODE, it) }
     _state.value = try {
-      server = embeddedServer(CIO, port = PORT) { page(code) }.start(wait = false)
-      WebPageState(on = true, address = "http://${lanAddress()}:$PORT", code = code)
+      server = embeddedServer(CIO, port = port) { page(code) }.start(wait = false)
+      WebPageState(on = true, port = port, address = "http://${lanAddress()}:$port", code = code)
     } catch (e: Exception) {
       store.putString(ON, null)
-      WebPageState(error = e.message ?: e.toString())
+      WebPageState(port = port, error = e.message ?: e.toString())
     }
   }
+
+  override fun setPort(port: Int) {
+    store.putString(PORT, if (port == DEFAULT_WEB_PORT) null else port.toString())
+    switch(_state.value.on)
+  }
+
+  private fun port() = store.getString(PORT)?.toIntOrNull() ?: DEFAULT_WEB_PORT
 
   fun stop() {
     server?.stop(500, 1_000)
@@ -101,8 +111,8 @@ class WebServer(private val controller: RobotController, private val store: Stor
   }
 
   private companion object {
-    const val PORT = 8080
     const val ON = "web.on"
+    const val PORT = "web.port"
     const val CODE = "web.code"
 
     /** The page's files, in the app's resources (compose.application.resources.dir). */

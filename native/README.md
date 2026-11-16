@@ -59,8 +59,8 @@ iosApp/run-ui-tests.sh                    # iOS scenarios + screenshots (/tmp/sh
 ## The web page
 
 One computer in the barn runs the desktop app with **Settings > Web page** on. It keeps the
-connection to the robot and serves the same app on port 8080 to browsers on the local network,
-behind a 6-digit code shown there. The page's screens use a `RemoteController`
+connection to the robot and serves the same app to browsers on the local network, on port 8080
+(or the one chosen there) behind a 6-digit code shown there. The page's screens use a `RemoteController`
 (`shared/.../app/Remote.kt`) instead of the `RobotController`: every command goes to the barn
 computer's controller, which sends its state back after every change. So there is one robot
 connection however many pages are open, and every rule stays in one place. A key held on the

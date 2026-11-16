@@ -60,6 +60,7 @@ object RowId {
   const val TEST = "test"
   const val READ_ROUTES = "read-routes"
   const val WEB_PAGE = "web-page"
+  const val WEB_PORT = "web-port"
   fun robot(uid: String) = "robot-$uid"
   fun route(r: String) = "route-$r"
 }
@@ -108,16 +109,26 @@ fun settingsScreen(s: ControllerState, now: Long, platform: Platform): SettingsS
 }
 
 /** The web page this computer serves to browsers on the network (the desktop app, app/Remote.kt). */
-data class WebPageState(val on: Boolean = false, val address: String = "", val code: String = "", val error: String? = null)
+data class WebPageState(val on: Boolean = false, val port: Int = DEFAULT_WEB_PORT, val address: String = "", val code: String = "", val error: String? = null)
+
+const val DEFAULT_WEB_PORT = 8080
 
 /** Settings with the web page section, before "about" (only where the app can serve it). */
 fun SettingsScreen.withWebPage(w: WebPageState): SettingsScreen = copy(
   sections = sections.dropLast(1) + Section(
     tr.webPage,
-    listOf(Row(RowId.WEB_PAGE, Glyph.Phone, tr.webPageRow, if (w.on) tr.webPageOn(w.address) else tr.off, toggle = w.on)),
+    listOf(
+      Row(RowId.WEB_PAGE, Glyph.Phone, tr.webPageRow, if (w.on) tr.webPageOn(w.address) else tr.off, toggle = w.on),
+      Row(RowId.WEB_PORT, Glyph.Dialpad, tr.port, w.port.toString()),
+    ),
     footer = w.error?.let { tr.webPageFailed(it) } ?: if (w.on) tr.webPageOnFooter(w.address, w.code) else tr.webPageOffFooter,
   ) + sections.last(),
 )
+
+fun portDialog(w: WebPageState) = TextDialog(tr.port, DEFAULT_WEB_PORT.toString(), w.port.toString(), tr.save, tr.cancel)
+
+/** The port typed in [portDialog], or null when it is not one (1024-65535: lower ones need an administrator). */
+fun webPort(text: String): Int? = text.trim().toIntOrNull()?.takeIf { it in 1024..65535 }
 
 data class RobotSettingsScreen(
   val title: String,
