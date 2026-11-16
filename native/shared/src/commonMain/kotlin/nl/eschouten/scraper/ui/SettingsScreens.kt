@@ -173,7 +173,7 @@ fun robotSettingsScreen(s: ControllerState, uid: String): RobotSettingsScreen? {
 
 fun routeNameDialog(p: RobotProfile, r: String) = TextDialog(tr.routeNameTitle(r), tr.routeNameHint, p.routeName(r), tr.save, tr.cancel)
 fun pinDialog(p: RobotProfile) = TextDialog(tr.pin, tr.pin, p.pin, tr.save, tr.cancel, secret = true)
-fun viaDialog(p: RobotProfile) = TextDialog(tr.viaTitle, "scraper-control.local", p.via, tr.save, tr.cancel)
+fun viaDialog(p: RobotProfile) = TextDialog(tr.viaTitle, "scraper-control-1a2b.local", p.via, tr.save, tr.cancel)
 fun apiPortDialog(s: ControllerState) = TextDialog(tr.apiPort, Settings.API_PORT.toString(), s.apiPort.toString(), tr.save, tr.cancel)
 
 /** Show or hide a route on the home screen; keeps the order A..D. */

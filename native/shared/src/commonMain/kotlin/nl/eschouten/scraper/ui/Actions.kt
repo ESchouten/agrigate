@@ -2,6 +2,7 @@
 // thing everywhere. Each returns the message for a toast (or null for none).
 package nl.eschouten.scraper.ui
 
+import io.ktor.http.Url
 import nl.eschouten.scraper.app.RobotController
 import nl.eschouten.scraper.app.RobotProfile
 import nl.eschouten.scraper.model.FoundScraper
@@ -60,9 +61,9 @@ object Actions {
    *  through that address), makes it the robot in use and ends the first setup. False when it
    *  is not such a link. */
   suspend fun openLink(c: RobotController, link: String): Boolean {
-    val q = addLink(link) ?: return false
-    val via = q["via"]?.takeIf { it.isNotBlank() } ?: return false
-    val pin = q["pin"] ?: ""
+    val url = runCatching { Url(link) }.getOrNull()?.takeIf { it.protocol.name == "scraper-control" && it.host == "add" } ?: return false
+    val via = url.parameters["via"]?.takeIf { it.isNotBlank() } ?: return false
+    val pin = url.parameters["pin"] ?: ""
     val s = c.state.value
     val same = s.robots.firstOrNull { it.via.equals(via, ignoreCase = true) }
     val fresh = s.robots.singleOrNull()?.takeIf { !s.onboarded && it.robotId == null && it.via.isEmpty() }   // the empty first robot
@@ -76,15 +77,6 @@ object Actions {
     }
     c.updateSettings { onboarded = true }
     return true
-  }
-
-  /** The query of a scraper-control://add?... link, or null. */
-  fun addLink(link: String): Map<String, String>? {
-    val prefix = "scraper-control://add?"
-    if (!link.startsWith(prefix, ignoreCase = true)) return null
-    return link.substring(prefix.length).split('&').mapNotNull { p ->
-      p.split('=', limit = 2).takeIf { it.size == 2 }?.let { it[0] to it[1] }
-    }.toMap()
   }
 
   /** Desktop: serve the web API or not, and on which port (1024..65535; else unchanged). */

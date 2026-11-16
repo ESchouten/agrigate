@@ -5,27 +5,26 @@
 #include "../src/Api.h"
 
 int main() {
-  ApiCall c = parseCall("GET", "/api/status", "");
+  ApiCall c = parseCall("GET", "/api/status");
   assert(c.kind == ApiCall::Status && !c.fresh);
-  assert(parseCall("GET", "/api/status", "fresh").fresh);
-  assert(parseCall("POST", "/api/status", "").kind == ApiCall::None);   // reading is a GET
-  c = parseCall("POST", "/api/route/B", "");
+  assert(parseCall("POST", "/api/status").kind == ApiCall::None);   // reading is a GET
+  c = parseCall("POST", "/api/route/B");
   assert(c.kind == ApiCall::Route && c.route == 'B');
-  assert(parseCall("POST", "/api/route/d", "").route == 'D');
-  assert(!c.dryRun && parseCall("POST", "/api/route/A", "dryRun").dryRun);
+  assert(parseCall("POST", "/api/route/d").route == 'D');
+  assert(!c.dryRun);
   for (const char* bad : {"/api/route/E", "/api/route/", "/api/route/AB", "/api/route"})
-    assert(parseCall("POST", bad, "").kind == ApiCall::None);
-  assert(parseCall("GET", "/api/route/A", "").kind == ApiCall::None);   // a link in a browser starts nothing
-  c = parseCall("POST", "/api/planning/on", "");
+    assert(parseCall("POST", bad).kind == ApiCall::None);
+  assert(parseCall("GET", "/api/route/A").kind == ApiCall::None);   // a link in a browser starts nothing
+  c = parseCall("POST", "/api/planning/on");
   assert(c.kind == ApiCall::Planning && c.yes);
-  c = parseCall("POST", "/api/planning/off", "");
+  c = parseCall("POST", "/api/planning/off");
   assert(c.kind == ApiCall::Planning && !c.yes);
-  assert(parseCall("POST", "/api/planning/maybe", "").kind == ApiCall::None);
-  c = parseCall("POST", "/api/answer/yes", "");
+  assert(parseCall("POST", "/api/planning/maybe").kind == ApiCall::None);
+  c = parseCall("POST", "/api/answer/yes");
   assert(c.kind == ApiCall::Answer && c.yes);
-  c = parseCall("POST", "/api/answer/no", "");
+  c = parseCall("POST", "/api/answer/no");
   assert(c.kind == ApiCall::Answer && !c.yes);
-  assert(parseCall("GET", "/", "").kind == ApiCall::None);
+  assert(parseCall("GET", "/").kind == ApiCall::None);
 
   PinGate g;
   assert(g.check("Bearer 1234", "1234", 1000) == 200);
@@ -44,8 +43,8 @@ int main() {
   assert(wrap.check("Bearer 1", "1", 0xFFFFFFF0u + 30000) == 429);
   assert(wrap.check("Bearer 1", "1", 0xFFFFFFF0u + 61000) == 200);
 
-  assert(parseCall("POST", "/api/stop", "").kind == ApiCall::Stop);
-  assert(parseCall("GET", "/api/stop", "").kind == ApiCall::None);
+  assert(parseCall("POST", "/api/stop").kind == ApiCall::Stop);
+  assert(parseCall("GET", "/api/stop").kind == ApiCall::None);
   ApiStatus st;
   assert(toJson(st) == "{\"planning\":null,\"nextRun\":\"\",\"batteryMv\":null,\"activity\":\"\",\"route\":\"\","
                        "\"busy\":false,\"driving\":false,\"finishQuestion\":false}");

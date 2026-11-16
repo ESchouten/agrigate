@@ -453,8 +453,8 @@ class Tr(val code: String) {
   fun viaDevice(address: String): String = t("Via $address", "Through $address")
   val viaTitle: String get() = t("Via een ander apparaat", "Through another device")
   val viaHelp: String get() = t(
-    "Het adres van de knoppen of een computer met de web-API die de robot via Bluetooth bereikt, bijvoorbeeld scraper-control.local. Leeg: rechtstreeks via Bluetooth.",
-    "The address of the buttons or a computer with the web API that reaches the robot over Bluetooth, for example scraper-control.local. Empty: directly over Bluetooth.",
+    "Het adres van de knoppen of de computer die de robot via Bluetooth bereikt, bijvoorbeeld scraper-control-1a2b.local. Leeg: rechtstreeks via Bluetooth.",
+    "The address of the buttons or the computer that reaches the robot over Bluetooth, for example scraper-control-1a2b.local. Empty: directly over Bluetooth.",
   )
   fun deviceUnreachable(address: String): String = t(
     "Kan $address niet bereiken. Staat het apparaat aan en zit je op hetzelfde netwerk?",

@@ -35,7 +35,7 @@ data class RobotProfile(
   val label: String = "", // own name, e.g. "Stal 2"
   val pin: String = "",
   /** Reached through another device's web API (docs/API.md): the buttons or a computer that
-   *  holds the Bluetooth link, e.g. "scraper-control.local". "" = Bluetooth from here. */
+   *  holds the Bluetooth link, e.g. "scraper-control-1a2b.local". "" = Bluetooth from here. */
   val via: String = "",
   val routes: String = "ABCD", // which route slots to show, e.g. "ABC"
   val routeNames: Map<String, String> = emptyMap(), // "A" -> "Voergang"

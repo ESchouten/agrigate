@@ -32,8 +32,8 @@ A device without any PIN set is open.
 
 | Call | What |
 |---|---|
-| `GET /api/status` | The robot as last seen. `?fresh` reads it now. |
-| `POST /api/route/<A-D>` | Start that route. While a route runs it stops it instead (a safety stop, like a route button). `?dryRun`: only the checks, the robot is put back and nothing drives. |
+| `GET /api/status` | The robot as last seen. `?fresh=1` reads it now. |
+| `POST /api/route/<A-D>` | Start that route. While a route runs it stops it instead (a safety stop, like a route button). `?dryRun=1`: only the checks, the robot is put back and nothing drives. |
 | `POST /api/stop` | Stop the running route (a safety stop). `Busy` when no route runs. |
 | `POST /api/planning/on`, `/off` | The schedule on or off. |
 | `POST /api/answer/yes`, `/no` | After a stop the robot asks whether to finish the route (`finishQuestion`). Yes drives on, no ends the route and leaves the schedule off. Never answered by itself. |
@@ -65,7 +65,7 @@ unknown call.
 ## Examples
 
 ```bash
-curl -H "Authorization: Bearer 1234" http://scraper-control-1a2b.local/api/status?fresh
+curl -H "Authorization: Bearer 1234" "http://scraper-control-1a2b.local/api/status?fresh=1"
 curl -X POST -H "Authorization: Bearer 1234" http://scraper-control-1a2b.local/api/route/A
 curl -X POST -H "Authorization: Bearer 1234" http://scraper-control-1a2b.local/api/planning/off
 ```

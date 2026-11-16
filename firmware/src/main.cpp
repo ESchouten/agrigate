@@ -731,14 +731,17 @@ static String hostName() {
   return b;
 }
 
+static void stopServing() {
+  if (!serving) return;
+  server.stop();
+  MDNS.end();
+  serving = false;
+}
+
 // Before a download over https: the web API and Bluetooth off, so TLS has the memory (Erik
 // 2026-11-16). The API comes back by itself (wifiTick), Bluetooth at the next robot session.
 static void apiOff() {
-  if (serving) {
-    server.stop();
-    MDNS.end();
-  }
-  serving = false;
+  stopServing();
   BtLink::release();
 }
 
@@ -1215,11 +1218,8 @@ static void wifiTick() {
   if (wifiSsid.isEmpty()) return;
   uint32_t now = millis();
   if (WiFi.status() != WL_CONNECTED) {
-    if (serving) {
-      server.stop();
-      MDNS.end();
-    }
-    serving = checkedOnce = false;
+    stopServing();
+    checkedOnce = false;
     if (!lastWifiTry || now - lastWifiTry >= kWifiTryEveryMs || WiFi.getMode() == WIFI_OFF) {
       lastWifiTry = now | 1;
       WiFi.mode(WIFI_STA);
@@ -1307,8 +1307,9 @@ static uint32_t resultUntil = 0;   // an API command's result is on screen until
 
 static void handleApi() {
   HTTPMethod m = server.method();
-  ApiCall c = parseCall(m == HTTP_GET ? "GET" : m == HTTP_POST ? "POST" : "", server.uri().c_str(),
-                        server.hasArg("fresh") ? "fresh" : "");
+  ApiCall c = parseCall(m == HTTP_GET ? "GET" : m == HTTP_POST ? "POST" : "", server.uri().c_str());
+  c.fresh = server.hasArg("fresh");   // the server keeps only "key=value": ?fresh=1
+  c.dryRun = server.hasArg("dryRun");
   if (c.kind == ApiCall::None) return server.send(404, "application/json", "{}");
   int code = gate.check(server.header("Authorization").c_str(), pin.c_str(), millis());
   if (code != 200) return server.send(code, "application/json", "{}");
@@ -1318,14 +1319,16 @@ static void handleApi() {
     if (c.fresh) r = readRobotOnHome(err);
   } else {
     wake();
-    String title = c.kind == ApiCall::Planning ? String(tx->planning) : String(tx->route) + " " + c.route;
-    Kind kind = c.kind == ApiCall::Planning ? Kind::Planning : Kind::Route;
+    bool planning = c.kind == ApiCall::Planning, stop = c.kind == ApiCall::Stop || c.kind == ApiCall::Answer;
+    String title = planning ? String(tx->planning) : stop ? String(tx->routeStopped) : String(tx->route) + " " + c.route;
+    Kind kind = planning ? Kind::Planning : Kind::Route;
+    if (stop) routeStopped = Stopped::Yes;
     Job job;
-    if (c.kind == ApiCall::Route) job = routeJob(c.route, false, c.dryRun);
-    else if (c.kind == ApiCall::Planning) job = [on = c.yes](Robot& rb) { return rb.status().planning < 0 ? Result::Busy : rb.setPlanning(on); };
-    else if (c.kind == ApiCall::Stop) {
-      title = tx->routeStopped;
-      routeStopped = Stopped::Yes;
+    if (c.kind == ApiCall::Route) {
+      job = routeJob(c.route, false, c.dryRun);
+    } else if (planning) {
+      job = [on = c.yes](Robot& rb) { return rb.status().planning < 0 ? Result::Busy : rb.setPlanning(on); };
+    } else if (c.kind == ApiCall::Stop) {
       job = [](Robot& rb) {
         if (!rb.drivingRoute()) return Result::Busy;   // nothing pressed
         Result res = rb.stopRoute();
@@ -1333,8 +1336,6 @@ static void handleApi() {
         return res;
       };
     } else {
-      title = tx->routeStopped;
-      routeStopped = Stopped::Yes;
       job = [yes = c.yes](Robot& rb) {
         Result res = rb.answerStop(yes);
         if (res == Result::Ok) routeStopped = yes ? Stopped::Continues : Stopped::Cancelled;

@@ -34,7 +34,7 @@ data class ApiAnswer(
 
 internal val apiJson = Json { ignoreUnknownKeys = true; encodeDefaults = true; explicitNulls = true }
 
-/** "scraper-control.local" or "host:8080" -> "http://...", a full URL as it is. */
+/** "scraper-control-1a2b.local" or "host:8080" -> "http://...", a full URL as it is. */
 fun apiBase(via: String): String = via.trim().trimEnd('/').let { if ("://" in it) it else "http://$it" }
 
 private val client by lazy {
@@ -58,7 +58,7 @@ class ApiSession(private val p: RobotProfile) : ScraperSession {
   override suspend fun awaitClosed() = closed.await()
 
   override suspend fun connect() {
-    call(HttpMethod.Get, "status?fresh")
+    call(HttpMethod.Get, "status?fresh=1")
     isConnected = true
   }
 
@@ -70,7 +70,7 @@ class ApiSession(private val p: RobotProfile) : ScraperSession {
   override fun status() = status
   override val revision: Any get() = changes
 
-  override suspend fun startRoute(slot: String, dryRun: Boolean) = call(HttpMethod.Post, "route/$slot" + if (dryRun) "?dryRun" else "")
+  override suspend fun startRoute(slot: String, dryRun: Boolean) = call(HttpMethod.Post, "route/$slot" + if (dryRun) "?dryRun=1" else "")
   override suspend fun setPlanning(on: Boolean) = call(HttpMethod.Post, "planning/" + if (on) "on" else "off")
   override suspend fun stopRoute() = call(HttpMethod.Post, "stop")
   override suspend fun answerStop(finish: Boolean) = call(HttpMethod.Post, "answer/" + if (finish) "yes" else "no")

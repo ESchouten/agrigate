@@ -81,7 +81,7 @@ class WebApiTest {
     val (code, body) = raw("GET", "/api/status")
     assertEquals(200, code)
     assertTrue("\"planning\":false" in body && "\"age\":" in body, body)
-    assertTrue(raw("GET", "/api/status?fresh").second.contains("\"ok\":true"))
+    assertTrue(raw("GET", "/api/status?fresh=1").second.contains("\"ok\":true"))
   }
 
   @Test fun aStopFromThePhoneAndTheAnswerOnThePhone() = runBlocking {
