@@ -1365,13 +1365,13 @@ static void handleApi() {
 static void drawWifi() {
   using namespace ui;
   ui::Screen scr(tx->wifiRow);
-  card(10, 56, 300, 136, kCard);
-  if (serving) {   // a QR code that adds this robot to the app on a phone (Erik 2026-11-16)
-    qr(String("scraper-control://add?via=") + hostName() + ".local&pin=" + pin, 26, 66, 96);
-    text(tx->apiRow, 140, 62, kBold, kInk);
-    wrap(tx->scanToAdd, 140, 86, 160, kBody, kInk, 166);
-    centred(hostName() + ".local", 160, 168, kBody, kMuted);
+  if (serving) {   // a QR code, as large as fits, that adds this robot to the app (Erik 2026-11-16)
+    qr(String("scraper-control://add?via=") + hostName() + ".local&pin=" + pin, 16, 54, 140, 4);
+    text(tx->apiRow, 172, 60, kBold, kInk);
+    text(hostName(), 172, 88, kSmall, kMuted);
+    text(".local", 172, 106, kSmall, kMuted);
   } else {
+    card(10, 56, 300, 136, kCard);
     settingRow(0, ICON_WIFI, tx->networkWord, wifiSsid.isEmpty() ? String(tx->notSet) : wifiSsid);
     settingRow(1, ICON_DOWNLOAD, tx->versionRow, FW_VERSION);
     if (!wifiSsid.isEmpty()) settingRow(2, ICON_BOLT, tx->apiRow, tx->apiOffline);

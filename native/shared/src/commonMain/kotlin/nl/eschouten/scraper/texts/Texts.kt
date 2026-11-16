@@ -467,13 +467,9 @@ class Tr(val code: String) {
   val webApi: String get() = t("Web-API", "Web API")
   val apiPort: String get() = t("Poort", "Port")
   fun apiFooter(address: String): String = t(
-    "Apps en andere programma's op dit netwerk bedienen de robot in gebruik via $address, met de pincode van die robot. Alleen voor je eigen netwerk: zet de poort nooit open naar internet.",
-    "Apps and other programs on this network control the robot in use through $address, with that robot's PIN. For your own network only: never open the port to the internet.",
+    "$address, met de pincode van de robot. Alleen voor je eigen netwerk, zet de poort nooit open naar internet.",
+    "$address, with the robot's PIN. Your own network only, never open the port to the internet.",
   )
   fun apiFailed(detail: String): String = t("De web-API kon niet starten: $detail", "The web API could not start: $detail")
-  val scanToAdd: String get() = t(
-    "Scan met de camera van je telefoon om de robot in de app te zetten.",
-    "Scan with your phone's camera to add the robot to the app.",
-  )
   val apiPortHelp: String get() = t("Een getal van 1024 tot 65535", "A number from 1024 to 65535")
 }

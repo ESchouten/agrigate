@@ -245,7 +245,7 @@ fun SettingsScreen(controller: RobotController, host: AppHost, nav: Nav) {
       }
       val qr = api?.qr
       if (qr != null && s.apiOn && sec.rows.any { it.id == RowId.API }) {
-        item(key = "api-qr") { QrCode(qr, tr.scanToAdd) }
+        item(key = "api-qr") { QrCode(qr) }
       }
     }
   }
@@ -431,12 +431,12 @@ fun AddRobotScreen(controller: RobotController, host: AppHost, nav: Nav) {
   }
 }
 
-/** A QR code (rows of dark modules) with a line under it, for a phone's camera. */
+/** A QR code (rows of dark modules), for a phone's camera. */
 @Composable
-fun QrCode(modules: List<BooleanArray>, caption: String) {
+fun QrCode(modules: List<BooleanArray>) {
   Column(Modifier.fillMaxWidth().padding(top = Space.l), horizontalAlignment = Alignment.CenterHorizontally) {
     androidx.compose.foundation.Canvas(
-      Modifier.size(196.dp).background(Color.White, RoundedCornerShape(8.dp)).padding(14.dp).testTag("api-qr"),
+      Modifier.size(300.dp).background(Color.White, RoundedCornerShape(8.dp)).padding(16.dp).testTag("api-qr"),
     ) {
       val cell = size.minDimension / modules.size
       modules.forEachIndexed { y, row ->
@@ -445,6 +445,5 @@ fun QrCode(modules: List<BooleanArray>, caption: String) {
         }
       }
     }
-    Text(caption, Modifier.padding(top = Space.s), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
   }
 }
