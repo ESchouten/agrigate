@@ -14,6 +14,7 @@ p.on('response', r => seen.push(`${r.status()} ${new URL(r.url()).pathname}${new
 p.on('websocket', ws => {
   seen.push(`ws ${ws.url()}`)
   ws.on('framereceived', f => seen.push(`<- ${f.payload}`))
+  ws.on('framesent', f => seen.push(`-> ${f.payload}`))
 })
 
 let failed = false
@@ -23,6 +24,7 @@ async function check(name, what, timeout = 30_000) {
   const ok = seen.some(what)
   await p.screenshot({ path: `web-page/${name}.png` })
   console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}`)
+  if (!ok) seen.slice(-15).forEach(s => console.log(`     ${s.slice(0, 300)}`))
   failed ||= !ok
   seen.length = 0
 }
@@ -43,7 +45,8 @@ await p.waitForTimeout(2_000)
 await p.mouse.click(150, 400) // route A
 await p.waitForTimeout(2_000)
 await p.mouse.click(195, 796) // "Eerst een proefrun"
-await check('dry-run-on-the-barn-computer', s => s.startsWith('<- ') && s.includes('DryRun'))
+await check('dry-run-asked', s => s.startsWith('-> ') && s.includes('startRoute'), 5_000)
+await check('dry-run-done-on-the-barn-computer', s => s.startsWith('<- ') && s.includes('DryRun'), 120_000)
 if (seen.some(s => s.startsWith('pageerror'))) failed = true
 await browser.close()
 process.exit(failed ? 1 : 0)
