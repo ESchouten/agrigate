@@ -8,6 +8,8 @@ Python script.
 - **Apps** for Android, iOS and desktop: routes, schedule, live status, logbook, the robot's own
   panel, home-screen widgets, Siri/Shortcuts. Dutch and English.
 - **Python**: the same robot API for scripts.
+- **Web API**: the buttons and the desktop app answer a small HTTP API on the local network, for
+  apps and tools out of Bluetooth range ([docs/API.md](docs/API.md)).
 - **Safety**: a route button during a route stops it; a "finish the route?" question after a
   stop is always answered by a person; the schedule is left the way it was found.
 
@@ -41,7 +43,8 @@ Everything is in the [latest release](https://github.com/ESchouten/scraper-contr
 2. **App**: it searches for the robot by itself and asks for the robot's PIN. The very first
    connection syncs with the robot, about 1.5 minutes, once.
 3. **Buttons**: hold the right button for the settings: PIN, Robot (pick it from a search) and
-   Wifi (a network or WPS). With wifi the buttons look for updates by themselves.
+   Wifi (a network or WPS). With wifi the buttons look for updates by themselves and serve the
+   [web API](docs/API.md).
 
 ### The buttons
 
