@@ -9,6 +9,7 @@
 // The screen dims after a minute and never goes off, so a press always acts at once.
 // With a wifi network set the M5 stays on it and answers a web API (Api.h): apps and other
 // tools on the same network start routes and switch the planning through the M5.
+#include <ESPmDNS.h>
 #include <M5Unified.h>
 #include <Preferences.h>
 #include <Update.h>
@@ -712,7 +713,10 @@ static bool serving = false;
 // Before a download over https: the web API and Bluetooth off, so TLS has the memory (Erik
 // 2026-11-16). The API comes back by itself (wifiTick), Bluetooth at the next robot session.
 static void apiOff() {
-  if (serving) server.stop();
+  if (serving) {
+    server.stop();
+    MDNS.end();
+  }
   serving = false;
   BtLink::release();
 }
@@ -1190,7 +1194,10 @@ static void wifiTick() {
   if (wifiSsid.isEmpty()) return;
   uint32_t now = millis();
   if (WiFi.status() != WL_CONNECTED) {
-    if (serving) server.stop();
+    if (serving) {
+      server.stop();
+      MDNS.end();
+    }
     serving = checkedOnce = false;
     if (!lastWifiTry || now - lastWifiTry >= kWifiTryEveryMs || WiFi.getMode() == WIFI_OFF) {
       lastWifiTry = now | 1;
@@ -1202,6 +1209,8 @@ static void wifiTick() {
   if (!serving) {
     server.begin();
     serving = true;
+    // http://scraper-control.local (a second one on the network gets "-2")
+    if (MDNS.begin("scraper-control")) MDNS.addService("http", "tcp", 80);
     Serial.printf("web API: http://%s/api\n", WiFi.localIP().toString().c_str());
     logHeap("wifi");
   }

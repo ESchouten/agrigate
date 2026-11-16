@@ -4,8 +4,9 @@ The buttons (M5Stack) and the desktop app answer the same small HTTP API on the 
 so apps and other tools (Home Assistant, a script, Siri Shortcuts) can control a robot that is
 out of their own Bluetooth range. The device that serves it holds the Bluetooth connection.
 
-- **Buttons**: with a wifi network set they stay on it and serve on port 80. The address is in
-  Settings > Wifi.
+- **Buttons**: with a wifi network set they stay on it and serve on port 80, as
+  `http://scraper-control.local` (a second one on the network: `scraper-control-2.local`). The
+  address is also in Settings > Wifi.
 - **Desktop app**: Settings > Web API, port 8080 by default.
 
 Plain HTTP: use it on your own network only, never forward the port to the internet (use a
@@ -55,7 +56,7 @@ call.
 ## Examples
 
 ```bash
-curl -H "Authorization: Bearer 1234" http://192.168.1.20/api/status?fresh
+curl -H "Authorization: Bearer 1234" http://scraper-control.local/api/status?fresh
 curl -X POST -H "Authorization: Bearer 1234" http://192.168.1.20/api/route/A
 curl -X POST -H "Authorization: Bearer 1234" http://192.168.1.20/api/planning/off
 ```
