@@ -104,14 +104,14 @@ jobs:
       - name: Web page (Compose for Web), as the desktop app serves it
         working-directory: native
         run: ./gradlew :composeApp:wasmJsBrowserDistribution --console=plain
-      - name: Web page in a browser, served by the desktop app (demo robot)
-        working-directory: native/scenarios
+      - name: Web page in a browser, served by the packaged desktop app (demo robot)
+        working-directory: native
         run: |
+          ./gradlew :composeApp:createDistributable --console=plain
           mkdir -p ~/.config/scraper-control && echo '{"web.on":"1"}' > ~/.config/scraper-control/settings.json
-          (cd .. && xvfb-run -a ./gradlew :composeApp:run --args="--demo setup=done" --console=plain > web-app.log 2>&1 &)
-          npm i --no-save playwright@1 > /dev/null && npx playwright install --with-deps chromium > /dev/null
-          for i in $(seq 1 60); do curl -sf http://localhost:8080/ > /dev/null && break; sleep 5; done
-          trap 'fuser -k 8080/tcp; rm ~/.config/scraper-control/settings.json' EXIT
+          SCRAPER_DEMO=setup=done xvfb-run -a "composeApp/build/compose/binaries/main/app/Scraper Control/bin/Scraper Control" > web-app.log 2>&1 &
+          trap 'pkill -f "Scraper Control"; rm ~/.config/scraper-control/settings.json' EXIT
+          cd scenarios && npm i --no-save playwright@1 > /dev/null && npx playwright install --with-deps chromium > /dev/null
           node web-page.mjs
       - name: Scenario tests on the Compose app (desktop, demo robot) + screenshots
         working-directory: native
@@ -163,6 +163,22 @@ jobs:
         working-directory: native
         shell: bash
         run: ./gradlew :composeApp:packageDistributionForCurrentOS --console=plain
+      - name: Web page in a browser, served by the packaged Windows app (demo robot)
+        working-directory: native
+        shell: bash
+        run: |
+          mkdir -p ~/.config/scraper-control && echo '{"web.on":"1"}' > ~/.config/scraper-control/settings.json
+          SCRAPER_DEMO=setup=done "composeApp/build/compose/binaries/main/app/Scraper Control/Scraper Control.exe" > web-app.log 2>&1 &
+          trap 'taskkill //IM "Scraper Control.exe" //F; rm ~/.config/scraper-control/settings.json' EXIT
+          cd scenarios && npm i --no-save playwright@1 > /dev/null && npx playwright install chromium > /dev/null
+          node web-page.mjs
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: web-page-windows
+          path: |
+            native/scenarios/web-page/
+            native/web-app.log
       - uses: actions/upload-artifact@v4
         with:
           name: scraper-control-windows
