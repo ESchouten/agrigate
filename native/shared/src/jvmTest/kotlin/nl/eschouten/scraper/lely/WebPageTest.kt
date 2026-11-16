@@ -4,6 +4,8 @@ package nl.eschouten.scraper.lely
 
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
+import io.ktor.client.request.get
+import io.ktor.http.HttpStatusCode
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -43,7 +45,8 @@ class WebPageTest {
   private val http = HttpClient(CIO) { installKrpc() }
   private lateinit var barn: RobotController
   private lateinit var server: WebServer
-  private val url get() = server.state.value.address.replace("http://", "ws://").replace(Regex("//.*:"), "//localhost:").replace("/?", "/rpc/")
+  private fun url(pin: String = "4321") = "ws://localhost:$port/rpc?pin=$pin"
+  private suspend fun status(pin: String) = http.get("http://localhost:$port/pin?pin=$pin").status
 
   @AfterTest fun stop() {
     server.stop()
@@ -60,9 +63,9 @@ class WebPageTest {
     assertNull(server.state.value.error)
   }
 
-  /** A page connected to it, until [scope] ends. */
-  private suspend fun page(scope: CoroutineScope): Controller =
-    remoteController(http.rpc(url) { rpcConfig { serialization { json() } } }.withService<RobotApi>(), scope)
+  /** A page connected to it with [pin], until [scope] ends. */
+  private suspend fun page(scope: CoroutineScope, pin: String = "4321"): Controller =
+    remoteController(http.rpc(url(pin)) { rpcConfig { serialization { json() } } }.withService<RobotApi>(), scope)
 
   private fun withPage(words: String = "", test: suspend CoroutineScope.(Controller) -> Unit) = runBlocking {
     barn(words)
@@ -74,17 +77,31 @@ class WebPageTest {
     }
   }
 
-  @Test fun onlyTheRightCodeGetsIn() = runBlocking {
+  @Test fun onlyARobotsPinGetsIn() = runBlocking {
     barn()
-    assertTrue(Regex("ws://localhost:$port/rpc/\\d{6}").matches(url), url)
     val scope = CoroutineScope(Dispatchers.Default + Job())
-    val wrong = runCatching { withTimeout(5_000) { remoteController(http.rpc("ws://localhost:$port/rpc/nope") { rpcConfig { serialization { json() } } }.withService<RobotApi>(), scope) } }
-    assertTrue(wrong.isFailure)
+    assertTrue(runCatching { withTimeout(5_000) { page(scope, "1234") } }.isFailure)
+    assertTrue(runCatching { withTimeout(5_000) { page(scope, "") } }.isFailure)
+    assertEquals(HttpStatusCode.OK, status("4321")) // a right PIN starts the count again
+    // 5 wrong tries in a row: a minute in which even the right PIN is refused
+    repeat(4) { assertEquals(HttpStatusCode.Forbidden, status("$it")) }
+    assertEquals(HttpStatusCode.Forbidden, status("1234"))
+    assertEquals(HttpStatusCode.TooManyRequests, status("4321"))
+    assertTrue(runCatching { withTimeout(5_000) { page(scope) } }.isFailure)
     scope.cancel()
   }
 
+  @Test fun thePageNeverSeesThePins() = withPage { page ->
+    assertTrue(page.state.value.robots.none { it.pin == "4321" })
+    assertTrue(page.state.value.robot.pin.isNotEmpty())
+    page.updateRobot(page.state.value.robot.copy(label = "Stal 2"))
+    assertEquals("4321", barn.state.value.robot.pin)
+    page.updateRobot(page.state.value.robot.copy(pin = "5555"))
+    assertEquals("5555", barn.state.value.robot.pin)
+  }
+
   @Test fun theStateArrivesAndARouteRunsOnTheBarnComputer() = withPage { page ->
-    assertEquals(barn.state.value.robot, page.state.value.robot)
+    assertEquals(barn.state.value.robot.uid, page.state.value.robot.uid)
     val o = page.startRoute("A", dryRun = true)
     assertTrue(o.ok, o.message)
     assertEquals(EventKind.DryRun, barn.state.value.history.first().kind)
@@ -125,7 +142,7 @@ class WebPageTest {
   @Test fun aPageThatDropsLetsGoOfTheKeyAndTheRobot() = runBlocking {
     barn("mode=manual")
     val scope = CoroutineScope(Dispatchers.Default + Job())
-    val rpc = http.rpc(url) { rpcConfig { serialization { json() } } }
+    val rpc = http.rpc(url()) { rpcConfig { serialization { json() } } }
     val page = remoteController(rpc.withService<RobotApi>(), scope)
     assertTrue(page.hold().ok)
     val held = scope.launch { page.input(RobotKey.StartStop.name, flow { delay(60_000) }) }

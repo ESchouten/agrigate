@@ -455,14 +455,17 @@ class Tr(val code: String) {
     "Switch this on on the barn computer: phones and computers on the same network then control the robot through a web page, and this computer keeps the connection to the robot.",
   )
   fun webPageOnFooter(address: String): String = t(
-    "Open $address in de browser van een telefoon of computer in hetzelfde netwerk. De code in het adres houdt anderen buiten. Laat deze computer aan en de app open.",
-    "Open $address in the browser of a phone or computer on the same network. The code in the address keeps others out. Keep this computer on and the app open.",
+    "Open $address in de browser van een telefoon of computer in hetzelfde netwerk en vul de pincode van een van je robots in. Laat deze computer aan en de app open.",
+    "Open $address in the browser of a phone or computer on the same network and enter the PIN of one of your robots. Keep this computer on and the app open.",
   )
   val port: String get() = t("Poort", "Port")
   val portInvalid: String get() = t("Kies een poort van 1024 tot en met 65535", "Choose a port from 1024 to 65535")
   fun webPageFailed(why: String): String = t("De webpagina start niet: $why", "The web page does not start: $why")
-  val connectingBarn: String get() = t(
-    "Verbinden met de stalcomputer...\nHet adres staat daar in de app, bij Instellingen > Webpagina.",
-    "Connecting to the barn computer...\nThe address is in the app there, under Settings > Web page.",
+  val connectingBarn: String get() = t("Verbinden met de stalcomputer...", "Connecting to the barn computer...")
+  val webPinHelp: String get() = t(
+    "De pincode van een van je robots, dezelfde als in de app van de fabrikant.",
+    "The PIN of one of your robots, the same as in the maker's app.",
   )
+  val tooManyTries: String get() = t("Te vaak een foute pincode. Probeer het over een minuut opnieuw.", "Wrong PIN too often. Try again in a minute.")
+  val connect: String get() = t("Verbinden", "Connect")
 }

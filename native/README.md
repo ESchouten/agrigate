@@ -60,7 +60,8 @@ iosApp/run-ui-tests.sh                    # iOS scenarios + screenshots (/tmp/sh
 
 One computer in the barn runs the desktop app with **Settings > Web page** on. It keeps the
 connection to the robot and serves the same app to browsers on the local network, on port 8080
-(or the one chosen there), at the address shown there (it ends in a code that keeps others out).
+(or the one chosen there). A page gets in with the PIN of one of the robots (a minute's pause
+after 5 wrong tries) and never sees the PINs themselves.
 The page's screens call the barn computer's `RobotController` through
 [kotlinx.rpc](https://github.com/Kotlin/kotlinx-rpc) (`shared/.../app/Controller.kt`), which
 sends its state back after every change. So there is one robot connection however many pages
