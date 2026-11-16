@@ -96,10 +96,13 @@ bool BtLink::connect() {
     std::lock_guard<std::mutex> g(mu_);
     inbox_.clear();
   }
-  // Bluetooth sometimes fails once and works the next time: three tries, a second apart.
+  // Bluetooth sometimes fails once and works the next time: three tries, a second apart. After
+  // each failed one the Bluetooth stack restarts, as a power cycle does, so a stack that got
+  // stuck starts clean (Erik 2026-11-16: two presses failed, after a power cycle it worked).
   for (int i = 0; i < 3; i++) {
     if (i) delay(1000);
     if (classic_ ? connectClassic() : connectBle()) return true;
+    release();
   }
   // Robot moved: search once and retry. A BLE robot stays BLE: no classic search (8 s) then.
   std::string keepAddress = address_;
