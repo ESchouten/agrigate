@@ -1308,8 +1308,6 @@ static uint32_t resultUntil = 0;   // an API command's result is on screen until
 static void handleApi() {
   HTTPMethod m = server.method();
   ApiCall c = parseCall(m == HTTP_GET ? "GET" : m == HTTP_POST ? "POST" : "", server.uri().c_str());
-  c.fresh = server.hasArg("fresh");   // the server keeps only "key=value": ?fresh=1
-  c.dryRun = server.hasArg("dryRun");
   if (c.kind == ApiCall::None) return server.send(404, "application/json", "{}");
   int code = gate.check(server.header("Authorization").c_str(), pin.c_str(), millis());
   if (code != 200) return server.send(code, "application/json", "{}");

@@ -73,6 +73,14 @@ class WebApiTest {
     assertFalse(barn.state.value.connected)   // and let the robot go
   }
 
+  @Test fun aDryRunStartsNothing() = runBlocking {
+    simulate()
+    val o = phone().startRoute("B", dryRun = true)
+    assertTrue(o.ok, o.message)
+    assertEquals(EventKind.DryRun, barn.state.value.history.first().kind)
+    assertTrue("\"mode\": \"home\"" in links.last().report(), links.last().report())   // not driving
+  }
+
   @Test fun theScheduleAndTheStatus() = runBlocking {
     simulate("--planning", "on")
     val p = phone()
@@ -81,7 +89,7 @@ class WebApiTest {
     val (code, body) = raw("GET", "/api/status")
     assertEquals(200, code)
     assertTrue("\"planning\":false" in body && "\"age\":" in body, body)
-    assertTrue(raw("GET", "/api/status?fresh=1").second.contains("\"ok\":true"))
+    assertTrue(raw("GET", "/api/status/fresh").second.contains("\"ok\":true"))
   }
 
   @Test fun aStopFromThePhoneAndTheAnswerOnThePhone() = runBlocking {
@@ -114,6 +122,8 @@ class WebApiTest {
     assertEquals(404, raw("GET", "/api/route/A").first)   // a link opened in a browser starts nothing
     assertEquals(404, raw("POST", "/api/route/E").first)
     assertEquals(404, raw("POST", "/api/planning/maybe").first)
+    assertEquals(404, raw("POST", "/api/route/A/dry").first)   // a mistyped dry run starts nothing
+    assertEquals(404, raw("POST", "/api/status/fresh").first)
   }
 
   @Test fun busyWhenThereIsNothingToStopOrAnswer() = runBlocking {

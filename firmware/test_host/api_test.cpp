@@ -7,12 +7,16 @@
 int main() {
   ApiCall c = parseCall("GET", "/api/status");
   assert(c.kind == ApiCall::Status && !c.fresh);
+  assert(parseCall("GET", "/api/status/fresh").fresh);
+  assert(parseCall("GET", "/api/status/now").kind == ApiCall::None);
   assert(parseCall("POST", "/api/status").kind == ApiCall::None);   // reading is a GET
   c = parseCall("POST", "/api/route/B");
   assert(c.kind == ApiCall::Route && c.route == 'B');
   assert(parseCall("POST", "/api/route/d").route == 'D');
   assert(!c.dryRun);
-  for (const char* bad : {"/api/route/E", "/api/route/", "/api/route/AB", "/api/route"})
+  c = parseCall("POST", "/api/route/A/dryRun");
+  assert(c.kind == ApiCall::Route && c.route == 'A' && c.dryRun);
+  for (const char* bad : {"/api/route/E", "/api/route/", "/api/route/AB", "/api/route", "/api/route/A/dry", "/api/route/E/dryRun"})
     assert(parseCall("POST", bad).kind == ApiCall::None);
   assert(parseCall("GET", "/api/route/A").kind == ApiCall::None);   // a link in a browser starts nothing
   c = parseCall("POST", "/api/planning/on");

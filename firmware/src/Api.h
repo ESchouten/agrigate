@@ -8,11 +8,12 @@ struct ApiCall {
   enum Kind { None, Status, Route, Stop, Planning, Answer } kind = None;
   char route = 0;      // Route: 'A'..'D'
   bool yes = false;    // Planning: on, Answer: yes (finish the route)
-  bool fresh = false;  // Status: read the robot now (?fresh=1)
-  bool dryRun = false; // Route: only the checks, nothing starts (?dryRun=1)
+  bool fresh = false;  // Status: read the robot now
+  bool dryRun = false; // Route: only the checks, nothing starts
 };
 
-// method "GET" / "POST", path without the query (fresh and dryRun: the caller, from the query).
+// method "GET" / "POST" and the path. Nothing is in a query: a web server that drops part of
+// one (the M5's keeps only key=value) must never turn a dry run into a start.
 inline ApiCall parseCall(const std::string& method, const std::string& path) {
   ApiCall c;
   auto onOff = [&](const std::string& rest, const char* yes, const char* no, ApiCall::Kind k) {
@@ -21,16 +22,18 @@ inline ApiCall parseCall(const std::string& method, const std::string& path) {
       c.yes = rest == yes;
     }
   };
-  if (method == "GET" && path == "/api/status") {
+  if (method == "GET" && (path == "/api/status" || path == "/api/status/fresh")) {
     c.kind = ApiCall::Status;
+    c.fresh = path.size() > 11;
   } else if (method != "POST") {
     return c;   // everything else changes something: never from a link opened in a browser
-  } else if (path.size() == 12 && path.rfind("/api/route/", 0) == 0) {
+  } else if (path.rfind("/api/route/", 0) == 0 && path.size() >= 12 && (path.size() == 12 || path.compare(12, std::string::npos, "/dryRun") == 0)) {
     char r = path[11];
     if (r >= 'a' && r <= 'd') r = char(r - 'a' + 'A');
     if (r >= 'A' && r <= 'D') {
       c.kind = ApiCall::Route;
       c.route = r;
+      c.dryRun = path.size() > 12;
     }
   } else if (path == "/api/stop") {
     c.kind = ApiCall::Stop;

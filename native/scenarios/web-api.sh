@@ -21,7 +21,7 @@ check() {   # check NAME "<answer>" PATTERN
 for _ in $(seq 60); do curl -s -o /dev/null "http://127.0.0.1:8080/" && break; sleep 2; done
 check "serves"            "$(api GET /api/status)"            '200 {"ok":true,*'
 check "no PIN"            "$(api GET /api/status '')"         '401 *'
-check "status read now"   "$(api GET '/api/status?fresh=1')"    '200 {"ok":true,*"planning":*'
+check "status read now"   "$(api GET /api/status/fresh    )"    '200 {"ok":true,*"planning":*'
 check "nothing to stop"   "$(api POST /api/stop)"             '502 {"ok":false,"fault":"Busy",*'
 check "route A starts"    "$(api POST /api/route/A)"          '200 {"ok":true,*'
 check "unknown call"      "$(api GET /api/route/A)"           '404 *'

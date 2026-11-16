@@ -18,9 +18,9 @@ class ApiCalls(private val c: RobotController, private val now: () -> Long) {
   private var wrong = 0
   private var lockedUntil = 0L
 
-  /** HTTP status and JSON body. [query]: the part after '?'; [authorization]: that header. */
-  suspend fun handle(method: String, path: String, query: String, authorization: String?): Pair<Int, String> = one.withLock {
-    val call = callFor(method, path, query) ?: return@withLock 404 to "{}"
+  /** HTTP status and JSON body. [authorization]: that header. */
+  suspend fun handle(method: String, path: String, authorization: String?): Pair<Int, String> = one.withLock {
+    val call = callFor(method, path) ?: return@withLock 404 to "{}"
     val gate = check(authorization?.removePrefix("Bearer ")?.takeIf { authorization.startsWith("Bearer ") } ?: "")
     if (gate != 200) return@withLock gate to "{}"
     val o = call()
@@ -36,17 +36,21 @@ class ApiCalls(private val c: RobotController, private val now: () -> Long) {
   }
 
   /** null: not a call of the API. The call itself returns null for nothing done (a plain status). */
-  private fun callFor(method: String, path: String, query: String): (suspend () -> Outcome?)? {
+  private fun callFor(method: String, path: String): (suspend () -> Outcome?)? {
     val part = path.removePrefix("/api/").split('/')
-    val arg = part.getOrNull(1)
+    val route = part.getOrNull(1)?.uppercase()?.takeIf { part[0] == "route" && it in Settings.allRoutes }
     return when {
-      method == "GET" && path == "/api/status" -> ({ if ("fresh" in query) c.refresh() else null })
-      method != "POST" || part.size > 2 -> null   // a change never comes from a link opened in a browser
-      part[0] == "route" && arg?.uppercase() in Settings.allRoutes ->
-        ({ c.startRoute(arg!!.uppercase(), dryRun = "dryRun" in query, ask = false) })
+      method == "GET" -> when (part) {
+        listOf("status") -> ({ null })
+        listOf("status", "fresh") -> ({ c.refresh() })
+        else -> null   // a change never comes from a link opened in a browser
+      }
+      method != "POST" -> null
+      route != null && part.size == 2 -> ({ c.startRoute(route, ask = false) })
+      route != null && part.drop(2) == listOf("dryRun") -> ({ c.startRoute(route, dryRun = true, ask = false) })
       part == listOf("stop") -> ({ c.stopRoute() })
-      part[0] == "planning" && (arg == "on" || arg == "off") -> ({ c.setPlanning(arg == "on") })
-      part[0] == "answer" && (arg == "yes" || arg == "no") -> ({ c.answerStop(arg == "yes") })
+      part == listOf("planning", "on") || part == listOf("planning", "off") -> ({ c.setPlanning(part[1] == "on") })
+      part == listOf("answer", "yes") || part == listOf("answer", "no") -> ({ c.answerStop(part[1] == "yes") })
       else -> null
     }
   }

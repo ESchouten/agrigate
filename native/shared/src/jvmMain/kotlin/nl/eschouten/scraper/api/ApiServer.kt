@@ -60,7 +60,7 @@ class ApiServer(private val controller: RobotController) {
     s.createContext("/") { ex ->
       ex.use {
         val (code, body) = runBlocking {
-          calls.handle(ex.requestMethod, ex.requestURI.path, ex.requestURI.rawQuery ?: "", ex.requestHeaders.getFirst("Authorization"))
+          calls.handle(ex.requestMethod, ex.requestURI.path, ex.requestHeaders.getFirst("Authorization"))
         }
         val bytes = body.toByteArray()
         ex.responseHeaders.add("Content-Type", "application/json")
