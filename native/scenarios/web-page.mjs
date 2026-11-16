@@ -46,7 +46,7 @@ await p.mouse.click(150, 400) // route A
 await p.waitForTimeout(2_000)
 await p.mouse.click(195, 796) // "Eerst een proefrun"
 await check('dry-run-asked', s => s.startsWith('-> ') && s.includes('startRoute'), 5_000)
-await check('dry-run-done-on-the-barn-computer', s => s.startsWith('<- ') && s.includes('DryRun'), 120_000)
+await check('dry-run-done-on-the-barn-computer', s => s.includes('CallSuccess') && s.includes('startRoute') && s.includes('\\"ok\\":true'), 60_000)
 if (seen.some(s => s.startsWith('pageerror'))) failed = true
 await browser.close()
 process.exit(failed ? 1 : 0)
