@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -16,6 +17,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -25,6 +27,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
@@ -72,9 +77,12 @@ fun main() {
 @Composable
 private fun PinForm(ask: Ask, onPin: (String) -> Unit) = Column(Modifier.widthIn(max = 360.dp), Arrangement.spacedBy(Space.l), Alignment.CenterHorizontally) {
   var pin by remember { mutableStateOf("") }
+  val focus = remember { FocusRequester() }
+  LaunchedEffect(Unit) { focus.requestFocus() }
+  val go = { if (pin.isNotEmpty()) onPin(pin) }
   Text(tr.webPinHelp, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
   OutlinedTextField(
-    pin, { pin = it.filter(Char::isDigit) }, Modifier.fillMaxWidth(),
+    pin, { pin = it.filter(Char::isDigit) }, Modifier.fillMaxWidth().focusRequester(focus),
     label = { Text(tr.pin) },
     singleLine = true,
     isError = ask != Ask.Pin,
@@ -84,7 +92,8 @@ private fun PinForm(ask: Ask, onPin: (String) -> Unit) = Column(Modifier.widthIn
       Ask.TooMany -> ({ Text(tr.tooManyTries) })
     },
     visualTransformation = PasswordVisualTransformation(),
-    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword, imeAction = ImeAction.Go),
+    keyboardActions = KeyboardActions(onGo = { go() }),
   )
-  ActionButton(Action(tr.connect, ActionKind.Confirm, "web-connect", enabled = pin.isNotEmpty())) { onPin(pin) }
+  ActionButton(Action(tr.connect, ActionKind.Confirm, "web-connect", enabled = pin.isNotEmpty())) { go() }
 }
