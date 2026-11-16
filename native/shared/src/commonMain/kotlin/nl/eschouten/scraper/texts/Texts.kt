@@ -464,12 +464,12 @@ class Tr(val code: String) {
     "Te vaak een verkeerde pincode. Probeer het over een minuut opnieuw.",
     "Too many wrong PINs. Try again in a minute.",
   )
-  val webApi: String get() = t("Web-API", "Web API")
+  val webApi: String get() = t("Webpagina en API", "Web page and API")
   val apiPort: String get() = t("Poort", "Port")
   fun apiFooter(address: String): String = t(
-    "$address, met de pincode van de robot. Alleen voor je eigen netwerk, zet de poort nooit open naar internet.",
-    "$address, with the robot's PIN. Your own network only, never open the port to the internet.",
+    "Open $address in een browser, of scan de code met de app. Met de pincode van de robot. Alleen voor je eigen netwerk, zet de poort nooit open naar internet.",
+    "Open $address in a browser, or scan the code with the app. With the robot's PIN. Your own network only, never open the port to the internet.",
   )
-  fun apiFailed(detail: String): String = t("De web-API kon niet starten: $detail", "The web API could not start: $detail")
+  fun apiFailed(detail: String): String = t("Dit kon niet starten: $detail", "This could not start: $detail")
   val apiPortHelp: String get() = t("Een getal van 1024 tot 65535", "A number from 1024 to 65535")
 }

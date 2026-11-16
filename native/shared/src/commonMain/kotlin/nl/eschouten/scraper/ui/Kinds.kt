@@ -28,7 +28,12 @@ enum class Glyph {
   Phone, Play, Refresh, Forward, Backward,
 }
 
-enum class Platform { Android, Ios, Desktop }
+/** Web: the app as a page in a browser, served by the desktop app (its robot goes through that computer). */
+enum class Platform {
+  Android, Ios, Desktop, Web;
+
+  val hasWidgets get() = this == Android || this == Ios
+}
 
 /** A button: what it says, what it does (the app handles [action]), and its test id. */
 data class Action(val label: String, val action: ActionKind, val testId: String, val primary: Boolean = true, val enabled: Boolean = true)

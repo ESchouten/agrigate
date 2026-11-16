@@ -1,9 +1,18 @@
 // The serving side of the web API (docs/API.md), for any host: which call a request is, who
 // may make it, and the answer, all through the app's RobotController (the robot in use). The
 // desktop serves it over HTTP (ApiServer); the buttons have their own (firmware/src/Api.h).
+// An app also answers the calls for a type's own screen (the panel): its connection to the robot
+// stays open only while someone keeps asking for the screen, and a key stays down only while
+// it is repeated, so a page or phone that goes away lets go by itself.
 package nl.eschouten.scraper.api
 
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -12,8 +21,10 @@ import nl.eschouten.scraper.app.Problem
 import nl.eschouten.scraper.app.RobotController
 import nl.eschouten.scraper.app.Settings
 import nl.eschouten.scraper.model.ScraperFault
+import nl.eschouten.scraper.texts.tr
+import kotlin.concurrent.Volatile
 
-class ApiCalls(private val c: RobotController, private val now: () -> Long) {
+class ApiCalls(private val c: RobotController, private val scope: CoroutineScope = CoroutineScope(Dispatchers.Default), private val now: () -> Long) {
   private val one = Mutex()   // one call at a time, like the buttons
   private var wrong = 0
   private var lockedUntil = 0L
@@ -43,9 +54,13 @@ class ApiCalls(private val c: RobotController, private val now: () -> Long) {
       method == "GET" -> when (part) {
         listOf("status") -> ({ null })
         listOf("status", "fresh") -> ({ c.refresh() })
+        listOf("panel") -> ::watch
         else -> null   // a change never comes from a link opened in a browser
       }
       method != "POST" -> null
+      part[0] == "panel" && part.size == 2 -> ({ c.custom { it.input(part[1]) } })
+      part[0] == "panel" && part.drop(2) == listOf("down") -> ({ keyDown(part[1]) })
+      part[0] == "panel" && part.drop(2) == listOf("up") -> ({ key?.up?.complete(Unit); null })
       route != null && part.size == 2 -> ({ c.startRoute(route, ask = false) })
       route != null && part.drop(2) == listOf("dryRun") -> ({ c.startRoute(route, dryRun = true, ask = false) })
       part == listOf("stop") -> ({ c.stopRoute() })
@@ -53,6 +68,47 @@ class ApiCalls(private val c: RobotController, private val now: () -> Long) {
       part == listOf("answer", "yes") || part == listOf("answer", "no") -> ({ c.answerStop(part[1] == "yes") })
       else -> null
     }
+  }
+
+  private var watching: Job? = null
+  @Volatile private var watchedAt = 0L
+  @Volatile private var key: Held? = null
+
+  private class Held(val name: String, @Volatile var until: Long) {
+    val up = CompletableDeferred<Unit>()
+  }
+
+  /** The connection to the robot stays open until [PANEL_FOR_MS] after the last ask. */
+  private suspend fun watch(): Outcome? {
+    watchedAt = now()
+    if (watching?.isActive == true) return null
+    val o = c.hold()
+    if (o.ok) watching = scope.launch {
+      while (now() - watchedAt < PANEL_FOR_MS) delay(250)
+      key?.up?.complete(Unit)
+      c.release()
+    }
+    return o
+  }
+
+  /** A key goes down, or stays down: until its "up", or [KEY_FOR_MS] after the last repeat. */
+  private fun keyDown(name: String): Outcome? {
+    if (c.session == null) return Outcome(false, tr.notConnected, problem = Problem.Busy)
+    key?.takeIf { it.name == name && !it.up.isCompleted }?.let {
+      it.until = now() + KEY_FOR_MS
+      return null
+    }
+    key?.up?.complete(Unit)
+    val k = Held(name, now() + KEY_FOR_MS).also { key = it }
+    scope.launch {
+      val guard = launch {
+        while (now() < k.until) delay(50)
+        k.up.complete(Unit)
+      }
+      c.custom { it.input(name, k.up) }
+      guard.cancel()
+    }
+    return null
   }
 
   /** The PIN of the robot in use (none set: open). 5 wrong in a row: a minute closed (429);

@@ -1,7 +1,9 @@
-// The desktop app serves the web API (docs/API.md) for the robot in use, when Settings > Web API
-// is on: the JDK's own HTTP server, and http://scraper-control-1a2b.local:<port> by mDNS (JmDNS),
-// because many networks do not resolve a computer's own name. The name is fixed per computer
-// (the end of its network address), so two devices never swap names (Erik 2026-11-16).
+// The desktop app serves the web API (docs/API.md) for the robot in use, when Settings > Web page
+// and API is on: the JDK's own HTTP server, and http://scraper-control-1a2b.local:<port> by mDNS
+// (JmDNS), because many networks do not resolve a computer's own name. The name is fixed per
+// computer (the end of its network address), so two devices never swap names (Erik 2026-11-16).
+// The same address in a browser is the web page: the app itself (composeApp's wasmJs build, in
+// the desktop app's resources), whose robot goes through this computer's web API like any app's.
 package nl.eschouten.scraper.api
 
 import com.google.zxing.BarcodeFormat
@@ -14,6 +16,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import nl.eschouten.scraper.app.RobotController
+import java.io.File
 import java.net.Inet4Address
 import java.net.InetAddress
 import java.net.InetSocketAddress
@@ -21,7 +24,11 @@ import java.net.NetworkInterface
 import javax.jmdns.JmDNS
 import javax.jmdns.ServiceInfo
 
-class ApiServer(private val controller: RobotController) {
+/** [page]: the web page's files, by default from the app's resources (compose.application.resources.dir). */
+class ApiServer(
+  private val controller: RobotController,
+  private val page: File? = System.getProperty("compose.application.resources.dir")?.let { File(it, "web") },
+) {
   private val calls = ApiCalls(controller) { System.currentTimeMillis() }
   private var server: HttpServer? = null
   private var mdns: JmDNS? = null
@@ -59,13 +66,13 @@ class ApiServer(private val controller: RobotController) {
     }
     s.createContext("/") { ex ->
       ex.use {
-        val (code, body) = runBlocking {
+        val file = pageFile(ex.requestURI.path).takeIf { ex.requestMethod == "GET" }
+        val (code, body) = if (file != null) 200 to file.readBytes() else runBlocking {
           calls.handle(ex.requestMethod, ex.requestURI.path, ex.requestHeaders.getFirst("Authorization"))
-        }
-        val bytes = body.toByteArray()
-        ex.responseHeaders.add("Content-Type", "application/json")
-        ex.sendResponseHeaders(code, bytes.size.toLong())
-        ex.responseBody.write(bytes)
+        }.let { it.first to it.second.toByteArray() }
+        ex.responseHeaders.add("Content-Type", file?.let { types[it.extension] ?: "application/octet-stream" } ?: "application/json")
+        ex.sendResponseHeaders(code, body.size.toLong())
+        ex.responseBody.write(body)
       }
     }
     s.start()   // one call at a time (the default executor): like the buttons
@@ -83,6 +90,12 @@ class ApiServer(private val controller: RobotController) {
     return got
   }
 
+  /** A file of the web page ("/" is index.html), never one outside its folder. */
+  private fun pageFile(path: String): File? {
+    val root = page?.canonicalFile ?: return null
+    return File(root, path.trimStart('/').ifEmpty { "index.html" }).canonicalFile.takeIf { it.isFile && it.startsWith(root) }
+  }
+
   fun stop() {
     mdns?.let { m -> runCatching { m.unregisterAllServices(); m.close() } }
     mdns = null
@@ -92,6 +105,8 @@ class ApiServer(private val controller: RobotController) {
   }
 
   companion object {
+    private val types = mapOf("html" to "text/html; charset=utf-8", "js" to "text/javascript", "mjs" to "text/javascript", "wasm" to "application/wasm", "png" to "image/png")
+
     /** This computer on the local network: the interface and its first private IPv4 address. */
     fun lan(): Pair<NetworkInterface, InetAddress>? = NetworkInterface.networkInterfaces().toList()
       .filter { it.isUp && !it.isLoopback && !it.isVirtual }

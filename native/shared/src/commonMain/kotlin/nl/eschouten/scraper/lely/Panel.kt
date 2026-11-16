@@ -66,7 +66,7 @@ class PanelFlow(private val controller: RobotController) {
 
   /** A tap on a key; the message for a toast when it failed, else null. */
   suspend fun press(key: RobotKey): String? {
-    val o: Outcome = controller.custom { (it as LelySession).press(key) }
+    val o: Outcome = controller.custom { it.input(key.name) }
     return if (o.ok) null else o.message
   }
 
@@ -80,7 +80,7 @@ class PanelFlow(private val controller: RobotController) {
     downSent = key
     val u = CompletableDeferred<Unit>().also { up = it }
     scope.launch(Dispatchers.Main.immediateOrDefault()) {
-      val o = controller.custom { (it as LelySession).hold(key, u) }
+      val o = controller.custom { it.input(key.name, u) }
       if (!o.ok) onError(o.message)
     }
   }
@@ -102,8 +102,22 @@ class PanelFlow(private val controller: RobotController) {
   }
 
   fun view(cs: ControllerState, st: PanelState = _state.value): PanelScreen {
-    val live = (controller.session as? LelySession)?.live
-    return panelScreen(cs, st.held, st.error, live?.screen, live?.highlighted, live?.manual)
+    val live = cs.live
+    return panelScreen(cs, st.held, st.error, live?.screen, live?.highlighted, live?.extra?.let(Manual::read))
+  }
+}
+
+/** The manual control screen's motors and direction in [nl.eschouten.scraper.model.ScraperStatus.extra]:
+ *  "manual" -> left, right, forward as 1 / 0 / ? (not known), e.g. "10?". */
+internal object Manual {
+  private const val KEY = "manual"
+
+  fun write(m: ManualState): Map<String, String> =
+    mapOf(KEY to listOf(m.left, m.right, m.forward).joinToString("") { when (it) { true -> "1"; false -> "0"; null -> "?" } })
+
+  fun read(extra: Map<String, String>): ManualState? = extra[KEY]?.let { v ->
+    fun b(i: Int) = when (v.getOrNull(i)) { '1' -> true; '0' -> false; else -> null }
+    ManualState(b(0), b(1), b(2))
   }
 }
 

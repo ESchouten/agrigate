@@ -40,7 +40,7 @@ fun main(args: Array<String>) {
   val icon = appIcon()
   val demo = demoWords(args)
   val controller = AppStart.controller(FileStore(), demo)
-  ApiServer(controller).follow(CoroutineScope(Dispatchers.IO))   // Settings > Web API
+  ApiServer(controller).follow(CoroutineScope(Dispatchers.IO))   // Settings > Web page and API
   val nav = Nav()
   application {
     Window(

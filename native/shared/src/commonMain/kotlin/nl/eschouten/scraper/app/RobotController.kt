@@ -350,7 +350,10 @@ class RobotController(
   suspend fun hold(): Outcome {
     holds++
     if (isConnected) return Outcome(true, tr.connected)
-    val o = job(work = { Outcome(true, tr.connected) })
+    val o = job(work = {
+      robot!!.watch()
+      Outcome(true, tr.connected)
+    })
     if (!o.ok) holds = 0
     return o
   }

@@ -104,11 +104,14 @@ jobs:
       - name: Scenario tests on the Compose app (desktop, demo robot) + screenshots
         working-directory: native
         run: ./gradlew :composeApp:jvmTest --console=plain
-      - name: Web API of the packaged desktop app (demo robot)
+      - name: Web API and web page of the packaged desktop app (demo robot), the page in a browser
         working-directory: native
         run: |
           ./gradlew :composeApp:createDistributable --console=plain
-          xvfb-run -a scenarios/web-api.sh "composeApp/build/compose/binaries/main/app/Scraper Control/bin/Scraper Control"
+          SCRAPER_DEMO="setup=done api=on" xvfb-run -a "composeApp/build/compose/binaries/main/app/Scraper Control/bin/Scraper Control" > web-app.log 2>&1 &
+          trap 'pkill -f "Scraper Control"; tail -40 "$GITHUB_WORKSPACE/native/web-app.log"' EXIT
+          cd scenarios && npm i --no-save playwright@1 > /dev/null && npx playwright install --with-deps chromium > /dev/null
+          node web.mjs
       - name: Android app (Compose, core via the NDK)
         working-directory: native
         run: ./gradlew :androidApp:assembleDebug --console=plain

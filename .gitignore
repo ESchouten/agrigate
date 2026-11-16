@@ -26,3 +26,4 @@ python/scraper_control/scraper_core.dll
 native/androidApp/.cxx/
 native/iosApp/Widgets/Info.plist
 native/iosApp/ScraperControl/Info.plist
+native/scenarios/node_modules/
