@@ -169,7 +169,7 @@ jobs:
         run: |
           mkdir -p ~/.config/scraper-control && echo '{"web.on":"1"}' > ~/.config/scraper-control/settings.json
           SCRAPER_DEMO=setup=done "composeApp/build/compose/binaries/main/app/Scraper Control/Scraper Control.exe" > web-app.log 2>&1 &
-          trap 'taskkill //IM "Scraper Control.exe" //F; rm ~/.config/scraper-control/settings.json' EXIT
+          trap 'tail -40 ../web-app.log; taskkill //IM "Scraper Control.exe" //F; rm ~/.config/scraper-control/settings.json' EXIT
           cd scenarios && npm i --no-save playwright@1 > /dev/null && npx playwright install chromium > /dev/null
           node web-page.mjs
       - uses: actions/upload-artifact@v4
