@@ -5,14 +5,18 @@ so apps and other tools (Home Assistant, a script, Siri Shortcuts) can control a
 out of their own Bluetooth range. The device that serves it holds the Bluetooth connection.
 
 - **Buttons**: with a wifi network set they stay on it and serve on port 80.
-- **Desktop app**: Settings > Web API, port 8080 by default.
+- **Desktop app**: Settings > Web page and API, port 8080 by default. The same address in a
+  browser is the **web page**: the app itself, for a phone or computer without the app. Its robot
+  goes through that computer's web API like any app's.
 
 Each device has a fixed name of its own on the network, from its network address:
-`http://scraper-control-1a2b.local` (buttons: Settings > Wifi; desktop: Settings > Web API).
+`http://scraper-control-1a2b.local` (buttons: Settings > Wifi; desktop: Settings > Web page and API).
 
 **In the apps**, a robot can go through such a device instead of Bluetooth: in the robot's
 settings, Connection, enter the device's address. Routes, the schedule, the status and the stop
-question work the same; the robot's own panel and manual driving need Bluetooth.
+question work the same; the robot's own panel and manual driving work through a desktop app
+(see The panel), not through the buttons. The device itself may reach the robot through yet
+another device.
 
 Plain HTTP: use it on your own network only, never forward the port to the internet (use a
 VPN for remote access).
@@ -42,6 +46,18 @@ A device without any PIN set is open.
 
 One call at a time: the device runs it to the end, connecting and disconnecting the robot, and
 then answers.
+
+## The panel
+
+Only the desktop app answers these (the buttons: `404`), for the robot's own panel and manual
+driving in the apps and on the web page.
+
+| Call | What |
+|---|---|
+| `GET /api/panel` | Keeps the connection to the robot open and answers with the robot's display in `status` (`screen`, `highlighted`, `extra`). Ask again a few times a second: 5 seconds after the last ask the robot is let go. |
+| `POST /api/panel/<key>` | A tap on a key, by the robot type's name for it (`Up`, `Down`, `Enter`, `Back`, `StartStop`, `Prog`, `Soft1`..`Soft3`). |
+| `POST /api/panel/<key>/down` | The key goes down and stays down. Repeat it a few times a second while it is held: a second after the last repeat the key comes up by itself, so a page that is closed or a phone that leaves the network never keeps the robot driving. |
+| `POST /api/panel/<key>/up` | The key comes up. |
 
 ## Answers
 

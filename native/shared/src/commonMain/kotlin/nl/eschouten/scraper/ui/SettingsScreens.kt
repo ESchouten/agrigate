@@ -78,7 +78,7 @@ fun settingsScreen(s: ControllerState, now: Long, platform: Platform, api: WebAp
     tr.robots,
     s.robots.map { r ->
       Row(RowId.robot(r.uid), Glyph.Robot, r.displayName, if (r.uid == s.robot.uid) tr.inUse else (r.robotId ?: tr.notLinkedYet)) // opens its settings: a chevron, "in use" says which one is active
-    } + Row(RowId.ADD_ROBOT, Glyph.Add, tr.addRobot, tr.secondRobot, enabled = !s.isBusy),
+    } + listOfNotNull(Row(RowId.ADD_ROBOT, Glyph.Add, tr.addRobot, tr.secondRobot, enabled = !s.isBusy).takeIf { platform != Platform.Web }),   // a page has the one robot of the computer that serves it
   )
   val activity = Section(
     tr.activity,
@@ -89,7 +89,7 @@ fun settingsScreen(s: ControllerState, now: Long, platform: Platform, api: WebAp
       ),
     ),
   )
-  val widgets = if (platform == Platform.Desktop) null else Section(
+  val widgets = if (!platform.hasWidgets) null else Section(
     tr.widgets,
     listOf(Row(RowId.WIDGETS, Glyph.Widgets, tr.routesOnHome, if (platform == Platform.Ios) tr.widgetHelpIos(APP_NAME) else tr.widgetHelpAndroid(APP_NAME), enabled = false)),
   )

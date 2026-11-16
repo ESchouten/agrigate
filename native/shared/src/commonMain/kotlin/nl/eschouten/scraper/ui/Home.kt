@@ -51,7 +51,6 @@ data class HomeScreen(
 
 fun homeScreen(s: ControllerState, now: Long, platform: Platform): HomeScreen {
   val m = s.model
-  val screens = if (s.robot.via.isEmpty()) m.screens else emptyList()   // a type's own screens need its Bluetooth session
   val snap = s.snapshot
   val pill = when (s.link) {
     LinkState.Searching -> StatePill(tr.searchRobot + "...", null, true, false)
@@ -104,10 +103,10 @@ fun homeScreen(s: ControllerState, now: Long, platform: Platform): HomeScreen {
       )
     },
     allHidden = if (m.can(Capability.Routes) && routes.isEmpty()) tr.allRoutesHidden else null,
-    modelTitle = if (screens.isNotEmpty()) m.fullName else null,
-    modelScreens = screens.map { ModelScreenCard(it.id, it.title, it.subtitle, "screen-${it.id}") },
+    modelTitle = if (m.screens.isNotEmpty()) m.fullName else null,
+    modelScreens = m.screens.map { ModelScreenCard(it.id, it.title, it.subtitle, "screen-${it.id}") },
     widgetTip = when {
-      s.widgetTipSeen || platform == Platform.Desktop -> null
+      s.widgetTipSeen || !platform.hasWidgets -> null
       platform == Platform.Ios -> tr.widgetTipIos(APP_NAME)
       else -> tr.widgetTipAndroid(APP_NAME)
     },

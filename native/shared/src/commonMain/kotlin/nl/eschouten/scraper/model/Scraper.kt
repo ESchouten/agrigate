@@ -8,8 +8,10 @@
 //   ScraperException  why something failed, in generic terms (ScraperFault)
 package nl.eschouten.scraper.model
 
+import kotlinx.coroutines.Deferred
 import kotlinx.serialization.Serializable
 import nl.eschouten.scraper.app.RobotProfile
+import nl.eschouten.scraper.texts.tr
 
 /** What a scraper type supports. The apps show only what is supported. */
 enum class Capability {
@@ -37,6 +39,11 @@ data class ScraperStatus(
   val busy: Boolean = false, // not ready for a new command (driving, in a menu, ...)
   val driving: Boolean = false, // a route runs: stopRoute() can stop it
   val finishQuestion: Boolean = false, // a stopped route asks "finish it?": answerStop()
+  // the robot's own display, for a type's own screens (its panel): the text, the selected row,
+  // and what else the type reads there (its own keys)
+  val screen: String = "",
+  val highlighted: String = "",
+  val extra: Map<String, String> = emptyMap(),
 )
 
 /** One step of a running command, for the progress bar. [id] is defined by the type. */
@@ -130,4 +137,14 @@ interface ScraperSession {
   /** [Capability.RouteContents]: route slot -> what it consists of, as the robot shows it,
    *  e.g. "C" -> "1 2 3". Only reads; the robot is left as it was. */
   suspend fun readRoutes(): Map<String, String> = emptyMap()
+
+  /** The connection stays open for a type's own screen (its panel): keep [status] live until
+   *  [disconnect]. A session that follows the robot anyway needs nothing. */
+  suspend fun watch() {}
+
+  /** An input on a type's own screen, by the type's name for it (e.g. a panel key): held
+   *  until [until] completes, or a tap when null. */
+  suspend fun input(name: String, until: Deferred<*>? = null) {
+    throw ScraperException(ScraperFault.Failed, tr.notSupported)
+  }
 }

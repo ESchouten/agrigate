@@ -2,6 +2,9 @@
 // that holds the Bluetooth link. Behind the same ScraperSession as a robot over Bluetooth, so
 // the controller, the screens and the widgets do not know the difference. Every command is a
 // whole session on that device (connect, act, disconnect there); connect() reads the robot.
+// For a type's own screen (the panel) the device keeps its connection open for as long as this
+// session asks for the screen, and a held key for as long as it is repeated: a page or phone
+// that goes away lets go by itself.
 package nl.eschouten.scraper.api
 
 import io.ktor.client.HttpClient
@@ -13,6 +16,16 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import nl.eschouten.scraper.app.RobotProfile
@@ -34,6 +47,14 @@ data class ApiAnswer(
 
 internal val apiJson = Json { ignoreUnknownKeys = true; encodeDefaults = true; explicitNulls = true }
 
+/** How often a session asks for the robot's screen, and repeats a held key. The device closes
+ *  its connection [PANEL_FOR_MS] after the last ask, and lets a key go [KEY_FOR_MS] after the
+ *  last repeat. */
+const val PANEL_EVERY_MS = 300L
+const val PANEL_FOR_MS = 5_000L
+const val KEY_REPEAT_MS = 300L
+const val KEY_FOR_MS = 1_000L
+
 /** "scraper-control-1a2b.local" or "host:8080" -> "http://...", a full URL as it is. */
 fun apiBase(via: String): String = via.trim().trimEnd('/').let { if ("://" in it) it else "http://$it" }
 
@@ -51,6 +72,7 @@ class ApiSession(private val p: RobotProfile) : ScraperSession {
   private var status = ScraperStatus()
   private var changes = 0
   private val closed = CompletableDeferred<Unit>()
+  private val scope = CoroutineScope(Dispatchers.Default)
 
   override var isConnected = false
     private set
@@ -64,7 +86,29 @@ class ApiSession(private val p: RobotProfile) : ScraperSession {
 
   override suspend fun disconnect() {
     isConnected = false
+    scope.cancel()
     closed.complete(Unit)
+  }
+
+  /** The device keeps its connection to the robot for as long as it is asked for the screen. */
+  override suspend fun watch() {
+    call(HttpMethod.Get, "panel")
+    scope.launch {
+      while (isActive) {
+        delay(PANEL_EVERY_MS)
+        runCatching { call(HttpMethod.Get, "panel") }.onFailure { if (it !is CancellationException) disconnect() }
+      }
+    }
+  }
+
+  /** A held key is repeated until [until]; the device lets go when the repeats stop. */
+  override suspend fun input(name: String, until: Deferred<*>?) {
+    if (until == null) return call(HttpMethod.Post, "panel/$name")
+    try {
+      do call(HttpMethod.Post, "panel/$name/down") while (withTimeoutOrNull(KEY_REPEAT_MS) { until.await() } == null)
+    } finally {
+      withContext(NonCancellable) { runCatching { call(HttpMethod.Post, "panel/$name/up") } }
+    }
   }
 
   override fun status() = status
@@ -93,7 +137,7 @@ class ApiSession(private val p: RobotProfile) : ScraperSession {
     }
     val a = runCatching { apiJson.decodeFromString<ApiAnswer>(res.bodyAsText()) }.getOrNull()
       ?: throw ScraperException(ScraperFault.Failed, tr.deviceUnreachable(p.via))
-    a.status?.let {
+    a.status?.takeIf { it != status }?.let {
       status = it
       changes++
     }

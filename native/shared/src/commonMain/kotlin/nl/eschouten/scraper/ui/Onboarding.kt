@@ -66,11 +66,17 @@ class OnboardingFlow(private val controller: RobotController, val platform: Plat
     _state.value = _state.value.copy(page = p, result = null)
   }
 
+  /** A robot through another device (the web page): there is nothing to find, only its PIN. */
+  private val pages = OnboardingPage.entries.filter { it != OnboardingPage.FindRobot || controller.state.value.robot.via.isEmpty() }
+
+  /** On from the welcome page. */
+  fun start() = goto(pages[1])
+
   /** Back from a page; false on the first page (leave the app). */
   fun back(): Boolean {
-    val p = _state.value.page
-    if (p == OnboardingPage.Welcome) return false
-    goto(OnboardingPage.entries[p.ordinal - 1])
+    val i = pages.indexOf(_state.value.page)
+    if (i <= 0) return false
+    goto(pages[i - 1])
     return true
   }
 
@@ -104,7 +110,7 @@ class OnboardingFlow(private val controller: RobotController, val platform: Plat
     controller.updateSettings { onboarded = true }
   }
 
-  private fun header(i: Int) = StepHeader(tr.stepOf(i, 2), i / 2f, tr.back)
+  private fun header(p: OnboardingPage) = pages.indexOf(p).let { i -> StepHeader(tr.stepOf(i, pages.size - 1), i / (pages.size - 1f), tr.back) }
 
   fun welcome() = WelcomePage(
     tr.welcomeTitle,
@@ -119,7 +125,7 @@ class OnboardingFlow(private val controller: RobotController, val platform: Plat
   )
 
   fun find(s: ControllerState) = FindPage(
-    header(1), tr.searchRobot, tr.findLead,
+    header(OnboardingPage.FindRobot), tr.searchRobot, tr.findLead,
     skip = Action(tr.skip, ActionKind.Cancel, "onboarding-skip", primary = false),
     next = Action(tr.next, ActionKind.Confirm, "onboarding-next", enabled = s.robot.robotId != null),
   )
@@ -137,7 +143,7 @@ class OnboardingFlow(private val controller: RobotController, val platform: Plat
       }
     }
     return PinPage(
-      header(2), tr.pin, s.model.pinHelp, tr.pin, if (st.showPin) tr.hide else tr.show,
+      header(OnboardingPage.Pin), tr.pin, s.model.pinHelp, tr.pin, if (st.showPin) tr.hide else tr.show,
       progress = if (st.testing) progress(s.model, s.steps, s.link, RunIntent(), "") else null,
       result = result,
       test = Action(if (st.testing) tr.busyDots else tr.testConnection, ActionKind.TryAgain, "onboarding-test", primary = o?.ok != true, enabled = !st.testing),

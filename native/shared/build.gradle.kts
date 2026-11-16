@@ -36,6 +36,10 @@ kotlin {
   jvm {
     compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) }
   }
+  // the web page (composeApp): the app in a browser, its robot through the device that serves
+  // it (api/ApiSession); no core and no Bluetooth there (wasmJsMain)
+  @OptIn(org.jetbrains.kotlin.gradle.ExperimentalWasmDsl::class)
+  wasmJs { browser() }
   listOf(iosArm64(), iosSimulatorArm64()).forEach { t ->
     t.compilations.getByName("main").cinterops.create("core") {
       definitionFile.set(file("src/nativeInterop/cinterop/core.def"))
@@ -74,6 +78,10 @@ kotlin {
       }
     }
     iosMain.dependencies { implementation("io.ktor:ktor-client-darwin:$ktor") }
+    wasmJsMain.dependencies {
+      implementation("io.ktor:ktor-client-js:$ktor")
+      implementation("org.jetbrains.kotlinx:kotlinx-browser:0.5.0")
+    }
   }
 }
 

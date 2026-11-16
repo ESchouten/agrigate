@@ -110,7 +110,7 @@ fun OnboardingScreen(controller: RobotController, host: AppHost, nav: Nav) {
       OnboardingPage.Welcome -> Welcome(flow) {
         scope.launch {
           runCatching { host.requestBluetooth() }
-          flow.goto(OnboardingPage.FindRobot)
+          flow.start()
         }
       }
       OnboardingPage.FindRobot -> {

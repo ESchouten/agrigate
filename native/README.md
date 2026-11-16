@@ -8,6 +8,7 @@ a native UI per platform that only draws what the shared module says:
 | Android | Jetpack Compose (`composeApp`, `androidApp`) | Kable | JNI (`../core`, built by the NDK) |
 | Desktop (macOS, Windows, Linux) | Compose Desktop (`composeApp`) | Kable (btleplug) | JNI (built by CMake) |
 | iOS | SwiftUI (`iosApp`) | Kable (CoreBluetooth) | cinterop (`libcore.a`) |
+| Web page | Compose for Web, wasm (`composeApp`) | none: the web API of the desktop app that serves it | none |
 
 The driver is chosen in `gradle.properties` (`scraper.driver`), its Kotlin side is listed in
 `shared/.../model/Registry.kt`.
@@ -16,7 +17,7 @@ The driver is chosen in `gradle.properties` (`scraper.driver`), its Kotlin side 
 shared/      Kotlin Multiplatform: the robot API (core/), links (link/), robot controller,
              settings, logbook, texts (NL/EN), screen models (ui/), widget data, and the
              drivers' Kotlin side (model, own screens, demo robot)
-composeApp/  Compose screens (Android + desktop) and the scenario tests
+composeApp/  Compose screens (Android, desktop, web page) and the scenario tests
 androidApp/  Android app: activity, widgets, the NDK build of the core
 iosApp/      SwiftUI app, WidgetKit widgets, Siri/Shortcuts intent, XCUITests (XcodeGen)
 scenarios/   the user scenarios both apps must pass, and the checks around them
@@ -53,6 +54,20 @@ python3 ../tools/secrets.py               # optional: the build secrets (a real 
 ./gradlew :androidApp:assembleDebug       # Android APK
 cd iosApp && xcodegen && open ScraperControl.xcodeproj   # iOS app
 iosApp/run-ui-tests.sh                    # iOS scenarios + screenshots (/tmp/shots/<lang>)
+```
+
+## The web page
+
+The desktop app with **Settings > Web page and API** on serves the app itself to browsers on the
+local network, next to its [web API](../docs/API.md) (`shared/.../api/ApiServer.kt`). The page
+is the same Compose app built for wasm, with its own `RobotController` in the browser; its one
+robot goes through the computer the page came from (`api/ApiSession.kt`), exactly like a robot
+"through another device" in the apps. Its settings and logbook stay in that browser.
+
+```sh
+./gradlew :composeApp:run --args="--demo 'setup=done api=on'"   # the desktop app serving the page on :8080
+./gradlew :composeApp:wasmJsBrowserDistribution  # only the page (build/dist/wasmJs/productionExecutable)
+cd scenarios && node web.mjs                      # the web API and the page in a browser, against that app
 ```
 
 ## The demo robot

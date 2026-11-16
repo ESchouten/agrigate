@@ -28,7 +28,8 @@ import kotlin.test.assertTrue
 class WebApiTest {
   private val links = mutableListOf<SimulatorLink>()
   private val barn = RobotController(Settings.single(robotId = "00:12:FF:51:4D:00", pin = "4321"), MemoryStore())
-  private val server = ApiServer(barn)
+  private val page = java.nio.file.Files.createTempDirectory("page").toFile().also { java.io.File(it, "index.html").writeText("<html>the app</html>") }
+  private val server = ApiServer(barn, page)
   private var port = 0
 
   private fun simulate(vararg args: String) {
@@ -118,12 +119,58 @@ class WebApiTest {
   }
 
   @Test fun unknownCallsAndChangesFromABrowserLink() {
-    assertEquals(404, raw("GET", "/").first)
+    assertEquals(404, raw("GET", "/nothing").first)
     assertEquals(404, raw("GET", "/api/route/A").first)   // a link opened in a browser starts nothing
     assertEquals(404, raw("POST", "/api/route/E").first)
     assertEquals(404, raw("POST", "/api/planning/maybe").first)
     assertEquals(404, raw("POST", "/api/route/A/dry").first)   // a mistyped dry run starts nothing
     assertEquals(404, raw("POST", "/api/status/fresh").first)
+  }
+
+  @Test fun thePanelThroughTheBarnComputer() = runBlocking {
+    simulate()
+    val p = phone()
+    assertTrue(p.hold().ok)
+    assertTrue(barn.state.value.connected)   // the barn computer keeps the robot for the phone
+    withTimeout(10_000) { p.state.first { it.live?.screen?.isNotBlank() == true } }   // the robot's own display
+    assertTrue(p.custom { it.input("Down") }.ok)
+    p.release()
+    withTimeout(15_000) { barn.state.first { !it.connected } }   // nobody asks any more: it lets the robot go
+    assertTrue("down" in links.last().report())
+  }
+
+  @Test fun aHeldKeyIsLetGoWhenItsRepeatsStop() = runBlocking {
+    simulate("--mode", "manual")
+    assertEquals(502, raw("POST", "/api/panel/StartStop/down").first)   // not connected: nothing held
+    assertEquals(200, raw("GET", "/api/panel").first)
+    assertEquals(200, raw("POST", "/api/panel/StartStop/down").first)   // a finger on the key, and then the page is gone
+    val t0 = System.currentTimeMillis()
+    assertEquals(200, raw("POST", "/api/panel/Soft1").first)   // the next key waits until that one is up
+    val took = System.currentTimeMillis() - t0
+    assertTrue(took in 400..3_000, "$took ms")
+    assertEquals(502, raw("POST", "/api/panel/Nothing").first)   // not a key of this robot
+  }
+
+  @Test fun aPhoneThroughAComputerThroughAnotherDevice() = runBlocking {
+    simulate("--planning", "on")
+    val office = RobotController(Settings(listOf(RobotProfile(pin = "4321", via = "127.0.0.1:$port"))), MemoryStore())
+    val second = ApiServer(office, null)
+    try {
+      val o = phone(via = "127.0.0.1:${second.start(0)}").startRoute("B")
+      assertTrue(o.ok, o.message)
+      assertEquals(EventKind.Route, office.state.value.history.first().kind)
+      assertEquals(EventKind.Route, barn.state.value.history.first().kind)   // the one with Bluetooth did it
+    } finally {
+      second.stop()
+    }
+  }
+
+  @Test fun theSameAddressInABrowserIsTheWebPage() {
+    assertEquals(200 to "<html>the app</html>", raw("GET", "/", pin = null))   // the page asks for the PIN itself
+    assertEquals(200, raw("GET", "/index.html", pin = null).first)
+    java.io.File(page.parentFile, "outside.txt").writeText("x")
+    assertEquals(404, raw("GET", "/../outside.txt", pin = null).first)
+    assertEquals(404, raw("POST", "/index.html").first)
   }
 
   @Test fun busyWhenThereIsNothingToStopOrAnswer() = runBlocking {

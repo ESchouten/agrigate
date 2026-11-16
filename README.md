@@ -10,6 +10,8 @@ Python script.
 - **Python**: the same robot API for scripts.
 - **Web API**: the buttons and the desktop app answer a small HTTP API on the local network, for
   apps and tools out of Bluetooth range ([docs/API.md](docs/API.md)).
+- **Web page**: the desktop app serves the same app to browsers on the local network, for a
+  phone or computer without the app (Settings > Web page and API).
 - **Safety**: a route button during a route stops it; a "finish the route?" question after a
   stop is always answered by a person; the schedule is left the way it was found.
 
