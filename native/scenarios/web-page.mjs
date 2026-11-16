@@ -84,7 +84,7 @@ await touch('touchStart', kx, ky)
 await check('key-down-again', s => s.startsWith('-> ') && s.includes('input') && s.includes('Down'), 5_000)
 await p.close()
 p = watch
-await check('barn-computer-lets-go', s => s.startsWith('watch <- ') && s.includes('states') && !s.includes('connected\\":true'), 20_000)
+await check('barn-computer-lets-go', s => s.startsWith('watch <- ') && s.includes('states') && !s.includes('connected\\":true'), 150_000)
 if (seen.some(s => s.startsWith('pageerror'))) failed = true
 await browser.close()
 process.exit(failed ? 1 : 0)

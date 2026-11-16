@@ -102,7 +102,7 @@ class WebServer(
           rpcConfig { serialization { json() } }
           val page = Page(controller)
           registerService<RobotApi> { page }
-          closeReason.invokeOnCompletion { scope.launch { page.close() } }
+          println("DBG page open"); closeReason.invokeOnCompletion { println("DBG page closed $it ${closeReason.getCompleted()}"); scope.launch { page.close(); println("DBG page released") } }
         }
       }
       files?.takeIf { it.isDirectory }?.let { staticFiles("/", it) }
