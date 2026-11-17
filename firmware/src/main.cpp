@@ -731,6 +731,16 @@ static String hostName() {
   return b;
 }
 
+// The web API on, once the wifi is connected (again: a download turns it off, apiOff).
+static void serve() {
+  if (serving || WiFi.status() != WL_CONNECTED) return;
+  server.begin();
+  serving = true;
+  if (MDNS.begin(hostName().c_str())) MDNS.addService("http", "tcp", 80);
+  Serial.printf("web API: http://%s/api\n", WiFi.localIP().toString().c_str());
+  logHeap("wifi");
+}
+
 static void stopServing() {
   if (!serving) return;
   server.stop();
@@ -1227,13 +1237,7 @@ static void wifiTick() {
     }
     return;
   }
-  if (!serving) {
-    server.begin();
-    serving = true;
-    if (MDNS.begin(hostName().c_str())) MDNS.addService("http", "tcp", 80);
-    Serial.printf("web API: http://%s/api\n", WiFi.localIP().toString().c_str());
-    logHeap("wifi");
-  }
+  serve();
   server.handleClient();
   bool inUse = now - lastActive < 120000;
   bool owed = owedPlanning >= 0 && now - owedAt < kOwedForMs;
@@ -1363,6 +1367,7 @@ static void handleApi() {
 // ---- settings > wifi: left = network, middle = WPS, right = update ----------------------
 static void drawWifi() {
   using namespace ui;
+  serve();   // opening the settings looked for an update, which turned the API off
   ui::Screen scr(tx->wifiRow);
   if (serving) {   // a QR code, as large as fits, that adds this robot to the app (Erik 2026-11-16)
     qr(String("scraper-control://add?via=") + hostName() + ".local&pin=" + pin, 16, 54, 140, 4);
