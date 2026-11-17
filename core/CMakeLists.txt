@@ -46,10 +46,7 @@ if(NOT ANDROID AND (WIN32 OR APPLE))
   FetchContent_Declare(velopack
     URL https://github.com/velopack/velopack/releases/download/1.2.161/velopack_libc_1.2.161.zip
     URL_HASH SHA256=31de8f2cf05a47bd5328a9f98b0c41aec1582156f6075f1058b26941f7f17c20)
-  FetchContent_GetProperties(velopack)
-  if(NOT velopack_POPULATED)
-    FetchContent_Populate(velopack)
-  endif()
+  FetchContent_MakeAvailable(velopack)   # headers and libraries only (no CMakeLists.txt)
   if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(arm64|aarch64|ARM64)$")
     set(VPK_ARCH arm64)
   else()
