@@ -34,6 +34,7 @@ void startBle() {
 }
 
 bool startClassic() {
+  if (btMemReleased(BT_MODE_CLASSIC_BT)) return false;   // started BLE only (the M5's btClassicInUse)
   startBle();   // Bluedroid with BLE first; classic joins the same host
   if (sppStarted) return true;
   if (BtLink::makeRoom) BtLink::makeRoom();

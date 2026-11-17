@@ -24,6 +24,7 @@
 #include <cctype>
 #include <cstring>
 #include <functional>
+#include <memory>
 #include <vector>
 
 #include "Api.h"
@@ -51,6 +52,10 @@ static Preferences prefs;
 static uint8_t storedVersion[9] = {'D', 'I', 'S', '0', '0', '1', '8', 'T', '4'};   // learned 2026-11-03
 static std::string savedAddress;
 static bool savedClassic = false;   // the robot was found over classic Bluetooth
+// BLE only (btClassicInUse): Bluetooth and the wifi fit next to each other, if Bluetooth starts
+// first (~78 KB free, the wifi and the web API take ~60 KB). With classic Bluetooth they do not:
+// then Bluetooth only runs for a robot session and the wifi is off meanwhile.
+static bool btWithWifi = false;
 static String pin;                 // from flash; set on the PIN screen
 // What the last route button did besides starting: stopped a running route, and then the
 // user's answer to the robot's "route afmaken?" (Erik 2026-11-11).
@@ -712,12 +717,17 @@ static void chooseRobot() {
     wrap(tx->robotSaved, 74, 76, 226, kTitle, kOk, 186);
   }
   delay(1200);
+  // Bluetooth starts BLE only or with classic (btClassicInUse), once at the start: another
+  // kind of robot (or none: the search may need classic) restarts the M5.
+  if (btClassicInUse() == btWithWifi) ESP.restart();
 }
 
 // ---- wifi, set up on the M5 itself (Erik: no phone, no app) ---------------------------
 // Settings > Wifi: Network = choose from a scan and type the password with the three
 // buttons (TextEditor), WPS = press the router's WPS button. Kept in flash like the PIN.
 static String wifiSsid, wifiPass;
+static uint32_t lastWifiTry = 0;   // wifiTick: 0 = try at once
+static bool wifiPaused = false;    // wifiDown() turned it off: the same network comes back, no new update check
 static WebServer server(80);   // the web API, while the wifi is up (wifiTick)
 static bool serving = false;
 
@@ -775,6 +785,8 @@ static bool wifiUp(uint32_t ms = 20000) {
 static void wifiDown() {
   WiFi.disconnect(true);
   WiFi.mode(WIFI_OFF);
+  lastWifiTry = 0;   // back on at the next wifiTick
+  wifiPaused = true;
 }
 
 // Connects with these; saves them only if that works.
@@ -1065,7 +1077,7 @@ static int download(const Manifest& m, bool stopOnPress = false) {
   mbedtls_sha256_context sha;
   mbedtls_sha256_init(&sha);
   mbedtls_sha256_starts(&sha, 0);
-  static uint8_t buf[2048];
+  std::unique_ptr<uint8_t[]> buf(new uint8_t[2048]);   // only now: Bluetooth is off for this
   long done = 0, shown = -1;
   uint32_t last = millis();
   while (done < m.size && millis() - last < 20000) {
@@ -1084,11 +1096,11 @@ static int download(const Manifest& m, bool stopOnPress = false) {
       delay(2);
       continue;
     }
-    size_t want = std::min<size_t>(sizeof buf, std::min<size_t>((size_t)avail, (size_t)(m.size - done)));
-    size_t n = s->readBytes(buf, want);
+    size_t want = std::min<size_t>(2048, std::min<size_t>((size_t)avail, (size_t)(m.size - done)));
+    size_t n = s->readBytes(buf.get(), want);
     if (n == 0) continue;
-    mbedtls_sha256_update(&sha, buf, n);
-    if (Update.write(buf, n) != n) break;
+    mbedtls_sha256_update(&sha, buf.get(), n);
+    if (Update.write(buf.get(), n) != n) break;
     done += (long)n;
     last = millis();
     if (done / 32768 != shown) {
@@ -1188,7 +1200,7 @@ static void selfUpdate() {
 // restarts. Never while in use (2 minutes after the last press or API command), never while a
 // planning is still owed to the robot (that is only in RAM); a button press stops a download.
 static const uint32_t kWifiTryEveryMs = 60UL * 1000, kCheckEveryMs = 24UL * 3600 * 1000;
-static uint32_t lastWifiTry = 0, lastCheck = 0;
+static uint32_t lastCheck = 0;
 static bool checkedOnce = false;   // on this connection
 
 static void installIfNewer() {
@@ -1219,14 +1231,18 @@ static void wifiTick() {
   uint32_t now = millis();
   if (WiFi.status() != WL_CONNECTED) {
     stopServing();
-    checkedOnce = false;
-    if (!lastWifiTry || now - lastWifiTry >= kWifiTryEveryMs || WiFi.getMode() == WIFI_OFF) {
+    if (!wifiPaused) checkedOnce = false;   // lost by itself: a new connection checks again
+    if (!lastWifiTry || now - lastWifiTry >= kWifiTryEveryMs) {
+      // Bluetooth first: next to a running wifi there is no room for its start
+      if (btWithWifi) BtLink::start();
+      else BtLink::release();
       lastWifiTry = now | 1;
       WiFi.mode(WIFI_STA);
       WiFi.begin(wifiSsid.c_str(), wifiPass.c_str());
     }
     return;
   }
+  wifiPaused = false;
   serve();
   server.handleClient();
   bool inUse = now - lastActive < 120000;
@@ -1235,6 +1251,7 @@ static void wifiTick() {
     lastCheck = now;
     checkedOnce = true;
     installIfNewer();   // restarts the M5 when it installed one
+    wifiDown();   // Bluetooth went off for the download (apiOff): it starts again before the wifi
   }
 }
 
@@ -1417,6 +1434,17 @@ static void settingsMenu() {
   idle();
 }
 
+// Classic Bluetooth only for a robot found over classic (or none chosen yet: the search may
+// need it). Without it the controller starts BLE only and gives its classic memory back
+// (~20 KB), which the wifi needs next to Bluetooth. Arduino asks this before setup().
+bool btClassicInUse(void) {
+  Preferences p;
+  p.begin(DRIVER_STORE, true);
+  bool classic = p.getBool("classic", false) || p.getString("addr", "").isEmpty();
+  p.end();
+  return classic;
+}
+
 void setup() {
   auto cfg = M5.config();
   M5.begin(cfg);
@@ -1441,7 +1469,8 @@ void setup() {
     stopServing();
     wifiDown();
   };
-  BtLink::start();
+  btWithWifi = !btClassicInUse();
+  if (btWithWifi) BtLink::start();
   logHeap("bluetooth");
   M5.Display.setBrightness(kBright);
   wake();

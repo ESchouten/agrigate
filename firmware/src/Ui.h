@@ -416,7 +416,7 @@ static void progressBar(int x, int y, int w, int done, int total) {
 }
 
 // ---- LVGL itself ---------------------------------------------------------------------------
-alignas(4) static uint8_t drawBuf[kW * 24 * 2];   // 24 lines of RGB565 at a time (15 KB)
+alignas(4) static uint8_t drawBuf[kW * 8 * 2];   // 8 lines of RGB565 at a time (5 KB: wifi and Bluetooth need the RAM)
 
 static void flush(lv_display_t* d, const lv_area_t* a, uint8_t* px) {
   D.pushImage(a->x1, a->y1, a->x2 - a->x1 + 1, a->y2 - a->y1 + 1, (const m5gfx::rgb565_t*)px);
