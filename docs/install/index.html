@@ -4,53 +4,64 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Install the buttons</title>
-<!-- The browser installer for the M5Stack buttons (ESP Web Tools). The release workflow puts
-     this page on GitHub Pages with manifest.json and the latest full firmware image. -->
+<!-- The browser installer for the M5Stack buttons (ESP Web Tools), in the app's look (the colours
+     of its Theme.kt). The release workflow puts this page on GitHub Pages with manifest.json
+     and the latest full firmware image. -->
 <script type="module" src="https://unpkg.com/esp-web-tools@10.4.0/dist/web/install-button.js?module"></script>
 <style>
-  :root { --bg: #f6f4f3; --card: #fff; --text: #1c1b1b; --muted: #5e5857; --red: #c8102e; }
-  @media (prefers-color-scheme: dark) { :root { --bg: #161414; --card: #1e1c1c; --text: #f2edec; --muted: #b9b0ae; --red: #e8364f; } }
-  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
-  main { max-width: 640px; margin: 0 auto; padding: 32px 16px 48px; }
-  h1 { font-size: 28px; margin: 0 0 4px; }
-  .sub { color: var(--muted); margin: 0 0 24px; }
-  .card { background: var(--card); border-radius: 16px; padding: 20px 24px; margin-bottom: 16px; }
-  ol { margin: 0; padding-left: 20px; }
-  li { margin: 6px 0; }
-  .muted { color: var(--muted); font-size: 14px; }
-  esp-web-install-button button[slot="activate"] { background: var(--red); color: #fff; border: 0; border-radius: 12px; padding: 12px 22px; font: 600 16px system-ui, sans-serif; cursor: pointer; }
-  a { color: var(--red); }
+  :root { --bg: #f6f4f3; --card: #fff; --line: #e4dfde; --text: #1c1b1b; --muted: #5e5857; --red: #c8102e; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #141212; --card: #1e1b1b; --line: #3b3535; --text: #ede7e6; --muted: #b8b0af; --red: #e5394f; }
+  }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.5 Roboto, system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { background: linear-gradient(135deg, #c8102e, #9b0c24); color: #fff; padding: 20px 20px 72px; }
+  header > div, main { max-width: 560px; margin: 0 auto; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; }
+  .brand svg { width: 26px; height: 26px; padding: 4px; background: #fff; border-radius: 8px; }
+  h1 { font-size: 34px; font-weight: 800; letter-spacing: -.5px; margin: 28px 0 4px; }
+  header p { margin: 0; opacity: .85; }
+  main { padding: 0 20px 48px; margin-top: -48px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 20px; padding: 16px 20px; margin-bottom: 12px; }
+  .step { display: flex; align-items: center; gap: 16px; }
+  .step b { flex: none; width: 52px; height: 52px; border-radius: 14px; background: var(--red); color: #fff; font-size: 22px; display: grid; place-items: center; }
+  .step div { font-weight: 700; }
+  .step span { display: block; font-weight: 400; color: var(--muted); }
+  h2 { font-size: 13px; letter-spacing: .8px; text-transform: uppercase; color: var(--muted); margin: 28px 4px 12px; }
+  .install { margin: 20px 0; text-align: center; }
+  .install button { background: var(--red); color: #fff; border: 0; border-radius: 28px; padding: 14px 40px; font: 700 16px Roboto, system-ui, sans-serif; cursor: pointer; }
+  .muted { color: var(--muted); font-size: 14px; margin: 0 4px; }
+  a { color: var(--red); font-weight: 700; text-decoration: none; }
+  ewt-install-dialog { --md-sys-color-primary: #c8102e; }   /* the installer's own dialog */
 </style>
 </head>
 <body>
+<header>
+  <div>
+    <div class="brand">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#c8102e" stroke-width="2.4" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M10 8.5v7l5.5-3.5z" fill="#c8102e"/></svg>
+      Scraper Control
+    </div>
+    <h1>Install the buttons</h1>
+    <p>On an M5Stack Basic (16 MB), straight from your browser.</p>
+  </div>
+</header>
 <main>
-  <h1>Install the buttons</h1>
-  <p class="sub">Scraper Control on an M5Stack Basic (16 MB), straight from your browser.</p>
+  <div class="card step"><b>1</b><div>Open this page on a computer<span>In Chrome or Edge, not on a phone.</span></div></div>
+  <div class="card step"><b>2</b><div>Connect the M5Stack<span>With a USB-C data cable.</span></div></div>
+  <div class="card step"><b>3</b><div>Click Install<span>Choose the M5Stack's port and confirm.</span></div></div>
+  <p class="install">
+    <esp-web-install-button manifest="manifest.json">
+      <button slot="activate">Install</button>
+      <span slot="unsupported">This browser cannot install: use Chrome or Edge on a computer.</span>
+      <span slot="not-allowed">Open this page over https.</span>
+    </esp-web-install-button>
+  </p>
+  <p class="muted">This is for the first install: it erases the M5Stack, including a saved PIN and wifi.
+    After that the buttons update themselves over wifi.</p>
 
-  <div class="card">
-    <ol>
-      <li>Use Chrome or Edge on a computer (not a phone).</li>
-      <li>Connect the M5Stack with a USB-C data cable.</li>
-      <li>Click <b>Install</b>, choose the M5Stack's port and confirm.</li>
-    </ol>
-    <p style="margin:20px 0 4px">
-      <esp-web-install-button manifest="manifest.json">
-        <button slot="activate">Install</button>
-        <span slot="unsupported">This browser cannot install: use Chrome or Edge on a computer.</span>
-        <span slot="not-allowed">Open this page over https.</span>
-      </esp-web-install-button>
-    </p>
-    <p class="muted">This is for the first install: it erases the M5Stack, including a saved PIN and wifi.
-      After that the buttons update themselves over wifi.</p>
-  </div>
-
-  <div class="card">
-    <b>Then on the M5Stack</b>
-    <ol>
-      <li>Hold the right button 1.5 s for the settings: enter the robot's PIN, choose the robot and set up wifi.</li>
-      <li>Left, middle and right start route A, B and C. Hold left for the schedule, hold middle for manual driving.</li>
-    </ol>
-  </div>
+  <h2>Then on the M5Stack</h2>
+  <div class="card step"><b>&#9881;&#65038;</b><div>Hold the right button 1.5 s<span>The settings: enter the robot's PIN, choose the robot and set up wifi.</span></div></div>
+  <div class="card step"><b>A</b><div>Left, middle and right<span>Start route A, B and C. Hold left for the schedule, hold middle for manual driving.</span></div></div>
 
   <p class="muted">Unofficial software, use at your own risk and keep the robot in sight.
     More in the <a href="https://github.com/ESchouten/scraper-control#install">README</a>.</p>

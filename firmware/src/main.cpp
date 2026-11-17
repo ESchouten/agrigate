@@ -24,6 +24,7 @@
 #include <cctype>
 #include <cstring>
 #include <functional>
+#include <memory>
 #include <vector>
 
 #include "Api.h"
@@ -51,6 +52,7 @@ static Preferences prefs;
 static uint8_t storedVersion[9] = {'D', 'I', 'S', '0', '0', '1', '8', 'T', '4'};   // learned 2026-11-03
 static std::string savedAddress;
 static bool savedClassic = false;   // the robot was found over classic Bluetooth
+static bool classicAtStart = false;   // Bluetooth started with classic (btClassicInUse)
 static String pin;                 // from flash; set on the PIN screen
 // What the last route button did besides starting: stopped a running route, and then the
 // user's answer to the robot's "route afmaken?" (Erik 2026-11-11).
@@ -712,12 +714,16 @@ static void chooseRobot() {
     wrap(tx->robotSaved, 74, 76, 226, kTitle, kOk, 186);
   }
   delay(1200);
+  // Bluetooth starts BLE only or with classic (btClassicInUse), once at the start: another
+  // kind of robot (or none: the search may need classic) restarts the M5.
+  if (btClassicInUse() != classicAtStart) ESP.restart();
 }
 
 // ---- wifi, set up on the M5 itself (Erik: no phone, no app) ---------------------------
 // Settings > Wifi: Network = choose from a scan and type the password with the three
 // buttons (TextEditor), WPS = press the router's WPS button. Kept in flash like the PIN.
 static String wifiSsid, wifiPass;
+static uint32_t lastWifiTry = 0;   // wifiTick: 0 = try at once
 static WebServer server(80);   // the web API, while the wifi is up (wifiTick)
 static bool serving = false;
 
@@ -729,6 +735,16 @@ static String hostName() {
   char b[24];
   snprintf(b, sizeof b, "scraper-control-%02x%02x", m[4], m[5]);
   return b;
+}
+
+// The web API on, once the wifi is connected (again: a download turns it off, apiOff).
+static void serve() {
+  if (serving || WiFi.status() != WL_CONNECTED) return;
+  server.begin();
+  serving = true;
+  if (MDNS.begin(hostName().c_str())) MDNS.addService("http", "tcp", 80);
+  Serial.printf("web API: http://%s/api\n", WiFi.localIP().toString().c_str());
+  logHeap("wifi");
 }
 
 static void stopServing() {
@@ -765,6 +781,7 @@ static bool wifiUp(uint32_t ms = 20000) {
 static void wifiDown() {
   WiFi.disconnect(true);
   WiFi.mode(WIFI_OFF);
+  lastWifiTry = 0;   // back on at the next wifiTick
 }
 
 // Connects with these; saves them only if that works.
@@ -1055,7 +1072,7 @@ static int download(const Manifest& m, bool stopOnPress = false) {
   mbedtls_sha256_context sha;
   mbedtls_sha256_init(&sha);
   mbedtls_sha256_starts(&sha, 0);
-  static uint8_t buf[2048];
+  std::unique_ptr<uint8_t[]> buf(new uint8_t[2048]);   // only now: Bluetooth is off for this
   long done = 0, shown = -1;
   uint32_t last = millis();
   while (done < m.size && millis() - last < 20000) {
@@ -1074,11 +1091,11 @@ static int download(const Manifest& m, bool stopOnPress = false) {
       delay(2);
       continue;
     }
-    size_t want = std::min<size_t>(sizeof buf, std::min<size_t>((size_t)avail, (size_t)(m.size - done)));
-    size_t n = s->readBytes(buf, want);
+    size_t want = std::min<size_t>(2048, std::min<size_t>((size_t)avail, (size_t)(m.size - done)));
+    size_t n = s->readBytes(buf.get(), want);
     if (n == 0) continue;
-    mbedtls_sha256_update(&sha, buf, n);
-    if (Update.write(buf, n) != n) break;
+    mbedtls_sha256_update(&sha, buf.get(), n);
+    if (Update.write(buf.get(), n) != n) break;
     done += (long)n;
     last = millis();
     if (done / 32768 != shown) {
@@ -1101,7 +1118,6 @@ static int download(const Manifest& m, bool stopOnPress = false) {
   return Update.end(true) ? 0 : 1;
 }
 
-static bool offerUpdate(bool quiet);
 static void selfUpdate() {
   using namespace ui;
   if (wifiSsid.isEmpty()) {
@@ -1114,14 +1130,7 @@ static void selfUpdate() {
     notice(tx->updateTitle, tx->wifiFailed, 2);
     return;
   }
-  offerUpdate(false);
-}
-
-// Wifi is up: check the latest release and offer a newer one (Install / Back). quiet: say
-// nothing when there is none (the settings menu shows a line instead).
-// Returns false only when quiet and nothing was shown; wifi is down afterwards.
-static bool offerUpdate(bool quiet) {
-  using namespace ui;
+  // wifi is up: check the latest release and offer a newer one (Install / Back)
   busy(tx->updateTitle, tx->checkingUpdate);
   String body;
   bool got = fetchText(String(kReleaseUrl) + kManifest, body);
@@ -1130,18 +1139,17 @@ static bool offerUpdate(bool quiet) {
   if (!got || !m.complete()) {
     wifiDown();
     notice(tx->updateTitle, tx->noUpdateInfo, 2);
-    return true;
+    return;
   }
   if (!isUpdate(m, FW_BOARD, FW_BUILD)) {
     wifiDown();
-    if (quiet) return false;
     notice(tx->updateTitle, String(tx->upToDate) + "\n" + tx->versionRow + " " + own, 0);
-    return true;
+    return;
   }
   if (!signatureOk(m)) {
     wifiDown();
     notice(tx->updateTitle, tx->notTrusted, 2);
-    return true;
+    return;
   }
   {
     ui::Screen scr(tx->updateTitle);
@@ -1164,32 +1172,30 @@ static bool offerUpdate(bool quiet) {
   waitAllReleased();
   if (!go) {
     wifiDown();
-    return true;
+    return;
   }
   busy(tx->updateTitle, tx->downloading);
   int r = download(m);
   wifiDown();
   if (r != 0) {
     notice(tx->updateTitle, r == 2 ? tx->notTrusted : tx->updateFailed, 2);
-    return true;
+    return;
   }
   prefs.putString("updated", m.version.c_str());
   notice(tx->updateTitle, tx->restarting, 1);
   ESP.restart();
-  return true;   // not reached: ESP.restart() does not return, but the compiler does not know that
 }
 
 // ---- wifi, the web API and automatic updates ---------------------------------------------
 // With a network set the M5 stays on it (Erik 2026-11-16) and answers the web API (handleApi):
 // a robot session and wifi side by side are fine, only a download over https needs Bluetooth
 // off (apiOff). A lost connection comes back by itself; if not, it tries again every minute.
-// On every new connection (a phone's hotspot in a barn without wifi) and otherwise once a
-// day it checks the latest release; a newer signed version is installed at once and the M5
-// restarts. Never while in use (2 minutes after the last press or API command), never while a
-// planning is still owed to the robot (that is only in RAM); a button press stops a download.
+// Once a day (Erik 2026-11-17; the first time when the wifi first connects after a start) it
+// checks the latest release; a newer signed version is installed at once and the M5 restarts.
+// Never while in use (2 minutes after the last press or API command), never while a planning
+// is still owed to the robot (that is only in RAM); a button press stops a download.
 static const uint32_t kWifiTryEveryMs = 60UL * 1000, kCheckEveryMs = 24UL * 3600 * 1000;
-static uint32_t lastWifiTry = 0, lastCheck = 0;
-static bool checkedOnce = false;   // on this connection
+static uint32_t lastCheck = 0;   // 0 = not yet since the start
 
 static void installIfNewer() {
   String body;
@@ -1219,28 +1225,22 @@ static void wifiTick() {
   uint32_t now = millis();
   if (WiFi.status() != WL_CONNECTED) {
     stopServing();
-    checkedOnce = false;
-    if (!lastWifiTry || now - lastWifiTry >= kWifiTryEveryMs || WiFi.getMode() == WIFI_OFF) {
+    if (!lastWifiTry || now - lastWifiTry >= kWifiTryEveryMs) {
+      BtLink::start();   // Bluetooth first: next to a running wifi there is no room for its start
       lastWifiTry = now | 1;
       WiFi.mode(WIFI_STA);
       WiFi.begin(wifiSsid.c_str(), wifiPass.c_str());
     }
     return;
   }
-  if (!serving) {
-    server.begin();
-    serving = true;
-    if (MDNS.begin(hostName().c_str())) MDNS.addService("http", "tcp", 80);
-    Serial.printf("web API: http://%s/api\n", WiFi.localIP().toString().c_str());
-    logHeap("wifi");
-  }
+  serve();
   server.handleClient();
   bool inUse = now - lastActive < 120000;
   bool owed = owedPlanning >= 0 && now - owedAt < kOwedForMs;
-  if (!inUse && !owed && (!checkedOnce || now - lastCheck >= kCheckEveryMs)) {
-    lastCheck = now;
-    checkedOnce = true;
+  if (!inUse && !owed && (!lastCheck || now - lastCheck >= kCheckEveryMs)) {
+    lastCheck = now | 1;
     installIfNewer();   // restarts the M5 when it installed one
+    wifiDown();   // Bluetooth went off for the download (apiOff): it starts again before the wifi
   }
 }
 
@@ -1363,6 +1363,7 @@ static void handleApi() {
 // ---- settings > wifi: left = network, middle = WPS, right = update ----------------------
 static void drawWifi() {
   using namespace ui;
+  serve();   // after an update check (apiOff)
   ui::Screen scr(tx->wifiRow);
   if (serving) {   // a QR code, as large as fits, that adds this robot to the app (Erik 2026-11-16)
     qr(String("scraper-control://add?via=") + hostName() + ".local&pin=" + pin, 16, 54, 140, 4);
@@ -1394,57 +1395,43 @@ static void wifiMenu() {
 }
 
 // ---- settings (right held 1.5 s): left = PIN, middle = robot, right = wifi ---------------
-static void drawSettings(const char* line = nullptr) {
+// No update check here: with a network set the M5 stays on it and checks by itself (wifiTick);
+// Settings > Wifi > Update checks on request.
+static void drawSettings() {
   using namespace ui;
   ui::Screen scr(tx->settings);
   card(10, 56, 300, 136, kCard);
   settingRow(0, ICON_ROBOT, tx->robotRow, savedAddress.empty() ? String(tx->automatic) : String(savedAddress.c_str()));
   settingRow(1, ICON_WIFI, tx->wifiRow, wifiSsid.isEmpty() ? String(tx->notSet) : wifiSsid);
-  String version = FW_VERSION;
-  if (line) settingRow(2, ICON_SYNC, tx->versionRow, line);   // looking for an update
-  else settingRow(2, ICON_DOWNLOAD, tx->versionRow, version);
+  settingRow(2, ICON_DOWNLOAD, tx->versionRow, FW_VERSION);
   String label[3] = {String(ICON_KEY) + " " + tx->pinTitle, String(ICON_ROBOT) + " " + tx->robotWord, String(ICON_WIFI) + " " + tx->wifiRow};
   Pill style[3] = {Pill::Neutral, Pill::Neutral, Pill::Neutral};
   pills(label, style);
 }
 
-// Opening the settings also looks for the saved wifi at once (Erik 2026-11-11): turn on a
-// phone's hotspot, open the settings, and a newer version is offered (Install / Back).
-// Not while a planning is still owed to the robot. A button stops the search.
 static void settingsMenu() {
   waitAllReleased();
-  bool owed = owedPlanning >= 0 && millis() - owedAt < kOwedForMs;
-  bool looking = !wifiSsid.isEmpty() && !owed;
-  if (looking && WiFi.status() != WL_CONNECTED) {
-    wifiOn();
-    WiFi.begin(wifiSsid.c_str(), wifiPass.c_str());
-  }
-  drawSettings(looking ? tx->settingsWifiLooking : nullptr);
+  drawSettings();
   uint32_t start = millis();
   while (millis() - start < 20000) {
     M5.update();
-    bool pressed = M5.BtnA.wasReleased() || M5.BtnB.wasReleased() || M5.BtnC.wasReleased();
-    if (pressed && looking) { wifiDown(); looking = false; }
     if (M5.BtnA.wasReleased()) { editPin(tx->newPin); break; }
     if (M5.BtnB.wasReleased()) { chooseRobot(); break; }
     if (M5.BtnC.wasReleased()) { wifiMenu(); break; }
-    if (looking && WiFi.status() == WL_CONNECTED) {
-      looking = false;
-      lastCheck = millis();
-      checkedOnce = true;
-      if (offerUpdate(true)) break;   // an update was offered (installed or not)
-      drawSettings(tx->settingsUpToDate);
-      start = millis();
-    } else if (looking && millis() - start > 15000) {
-      looking = false;
-      wifiDown();
-      drawSettings(tx->settingsWifiNone);
-      start = millis();
-    }
     delay(10);
   }
-  if (looking) wifiDown();
   idle();
+}
+
+// Classic Bluetooth only for a robot found over classic (or none chosen yet: the search may
+// need it). Without it the controller starts BLE only and gives its classic memory back
+// (~20 KB): more room next to the wifi. Arduino asks this before setup().
+bool btClassicInUse(void) {
+  Preferences p;
+  p.begin(DRIVER_STORE, true);
+  bool classic = p.getBool("classic", false) || p.getString("addr", "").isEmpty();
+  p.end();
+  return classic;
 }
 
 void setup() {
@@ -1464,6 +1451,16 @@ void setup() {
   static const char* headers[] = {"Authorization"};
   server.collectHeaders(headers, 1);
   server.onNotFound(handleApi);   // every path: Api.h decides
+  // Bluetooth first, and it stays on: started next to the wifi and the web API there was no
+  // room for it, and its failed start crashed the M5 (coredump 2026-11-17: 73 KB free). After
+  // a download stopped it (apiOff), the wifi goes off for its start and comes back (wifiTick).
+  BtLink::makeRoom = [] {
+    stopServing();
+    wifiDown();
+  };
+  classicAtStart = btClassicInUse();
+  BtLink::start();
+  logHeap("bluetooth");
   M5.Display.setBrightness(kBright);
   wake();
   if (pin.isEmpty() && editPin(tx->enterPin)) M5.Speaker.tone(2000, 150);

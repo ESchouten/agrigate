@@ -8,8 +8,11 @@ venv/
 build/
 dist/
 
-# PlatformIO build output
+# PlatformIO build output (and what pioarduino generates for custom_sdkconfig)
 firmware/.pio/
+firmware/.dummy/
+firmware/managed_components/
+firmware/sdkconfig.*
 
 # Editors / OS
 .DS_Store
