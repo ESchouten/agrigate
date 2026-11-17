@@ -86,20 +86,18 @@ val webPage by tasks.registering(Sync::class) {
 compose.desktop.application.nativeDistributions.appResourcesRootDir.set(layout.buildDirectory.dir("app-resources"))
 tasks.matching { it.name == "prepareAppResources" }.configureEach { dependsOn(webPage) }
 
-// The installer that keeps the app up to date (Velopack; `dotnet tool install -g vpk`), for this
-// system, in build/velopack: the installer (.exe / .pkg / .AppImage), the full package and its
-// feed releases.<channel>.json, which a release signs (firmware/sign_release.py --feed) for
-// app/DesktopUpdates.
+// The installer that keeps the app up to date (Velopack; `dotnet tool install -g vpk`), on Windows
+// and macOS, in build/velopack: the installer (.exe / .pkg), the full package and its feed
+// releases.<channel>.json, which a release signs (firmware/sign_release.py --feed) for
+// app/DesktopUpdates. Linux: packageDeb, updated through apt.
 val velopack by tasks.registering(Exec::class) {
   dependsOn("createDistributable")
   val app = layout.buildDirectory.dir("compose/binaries/main/app").get().asFile
   val out = layout.buildDirectory.dir("velopack").get().asFile
   val os = System.getProperty("os.name").lowercase()
-  val (dir, exe) = when {
-    os.startsWith("mac") -> File(app, "Scraper Control.app") to "Scraper Control"
-    os.startsWith("windows") -> File(app, "Scraper Control") to "Scraper Control.exe"
-    else -> File(app, "Scraper Control") to "bin/Scraper Control"
-  }
+  onlyIf { os.startsWith("mac") || os.startsWith("windows") }
+  val (dir, exe) = if (os.startsWith("mac")) File(app, "Scraper Control.app") to "Scraper Control"
+    else File(app, "Scraper Control") to "Scraper Control.exe"
   val tools = File(System.getProperty("user.home"), ".dotnet/tools")   // where `dotnet tool install -g` puts it
   val vpk = listOf("vpk", "vpk.exe").map { File(tools, it) }.firstOrNull { it.exists() }?.path ?: "vpk"
   doFirst { out.deleteRecursively() }

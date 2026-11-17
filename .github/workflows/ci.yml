@@ -118,11 +118,6 @@ jobs:
           trap 'pkill -f "Scraper Control"; tail -40 "$GITHUB_WORKSPACE/native/web-app.log"' EXIT
           cd scenarios && npm i --no-save playwright@1 > /dev/null && npx playwright install --with-deps chromium > /dev/null
           node web.mjs
-      - name: Linux installer that updates itself (Velopack AppImage, without build secrets)
-        working-directory: native
-        run: |
-          dotnet tool install -g vpk --version 1.2.161
-          ./gradlew :composeApp:velopack --console=plain
       - name: Android app (Compose, core via the NDK)
         working-directory: native
         run: ./gradlew :androidApp:assembleDebug --console=plain
@@ -132,7 +127,6 @@ jobs:
           path: |
             native/androidApp/build/outputs/apk/debug/*.apk
             native/composeApp/build/compose/jars/*.jar
-            native/composeApp/build/velopack/*.AppImage
       - uses: actions/upload-artifact@v7
         if: always()
         with:

@@ -150,10 +150,13 @@ jobs:
           path: out/
 
   desktop:
+    needs: version
     strategy:
       matrix:
         os: [macos-latest, ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -173,14 +176,23 @@ jobs:
         env:
           BUILD_SECRETS: ${{ secrets.BUILD_SECRETS }}
         run: python tools/secrets.py --release
-      - name: Build the installer (.dmg / .deb / .exe, with its own Java)
+      - name: The installer (Windows, macOS - Velopack, it keeps the app up to date - or Linux .deb)
         working-directory: native
         shell: bash
         run: |
-          ./gradlew :composeApp:packageDistributionForCurrentOS --console=plain
           mkdir -p ../out
-          cp composeApp/build/compose/binaries/main/*/*.{dmg,deb,exe} ../out/ 2>/dev/null || true
-          ls ../out/*
+          if [ "$RUNNER_OS" = Linux ]; then   # updates through the apt repository (job installer)
+            ./gradlew :composeApp:packageDeb --console=plain
+            cp composeApp/build/compose/binaries/main/deb/*.deb ../out/
+          else
+            dotnet tool install -g vpk --version 1.2.161
+            ./gradlew :composeApp:velopack --console=plain
+            v=composeApp/build/velopack
+            cp $v/*-full.nupkg $v/releases.*.json ../out/   # the app updates from these (publish signs the feed)
+            if [ "$RUNNER_OS" = macOS ]; then cp $v/*-Setup.pkg "../out/scraper-control-$VERSION-macos.pkg"
+            else cp $v/*-Setup.exe "../out/scraper-control-$VERSION-windows.exe"; fi
+          fi
+          ls ../out
       - uses: actions/upload-artifact@v7
         with:
           name: desktop-${{ matrix.os }}
@@ -190,7 +202,7 @@ jobs:
   # The browser installer for the buttons (docs/install) on GitHub Pages, with this release's
   # first-install image. Pages must be set to "GitHub Actions" once (Settings > Pages).
   installer:
-    needs: [version, firmware]
+    needs: [version, firmware, desktop]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -206,6 +218,10 @@ jobs:
         with:
           name: firmware
           path: fw
+      - uses: actions/download-artifact@v8
+        with:
+          name: desktop-ubuntu-latest
+          path: linux
       - name: Page, manifest and image
         run: |
           mkdir site
@@ -215,6 +231,25 @@ jobs:
           {"name": "Scraper Control buttons", "version": "$VERSION", "new_install_prompt_erase": true,
            "builds": [{"chipFamily": "ESP32", "parts": [{"path": "scraper-control-m5stack-core-full.bin", "offset": 0}]}]}
           JSON
+      - name: Apt repository with this release's .deb (sudo apt upgrade; README > Install), signed
+        env:
+          APT_SIGNING_KEY: ${{ secrets.APT_SIGNING_KEY }}
+        run: |
+          test -n "$APT_SIGNING_KEY" || { echo "secret APT_SIGNING_KEY is missing"; exit 1; }
+          mkdir -p site/apt/pool/main site/apt/dists/stable/main/binary-amd64
+          cp linux/*.deb site/apt/pool/main/
+          cd site/apt
+          dpkg-scanpackages --arch amd64 pool /dev/null > dists/stable/main/binary-amd64/Packages
+          gzip -9k dists/stable/main/binary-amd64/Packages
+          apt-ftparchive -o APT::FTPArchive::Release::Origin="Scraper Control" -o APT::FTPArchive::Release::Label="Scraper Control" \
+            -o APT::FTPArchive::Release::Suite=stable -o APT::FTPArchive::Release::Codename=stable \
+            -o APT::FTPArchive::Release::Architectures=amd64 -o APT::FTPArchive::Release::Components=main \
+            release dists/stable > dists/stable/Release
+          export GNUPGHOME="$RUNNER_TEMP/gnupg" && mkdir -m 700 "$GNUPGHOME"
+          echo "$APT_SIGNING_KEY" | gpg --batch --import
+          gpg --batch --yes --clearsign -o dists/stable/InRelease dists/stable/Release
+          gpg --batch --yes --armor --detach-sign -o dists/stable/Release.gpg dists/stable/Release
+          gpg --export > scraper-control.gpg   # the key apt checks (signed-by)
       - uses: actions/upload-pages-artifact@v5
         with:
           path: site
@@ -232,6 +267,14 @@ jobs:
           pattern: "{firmware,android,desktop-*}" # not the installer's github-pages
           path: dist
           merge-multiple: true
+      - name: Sign the desktop apps' update feeds (app/DesktopUpdates checks them)
+        env:
+          FIRMWARE_SIGNING_KEY: ${{ secrets.FIRMWARE_SIGNING_KEY }}
+        run: |
+          for f in dist/releases.*.json; do
+            python3 firmware/sign_release.py --feed "$f" --key "$FIRMWARE_SIGNING_KEY" > "${f%.json}.signed.json"
+            rm "$f"
+          done
       - name: Release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -243,4 +286,4 @@ jobs:
 
           - M5 buttons: they install this version themselves (settings, or automatically once a day / on a new wifi connection).
           - Android: install the .apk, or follow this repository with Obtainium for automatic updates.
-          - Desktop: .dmg (macOS), .deb (Linux), .exe (Windows). Not signed: on a Mac, right-click > Open the first time; on Windows, More info > Run anyway."
+          - Desktop: .exe (Windows) and .pkg (macOS): install once, after that the app offers each new version itself. Not signed: on Windows, More info > Run anyway; on a Mac, right-click > Open the first time. Linux: .deb, or the apt repository (README) so that apt upgrade keeps it up to date."

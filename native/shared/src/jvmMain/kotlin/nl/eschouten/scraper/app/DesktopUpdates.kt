@@ -1,4 +1,4 @@
-// Updates of the desktop app (Windows, macOS, Linux), the way the buttons update: from the latest
+// Updates of the desktop app on Windows and macOS (Linux: apt), the way the buttons update: from the latest
 // GitHub release, and only what the release key signed. A release signs each system's Velopack
 // feed (tools/sign_feed.py); the app checks that signature, downloads the package, checks its
 // SHA-256 against the signed feed, and hands Velopack (core/jni/updates_jni.cpp) a folder with
