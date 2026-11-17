@@ -62,17 +62,9 @@ compose.desktop {
         }
       }
       linux { iconFile.set(project.file("icons/icon.png")) }
-      windows {
-        iconFile.set(project.file("icons/icon.ico"))
-        menu = true            // in the Start menu
-        perUserInstall = true  // no administrator needed
-        upgradeUuid = "1fe694cb-fc77-4315-bb64-e8666b0218d5"   // never changes: a newer installer replaces the older app
-      }
-      targetFormats(
-        org.jetbrains.compose.desktop.application.dsl.TargetFormat.Dmg,
-        org.jetbrains.compose.desktop.application.dsl.TargetFormat.Deb,
-        org.jetbrains.compose.desktop.application.dsl.TargetFormat.Exe,
-      )
+      windows { iconFile.set(project.file("icons/icon.ico")) }
+      // Windows and macOS install with Velopack (task velopack below), Linux with this .deb
+      targetFormats(org.jetbrains.compose.desktop.application.dsl.TargetFormat.Deb)
       packageVersion = rootProject.extra["appVersion"] as String   // 1.6.120 (build.gradle.kts)
     }
   }

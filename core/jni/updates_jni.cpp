@@ -42,6 +42,7 @@ JNIEXPORT void JNICALL Java_nl_eschouten_scraper_app_DesktopUpdates_nativeAppRun
 JNIEXPORT jstring JNICALL Java_nl_eschouten_scraper_app_DesktopUpdates_nativeInstalledVersion(JNIEnv* e, jclass) {
   vpkc_update_manager_t* m = nullptr;
   std::string v;
+  // a manager needs a source; this one is never read, only the installed copy is looked at
   if (vpkc_new_update_manager("https://localhost/none", nullptr, nullptr, &m)) {
     char buf[64] = {0};
     vpkc_get_current_version(m, buf, sizeof buf);

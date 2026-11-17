@@ -15,8 +15,8 @@ format as src/Manifest.h.
 """
 import argparse
 import base64
-import json
 import hashlib
+import json
 import os
 import subprocess
 import sys

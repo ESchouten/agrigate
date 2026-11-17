@@ -1,8 +1,9 @@
-// Updates of the desktop app on Windows and macOS (Linux: apt), the way the buttons update: from the latest
-// GitHub release, and only what the release key signed. A release signs each system's Velopack
-// feed (tools/sign_feed.py); the app checks that signature, downloads the package, checks its
-// SHA-256 against the signed feed, and hands Velopack (core/jni/updates_jni.cpp) a folder with
-// just those two. Velopack puts the new version in place once the app has closed and starts it.
+// Updates of the desktop app on Windows and macOS (Linux: apt), the way the buttons update: from
+// the latest GitHub release, and only what the release key signed. A release signs each system's
+// Velopack feed (firmware/sign_release.py --feed); the app checks that signature, downloads the
+// package, checks its SHA-256 against the signed feed, and hands Velopack (core/jni/
+// updates_jni.cpp) a folder with just those two. Velopack puts the new version in place once the
+// app has closed and starts it.
 package nl.eschouten.scraper.app
 
 import kotlinx.coroutines.Dispatchers
@@ -15,7 +16,7 @@ import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
-import java.nio.file.Files
+import java.security.DigestInputStream
 import java.security.KeyFactory
 import java.security.MessageDigest
 import java.security.PublicKey
@@ -33,14 +34,8 @@ object DesktopUpdates {
   internal const val RELEASE_KEY = "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE5+BVstQnXROhuybMANmQsU1sRAZK" +
     "TB7yUjvfV7I+WLhYFhBkSv4gVirRK6oehdckBqIeV8QmclcXYdsj4SsvLw=="
 
-  /** Velopack's channel for this system. */
-  private val channel: String = System.getProperty("os.name").lowercase().let {
-    when {
-      it.startsWith("mac") -> "osx"
-      it.startsWith("windows") -> "win"
-      else -> "linux"
-    }
-  }
+  /** Velopack's channel for this system (only Windows and macOS have Velopack). */
+  private val channel = if (System.getProperty("os.name").lowercase().startsWith("mac")) "osx" else "win"
 
   @Serializable internal data class Envelope(val feed: String, val sig: String)
   @Serializable internal data class Feed(val Assets: List<Asset> = emptyList())
@@ -56,9 +51,13 @@ object DesktopUpdates {
   @JvmStatic private external fun nativeInstalledVersion(): String
   @JvmStatic private external fun nativeApply(dir: String): String
 
+  /** Where an update is put together; left behind by the update itself, cleared at the next start. */
+  private val work = File(System.getProperty("java.io.tmpdir"), "scraper-control-update")
+
   /** First thing in main(): Velopack's install and update hooks run (and exit) here. */
   fun appRun(args: Array<String>) {
     runCatching { loadCoreLibrary(); nativeAppRun(args) }
+    work.deleteRecursively()
   }
 
   /** The installed version; "" when run from a build (no updates then). */
@@ -75,11 +74,10 @@ object DesktopUpdates {
   /** Download, check and hand to Velopack; [beforeExit] runs, the app quits and comes back as the
    *  new version. Returns why not when it does not get that far. */
   suspend fun install(u: Update, beforeExit: () -> Unit = {}): String = withContext(Dispatchers.IO) {
-    val dir = Files.createTempDirectory("scraper-update").toFile()
+    val dir = work.apply { deleteRecursively(); mkdirs() }
     val pkg = File(dir, u.asset.FileName)
-    val body = get("$releases/download/v${u.version}/${u.asset.FileName}") ?: return@withContext "download failed"
-    if (!sha256(body).equals(u.asset.SHA256, ignoreCase = true)) return@withContext "the download does not match the signed release"
-    pkg.writeBytes(body)
+    if (!download("$releases/download/v${u.version}/${u.asset.FileName}", pkg)) return@withContext "download failed"
+    if (!sha256(pkg).equals(u.asset.SHA256, ignoreCase = true)) return@withContext "the download does not match the signed release"
     File(dir, "releases.$channel.json").writeBytes(u.feed)
     nativeApply(dir.absolutePath).ifEmpty {
       beforeExit()
@@ -117,10 +115,21 @@ object DesktopUpdates {
   private fun releaseKey(): PublicKey =
     KeyFactory.getInstance("EC").generatePublic(X509EncodedKeySpec(Base64.getDecoder().decode(RELEASE_KEY)))
 
-  private fun sha256(b: ByteArray) = MessageDigest.getInstance("SHA-256").digest(b).joinToString("") { "%02x".format(it) }
+  private fun sha256(f: File): String {
+    val md = MessageDigest.getInstance("SHA-256")
+    f.inputStream().use { DigestInputStream(it, md).readAllBytes() }   // streamed: packages are ~100 MB
+    return md.digest().joinToString("") { "%02x".format(it) }
+  }
+
+  private fun request(url: String) = HttpRequest.newBuilder(URI(url)).header("User-Agent", "scraper-control").build()
 
   private fun get(url: String): ByteArray? = runCatching {
-    val r = http.send(HttpRequest.newBuilder(URI(url)).header("User-Agent", "scraper-control").build(), HttpResponse.BodyHandlers.ofByteArray())
+    val r = http.send(request(url), HttpResponse.BodyHandlers.ofByteArray())
     if (r.statusCode() == 200) r.body() else null
   }.getOrNull()
+
+  /** Into [to], streamed. */
+  private fun download(url: String, to: File): Boolean = runCatching {
+    http.send(request(url), HttpResponse.BodyHandlers.ofFile(to.toPath())).statusCode() == 200
+  }.getOrDefault(false)
 }
