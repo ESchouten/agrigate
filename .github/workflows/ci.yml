@@ -149,6 +149,9 @@ jobs:
           distribution: temurin
           java-version: "17"
       - uses: gradle/actions/setup-gradle@v5
+      - uses: actions/setup-dotnet@v6 # for Velopack's vpk, as in release
+        with:
+          dotnet-version: "10.0.x"
       - name: Scenario tests on Windows (the core built by the Windows compiler, demo robot); by hand, like iOS
         if: github.event_name == 'workflow_dispatch'
         working-directory: native
@@ -187,6 +190,14 @@ jobs:
           java-version: "17"
       - uses: gradle/actions/setup-gradle@v5
         if: steps.changed.outputs.run == 'yes'
+      - uses: actions/setup-dotnet@v6 # for Velopack's vpk, as in release
+        if: steps.changed.outputs.run == 'yes'
+        with:
+          dotnet-version: "10.0.x"
+      - name: macOS installer that updates itself (Velopack, without build secrets), as release builds it
+        if: steps.changed.outputs.run == 'yes'
+        working-directory: native
+        run: ./gradlew :composeApp:velopack --console=plain && ls composeApp/build/velopack
       - uses: actions/cache@v6 # the Kotlin/Native compiler and its iOS libraries (~1 GB)
         if: steps.changed.outputs.run == 'yes'
         with:

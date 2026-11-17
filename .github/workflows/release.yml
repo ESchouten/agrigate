@@ -176,6 +176,10 @@ jobs:
       - uses: gradle/actions/setup-gradle@v5
         with:
           cache-read-only: true # ci's caches; a release adds nothing to them
+      - uses: actions/setup-dotnet@v6 # Velopack's vpk runs on .NET 10; the Mac runner has none where vpk looks
+        if: runner.os != 'Linux'
+        with:
+          dotnet-version: "10.0.x"
       - name: Build secrets
         shell: bash
         env:
