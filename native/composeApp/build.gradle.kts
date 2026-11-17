@@ -47,7 +47,8 @@ compose.desktop {
     mainClass = "nl.eschouten.scraper.app.MainKt"
     nativeDistributions {
       packageName = "Scraper Control"
-      modules("jdk.httpserver")   // the web API (api/ApiServer)
+      // beyond what is found by itself: the web API (api/ApiServer), updates (app/DesktopUpdates)
+      modules("jdk.httpserver", "java.net.http", "jdk.crypto.ec")
       // the app icon (from the iOS/Android icon), per system
       macOS {
         iconFile.set(project.file("icons/icon.icns"))
@@ -61,17 +62,9 @@ compose.desktop {
         }
       }
       linux { iconFile.set(project.file("icons/icon.png")) }
-      windows {
-        iconFile.set(project.file("icons/icon.ico"))
-        menu = true            // in the Start menu
-        perUserInstall = true  // no administrator needed
-        upgradeUuid = "1fe694cb-fc77-4315-bb64-e8666b0218d5"   // never changes: a newer installer replaces the older app
-      }
-      targetFormats(
-        org.jetbrains.compose.desktop.application.dsl.TargetFormat.Dmg,
-        org.jetbrains.compose.desktop.application.dsl.TargetFormat.Deb,
-        org.jetbrains.compose.desktop.application.dsl.TargetFormat.Exe,
-      )
+      windows { iconFile.set(project.file("icons/icon.ico")) }
+      // Windows and macOS install with Velopack (task velopack below), Linux with this .deb
+      targetFormats(org.jetbrains.compose.desktop.application.dsl.TargetFormat.Deb)
       packageVersion = rootProject.extra["appVersion"] as String   // 1.6.120 (build.gradle.kts)
     }
   }
@@ -84,5 +77,35 @@ val webPage by tasks.registering(Sync::class) {
 }
 compose.desktop.application.nativeDistributions.appResourcesRootDir.set(layout.buildDirectory.dir("app-resources"))
 tasks.matching { it.name == "prepareAppResources" }.configureEach { dependsOn(webPage) }
+
+// The installer that keeps the app up to date (Velopack; needs the .NET SDK for its vpk tool),
+// on Windows and macOS, in build/velopack: the installer (.exe / .pkg), the full package and its
+// feed releases.<channel>.json, which a release signs (firmware/sign_release.py --feed) for
+// app/DesktopUpdates. Linux: packageDeb, updated through apt.
+val hostOs = System.getProperty("os.name").lowercase()
+val velopackOs = hostOs.startsWith("mac") || hostOs.startsWith("windows")
+val vpkTool by tasks.registering(Exec::class) {   // the version core/CMakeLists.txt links
+  onlyIf { velopackOs }
+  commandLine("dotnet", "tool", "update", "-g", "vpk", "--version", "1.2.161", "--allow-downgrade")
+}
+val velopack by tasks.registering(Exec::class) {
+  dependsOn("createDistributable", vpkTool)
+  onlyIf { velopackOs }
+  val app = layout.buildDirectory.dir("compose/binaries/main/app").get().asFile
+  val out = layout.buildDirectory.dir("velopack").get().asFile
+  val (dir, exe) = if (hostOs.startsWith("mac")) File(app, "Scraper Control.app") to "Scraper Control"
+    else File(app, "Scraper Control") to "Scraper Control.exe"
+  val tools = File(System.getProperty("user.home"), ".dotnet/tools")   // where vpkTool puts it
+  doFirst {
+    out.deleteRecursively()
+    listOf("vpk", "vpk.exe").map { File(tools, it) }.firstOrNull { it.exists() }?.let { executable = it.path }
+  }
+  commandLine(
+    "vpk", "pack", "--packId", "ScraperControl", "--packTitle", "Scraper Control",
+    "--packVersion", rootProject.extra["appVersion"] as String, "--packDir", dir.path, "--mainExe", exe,
+    "--delta", "None", "--outputDir", out.path, "--yes",
+  )
+  if (hostOs.startsWith("windows")) args("--icon", project.file("icons/icon.ico").path)
+}
 
 if (findProject(":androidApp") != null) apply(from = "android.gradle")   // an Android SDK is there

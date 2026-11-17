@@ -158,14 +158,14 @@ jobs:
         working-directory: native
         shell: bash
         run: ./gradlew :shared:jvmTest --tests "*FileStoreTest*" --console=plain
-      - name: Windows installer (without build secrets, a release has them)
+      - name: Windows installer that updates itself (Velopack, without build secrets)
         working-directory: native
         shell: bash
-        run: ./gradlew :composeApp:packageDistributionForCurrentOS --console=plain
+        run: ./gradlew :composeApp:velopack --console=plain
       - uses: actions/upload-artifact@v7
         with:
           name: scraper-control-windows
-          path: native/composeApp/build/compose/binaries/main/exe/*.exe
+          path: native/composeApp/build/velopack/*Setup.exe
           if-no-files-found: error
 
   apps-ios:
