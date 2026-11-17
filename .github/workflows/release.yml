@@ -158,7 +158,7 @@ jobs:
     needs: version
     strategy:
       matrix:
-        os: [macos-latest, ubuntu-latest, windows-latest]
+        os: [macos-15, ubuntu-latest, windows-latest] # macos-latest (macOS 26) often finds no free runner
     runs-on: ${{ matrix.os }}
     env:
       VERSION: ${{ needs.version.outputs.version }}
