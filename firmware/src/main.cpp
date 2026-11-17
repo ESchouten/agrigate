@@ -52,10 +52,7 @@ static Preferences prefs;
 static uint8_t storedVersion[9] = {'D', 'I', 'S', '0', '0', '1', '8', 'T', '4'};   // learned 2026-11-03
 static std::string savedAddress;
 static bool savedClassic = false;   // the robot was found over classic Bluetooth
-// BLE only (btClassicInUse): Bluetooth and the wifi fit next to each other, if Bluetooth starts
-// first (~78 KB free, the wifi and the web API take ~60 KB). With classic Bluetooth they do not:
-// then Bluetooth only runs for a robot session and the wifi is off meanwhile.
-static bool btWithWifi = false;
+static bool classicAtStart = false;   // Bluetooth started with classic (btClassicInUse)
 static String pin;                 // from flash; set on the PIN screen
 // What the last route button did besides starting: stopped a running route, and then the
 // user's answer to the robot's "route afmaken?" (Erik 2026-11-11).
@@ -719,7 +716,7 @@ static void chooseRobot() {
   delay(1200);
   // Bluetooth starts BLE only or with classic (btClassicInUse), once at the start: another
   // kind of robot (or none: the search may need classic) restarts the M5.
-  if (btClassicInUse() == btWithWifi) ESP.restart();
+  if (btClassicInUse() != classicAtStart) ESP.restart();
 }
 
 // ---- wifi, set up on the M5 itself (Erik: no phone, no app) ---------------------------
@@ -1233,9 +1230,7 @@ static void wifiTick() {
     stopServing();
     if (!wifiPaused) checkedOnce = false;   // lost by itself: a new connection checks again
     if (!lastWifiTry || now - lastWifiTry >= kWifiTryEveryMs) {
-      // Bluetooth first: next to a running wifi there is no room for its start
-      if (btWithWifi) BtLink::start();
-      else BtLink::release();
+      BtLink::start();   // Bluetooth first: next to a running wifi there is no room for its start
       lastWifiTry = now | 1;
       WiFi.mode(WIFI_STA);
       WiFi.begin(wifiSsid.c_str(), wifiPass.c_str());
@@ -1436,7 +1431,7 @@ static void settingsMenu() {
 
 // Classic Bluetooth only for a robot found over classic (or none chosen yet: the search may
 // need it). Without it the controller starts BLE only and gives its classic memory back
-// (~20 KB), which the wifi needs next to Bluetooth. Arduino asks this before setup().
+// (~20 KB): more room next to the wifi. Arduino asks this before setup().
 bool btClassicInUse(void) {
   Preferences p;
   p.begin(DRIVER_STORE, true);
@@ -1469,8 +1464,8 @@ void setup() {
     stopServing();
     wifiDown();
   };
-  btWithWifi = !btClassicInUse();
-  if (btWithWifi) BtLink::start();
+  classicAtStart = btClassicInUse();
+  BtLink::start();
   logHeap("bluetooth");
   M5.Display.setBrightness(kBright);
   wake();

@@ -60,7 +60,10 @@ jobs:
           python-version: "3.12"
       - uses: actions/cache@v6
         with:
-          path: ~/.platformio
+          # sdkconfig.defaults: by its first line the platform knows its libraries are built
+          path: |
+            ~/.platformio
+            firmware/sdkconfig.defaults
           key: pio-${{ hashFiles('firmware/platformio.ini') }}
       - uses: actions/cache@v6 # what is compiled: only changed files compile again
         with:
