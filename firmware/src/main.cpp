@@ -724,7 +724,6 @@ static void chooseRobot() {
 // buttons (TextEditor), WPS = press the router's WPS button. Kept in flash like the PIN.
 static String wifiSsid, wifiPass;
 static uint32_t lastWifiTry = 0;   // wifiTick: 0 = try at once
-static bool wifiPaused = false;    // wifiDown() turned it off: the same network comes back, no new update check
 static WebServer server(80);   // the web API, while the wifi is up (wifiTick)
 static bool serving = false;
 
@@ -783,7 +782,6 @@ static void wifiDown() {
   WiFi.disconnect(true);
   WiFi.mode(WIFI_OFF);
   lastWifiTry = 0;   // back on at the next wifiTick
-  wifiPaused = true;
 }
 
 // Connects with these; saves them only if that works.
@@ -1192,13 +1190,12 @@ static void selfUpdate() {
 // With a network set the M5 stays on it (Erik 2026-11-16) and answers the web API (handleApi):
 // a robot session and wifi side by side are fine, only a download over https needs Bluetooth
 // off (apiOff). A lost connection comes back by itself; if not, it tries again every minute.
-// On every new connection (a phone's hotspot in a barn without wifi) and otherwise once a
-// day it checks the latest release; a newer signed version is installed at once and the M5
-// restarts. Never while in use (2 minutes after the last press or API command), never while a
-// planning is still owed to the robot (that is only in RAM); a button press stops a download.
+// Once a day (Erik 2026-11-17; the first time when the wifi first connects after a start) it
+// checks the latest release; a newer signed version is installed at once and the M5 restarts.
+// Never while in use (2 minutes after the last press or API command), never while a planning
+// is still owed to the robot (that is only in RAM); a button press stops a download.
 static const uint32_t kWifiTryEveryMs = 60UL * 1000, kCheckEveryMs = 24UL * 3600 * 1000;
-static uint32_t lastCheck = 0;
-static bool checkedOnce = false;   // on this connection
+static uint32_t lastCheck = 0;   // 0 = not yet since the start
 
 static void installIfNewer() {
   String body;
@@ -1228,7 +1225,6 @@ static void wifiTick() {
   uint32_t now = millis();
   if (WiFi.status() != WL_CONNECTED) {
     stopServing();
-    if (!wifiPaused) checkedOnce = false;   // lost by itself: a new connection checks again
     if (!lastWifiTry || now - lastWifiTry >= kWifiTryEveryMs) {
       BtLink::start();   // Bluetooth first: next to a running wifi there is no room for its start
       lastWifiTry = now | 1;
@@ -1237,14 +1233,12 @@ static void wifiTick() {
     }
     return;
   }
-  wifiPaused = false;
   serve();
   server.handleClient();
   bool inUse = now - lastActive < 120000;
   bool owed = owedPlanning >= 0 && now - owedAt < kOwedForMs;
-  if (!inUse && !owed && (!checkedOnce || now - lastCheck >= kCheckEveryMs)) {
-    lastCheck = now;
-    checkedOnce = true;
+  if (!inUse && !owed && (!lastCheck || now - lastCheck >= kCheckEveryMs)) {
+    lastCheck = now | 1;
     installIfNewer();   // restarts the M5 when it installed one
     wifiDown();   // Bluetooth went off for the download (apiOff): it starts again before the wifi
   }
