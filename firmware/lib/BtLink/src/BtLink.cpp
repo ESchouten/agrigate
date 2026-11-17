@@ -28,13 +28,16 @@ std::string lower(std::string s) {
 
 void startBle() {
   if (BLEDevice::getInitialized()) return;
+  if (BtLink::makeRoom) BtLink::makeRoom();
   BLEDevice::init("scraper-control");
   BLEDevice::setMTU(247);
 }
 
 bool startClassic() {
   startBle();   // Bluedroid with BLE first; classic joins the same host
-  if (!sppStarted) sppStarted = spp.begin("scraper-control", true);   // master: we connect out
+  if (sppStarted) return true;
+  if (BtLink::makeRoom) BtLink::makeRoom();
+  sppStarted = spp.begin("scraper-control", true);   // master: we connect out
   return sppStarted;
 }
 
@@ -42,6 +45,10 @@ void sortByRssi(std::vector<FoundRobot>& v) {
   std::sort(v.begin(), v.end(), [](const FoundRobot& x, const FoundRobot& y) { return x.rssi > y.rssi; });
 }
 }  // namespace
+
+std::function<void()> BtLink::makeRoom;
+
+void BtLink::start() { startBle(); }
 
 BtLink::BtLink(std::string address, bool classic) : address_(lower(address)), classic_(classic) {}
 

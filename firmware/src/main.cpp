@@ -1434,6 +1434,15 @@ void setup() {
   static const char* headers[] = {"Authorization"};
   server.collectHeaders(headers, 1);
   server.onNotFound(handleApi);   // every path: Api.h decides
+  // Bluetooth first, and it stays on: started next to the wifi and the web API there was no
+  // room for it, and its failed start crashed the M5 (coredump 2026-11-17: 73 KB free). After
+  // a download stopped it (apiOff), the wifi goes off for its start and comes back (wifiTick).
+  BtLink::makeRoom = [] {
+    stopServing();
+    wifiDown();
+  };
+  BtLink::start();
+  logHeap("bluetooth");
   M5.Display.setBrightness(kBright);
   wake();
   if (pin.isEmpty() && editPin(tx->enterPin)) M5.Speaker.tone(2000, 150);

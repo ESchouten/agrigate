@@ -9,6 +9,7 @@
 #include <Arduino.h>
 #include <BLEDevice.h>
 
+#include <functional>
 #include <mutex>
 #include <string>
 #include <vector>
@@ -27,9 +28,14 @@ class BtLink : public driver::Transport {
   // All robots nearby, strongest first: over BLE, and only when BLE finds none (and classic),
   // over classic Bluetooth (a classic search spoils a BLE scan next to it).
   static std::vector<FoundRobot> scanAll(uint32_t ms = 5000, bool classic = true);
+  // Starts Bluetooth (BLE); a search or connect also does that when it is not running.
+  static void start();
   // Stops Bluetooth and gives its memory back (for wifi); the next search or connect starts it
   // again. No link may be in use.
   static void release();
+  // Called right before Bluetooth starts: its start fails, and crashes, when the memory is
+  // taken (the M5 turns its wifi off here, and on again after).
+  static std::function<void()> makeRoom;
 
   // address: the robot's address, or "" to search for one; classic: how it was found.
   explicit BtLink(std::string address = "", bool classic = false);
