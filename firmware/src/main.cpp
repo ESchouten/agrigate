@@ -1111,7 +1111,6 @@ static int download(const Manifest& m, bool stopOnPress = false) {
   return Update.end(true) ? 0 : 1;
 }
 
-static bool offerUpdate(bool quiet);
 static void selfUpdate() {
   using namespace ui;
   if (wifiSsid.isEmpty()) {
@@ -1124,14 +1123,7 @@ static void selfUpdate() {
     notice(tx->updateTitle, tx->wifiFailed, 2);
     return;
   }
-  offerUpdate(false);
-}
-
-// Wifi is up: check the latest release and offer a newer one (Install / Back). quiet: say
-// nothing when there is none (the settings menu shows a line instead).
-// Returns false only when quiet and nothing was shown; wifi is down afterwards.
-static bool offerUpdate(bool quiet) {
-  using namespace ui;
+  // wifi is up: check the latest release and offer a newer one (Install / Back)
   busy(tx->updateTitle, tx->checkingUpdate);
   String body;
   bool got = fetchText(String(kReleaseUrl) + kManifest, body);
@@ -1140,18 +1132,17 @@ static bool offerUpdate(bool quiet) {
   if (!got || !m.complete()) {
     wifiDown();
     notice(tx->updateTitle, tx->noUpdateInfo, 2);
-    return true;
+    return;
   }
   if (!isUpdate(m, FW_BOARD, FW_BUILD)) {
     wifiDown();
-    if (quiet) return false;
     notice(tx->updateTitle, String(tx->upToDate) + "\n" + tx->versionRow + " " + own, 0);
-    return true;
+    return;
   }
   if (!signatureOk(m)) {
     wifiDown();
     notice(tx->updateTitle, tx->notTrusted, 2);
-    return true;
+    return;
   }
   {
     ui::Screen scr(tx->updateTitle);
@@ -1174,19 +1165,18 @@ static bool offerUpdate(bool quiet) {
   waitAllReleased();
   if (!go) {
     wifiDown();
-    return true;
+    return;
   }
   busy(tx->updateTitle, tx->downloading);
   int r = download(m);
   wifiDown();
   if (r != 0) {
     notice(tx->updateTitle, r == 2 ? tx->notTrusted : tx->updateFailed, 2);
-    return true;
+    return;
   }
   prefs.putString("updated", m.version.c_str());
   notice(tx->updateTitle, tx->restarting, 1);
   ESP.restart();
-  return true;   // not reached: ESP.restart() does not return, but the compiler does not know that
 }
 
 // ---- wifi, the web API and automatic updates ---------------------------------------------
@@ -1367,7 +1357,7 @@ static void handleApi() {
 // ---- settings > wifi: left = network, middle = WPS, right = update ----------------------
 static void drawWifi() {
   using namespace ui;
-  serve();   // opening the settings looked for an update, which turned the API off
+  serve();   // after an update check (apiOff)
   ui::Screen scr(tx->wifiRow);
   if (serving) {   // a QR code, as large as fits, that adds this robot to the app (Erik 2026-11-16)
     qr(String("scraper-control://add?via=") + hostName() + ".local&pin=" + pin, 16, 54, 140, 4);
@@ -1399,56 +1389,31 @@ static void wifiMenu() {
 }
 
 // ---- settings (right held 1.5 s): left = PIN, middle = robot, right = wifi ---------------
-static void drawSettings(const char* line = nullptr) {
+// No update check here: with a network set the M5 stays on it and checks by itself (wifiTick);
+// Settings > Wifi > Update checks on request.
+static void drawSettings() {
   using namespace ui;
   ui::Screen scr(tx->settings);
   card(10, 56, 300, 136, kCard);
   settingRow(0, ICON_ROBOT, tx->robotRow, savedAddress.empty() ? String(tx->automatic) : String(savedAddress.c_str()));
   settingRow(1, ICON_WIFI, tx->wifiRow, wifiSsid.isEmpty() ? String(tx->notSet) : wifiSsid);
-  String version = FW_VERSION;
-  if (line) settingRow(2, ICON_SYNC, tx->versionRow, line);   // looking for an update
-  else settingRow(2, ICON_DOWNLOAD, tx->versionRow, version);
+  settingRow(2, ICON_DOWNLOAD, tx->versionRow, FW_VERSION);
   String label[3] = {String(ICON_KEY) + " " + tx->pinTitle, String(ICON_ROBOT) + " " + tx->robotWord, String(ICON_WIFI) + " " + tx->wifiRow};
   Pill style[3] = {Pill::Neutral, Pill::Neutral, Pill::Neutral};
   pills(label, style);
 }
 
-// Opening the settings also looks for the saved wifi at once (Erik 2026-11-11): turn on a
-// phone's hotspot, open the settings, and a newer version is offered (Install / Back).
-// Not while a planning is still owed to the robot. A button stops the search.
 static void settingsMenu() {
   waitAllReleased();
-  bool owed = owedPlanning >= 0 && millis() - owedAt < kOwedForMs;
-  bool looking = !wifiSsid.isEmpty() && !owed;
-  if (looking && WiFi.status() != WL_CONNECTED) {
-    wifiOn();
-    WiFi.begin(wifiSsid.c_str(), wifiPass.c_str());
-  }
-  drawSettings(looking ? tx->settingsWifiLooking : nullptr);
+  drawSettings();
   uint32_t start = millis();
   while (millis() - start < 20000) {
     M5.update();
-    bool pressed = M5.BtnA.wasReleased() || M5.BtnB.wasReleased() || M5.BtnC.wasReleased();
-    if (pressed && looking) { wifiDown(); looking = false; }
     if (M5.BtnA.wasReleased()) { editPin(tx->newPin); break; }
     if (M5.BtnB.wasReleased()) { chooseRobot(); break; }
     if (M5.BtnC.wasReleased()) { wifiMenu(); break; }
-    if (looking && WiFi.status() == WL_CONNECTED) {
-      looking = false;
-      lastCheck = millis();
-      checkedOnce = true;
-      if (offerUpdate(true)) break;   // an update was offered (installed or not)
-      drawSettings(tx->settingsUpToDate);
-      start = millis();
-    } else if (looking && millis() - start > 15000) {
-      looking = false;
-      wifiDown();
-      drawSettings(tx->settingsWifiNone);
-      start = millis();
-    }
     delay(10);
   }
-  if (looking) wifiDown();
   idle();
 }
 

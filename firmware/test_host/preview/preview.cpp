@@ -72,7 +72,6 @@ static void all() {
   PinEditor e("4321"); e.next();
   drawPin(e, tx->enterPin); shot("6-pin");
   drawSettings(); shot("9-settings");
-  drawSettings(tx->settingsWifiLooking); shot("9b-settings-update");
   drawFinishQuestion(); shot("15-finish-question");
   drawResult(rb, true, tx->routeCancelled, st, ""); shot("16-cancelled");
   std::vector<FoundRobot> found = {{"00:12:ff:51:4d:00", "stal", -58}, {"00:12:ff:51:4d:01", "", -77}};
