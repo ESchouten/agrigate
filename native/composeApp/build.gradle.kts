@@ -47,7 +47,8 @@ compose.desktop {
     mainClass = "nl.eschouten.scraper.app.MainKt"
     nativeDistributions {
       packageName = "Scraper Control"
-      modules("jdk.httpserver")   // the web API (api/ApiServer)
+      // beyond what is found by itself: the web API (api/ApiServer), updates (app/DesktopUpdates)
+      modules("jdk.httpserver", "java.net.http", "jdk.crypto.ec")
       // the app icon (from the iOS/Android icon), per system
       macOS {
         iconFile.set(project.file("icons/icon.icns"))
