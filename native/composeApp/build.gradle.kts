@@ -78,27 +78,34 @@ val webPage by tasks.registering(Sync::class) {
 compose.desktop.application.nativeDistributions.appResourcesRootDir.set(layout.buildDirectory.dir("app-resources"))
 tasks.matching { it.name == "prepareAppResources" }.configureEach { dependsOn(webPage) }
 
-// The installer that keeps the app up to date (Velopack; `dotnet tool install -g vpk`), on Windows
-// and macOS, in build/velopack: the installer (.exe / .pkg), the full package and its feed
-// releases.<channel>.json, which a release signs (firmware/sign_release.py --feed) for
+// The installer that keeps the app up to date (Velopack; needs the .NET SDK for its vpk tool),
+// on Windows and macOS, in build/velopack: the installer (.exe / .pkg), the full package and its
+// feed releases.<channel>.json, which a release signs (firmware/sign_release.py --feed) for
 // app/DesktopUpdates. Linux: packageDeb, updated through apt.
+val hostOs = System.getProperty("os.name").lowercase()
+val velopackOs = hostOs.startsWith("mac") || hostOs.startsWith("windows")
+val vpkTool by tasks.registering(Exec::class) {   // the version core/CMakeLists.txt links
+  onlyIf { velopackOs }
+  commandLine("dotnet", "tool", "update", "-g", "vpk", "--version", "1.2.161", "--allow-downgrade")
+}
 val velopack by tasks.registering(Exec::class) {
-  dependsOn("createDistributable")
+  dependsOn("createDistributable", vpkTool)
+  onlyIf { velopackOs }
   val app = layout.buildDirectory.dir("compose/binaries/main/app").get().asFile
   val out = layout.buildDirectory.dir("velopack").get().asFile
-  val os = System.getProperty("os.name").lowercase()
-  onlyIf { os.startsWith("mac") || os.startsWith("windows") }
-  val (dir, exe) = if (os.startsWith("mac")) File(app, "Scraper Control.app") to "Scraper Control"
+  val (dir, exe) = if (hostOs.startsWith("mac")) File(app, "Scraper Control.app") to "Scraper Control"
     else File(app, "Scraper Control") to "Scraper Control.exe"
-  val tools = File(System.getProperty("user.home"), ".dotnet/tools")   // where `dotnet tool install -g` puts it
-  val vpk = listOf("vpk", "vpk.exe").map { File(tools, it) }.firstOrNull { it.exists() }?.path ?: "vpk"
-  doFirst { out.deleteRecursively() }
+  val tools = File(System.getProperty("user.home"), ".dotnet/tools")   // where vpkTool puts it
+  doFirst {
+    out.deleteRecursively()
+    listOf("vpk", "vpk.exe").map { File(tools, it) }.firstOrNull { it.exists() }?.let { executable = it.path }
+  }
   commandLine(
-    vpk, "pack", "--packId", "ScraperControl", "--packTitle", "Scraper Control",
+    "vpk", "pack", "--packId", "ScraperControl", "--packTitle", "Scraper Control",
     "--packVersion", rootProject.extra["appVersion"] as String, "--packDir", dir.path, "--mainExe", exe,
     "--delta", "None", "--outputDir", out.path, "--yes",
   )
-  if (os.startsWith("windows")) args("--icon", project.file("icons/icon.ico").path)
+  if (hostOs.startsWith("windows")) args("--icon", project.file("icons/icon.ico").path)
 }
 
 if (findProject(":androidApp") != null) apply(from = "android.gradle")   // an Android SDK is there

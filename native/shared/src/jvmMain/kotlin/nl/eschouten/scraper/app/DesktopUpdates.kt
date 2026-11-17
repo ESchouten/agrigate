@@ -16,7 +16,6 @@ import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
-import java.security.DigestInputStream
 import java.security.KeyFactory
 import java.security.MessageDigest
 import java.security.PublicKey
@@ -27,8 +26,9 @@ import java.util.Base64
 object DesktopUpdates {
   /** Where releases are; SCRAPER_UPDATES: another server laid out the same (a test of an update). */
   private val releases = System.getenv("SCRAPER_UPDATES") ?: "https://github.com/ESchouten/scraper-control/releases"
-  /** What the release signs before a feed (firmware/sign_release.py --feed). */
-  internal const val PREFIX = "scraper-control desktop feed v1\n"
+  /** What the release signs before a system's feed (firmware/sign_release.py --feed): a feed
+   *  signed for one system is not one for another. */
+  internal fun prefix(channel: String) = "scraper-control desktop feed v1 $channel\n"
 
   /** The release key: the same as the buttons' (firmware/src/ReleaseKey.h). */
   internal const val RELEASE_KEY = "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE5+BVstQnXROhuybMANmQsU1sRAZK" +
@@ -71,27 +71,29 @@ object DesktopUpdates {
     newer(feed, installedVersion)
   }
 
-  /** Download, check and hand to Velopack; [beforeExit] runs, the app quits and comes back as the
-   *  new version. Returns why not when it does not get that far. */
-  suspend fun install(u: Update, beforeExit: () -> Unit = {}): String = withContext(Dispatchers.IO) {
+  /** Download, check and, once [idle] returns (no robot session running), hand to Velopack;
+   *  [beforeExit] runs, the app quits and comes back as the new version. Returns why not when it
+   *  does not get that far. */
+  suspend fun install(u: Update, idle: suspend () -> Unit = {}, beforeExit: () -> Unit = {}): String = withContext(Dispatchers.IO) {
     val dir = work.apply { deleteRecursively(); mkdirs() }
     val pkg = File(dir, u.asset.FileName)
     if (!download("$releases/download/v${u.version}/${u.asset.FileName}", pkg)) return@withContext "download failed"
     if (!sha256(pkg).equals(u.asset.SHA256, ignoreCase = true)) return@withContext "the download does not match the signed release"
     File(dir, "releases.$channel.json").writeBytes(u.feed)
+    idle()
     nativeApply(dir.absolutePath).ifEmpty {
       beforeExit()
       kotlin.system.exitProcess(0)
     }
   }
 
-  /** The feed inside [envelope] when [key] signed it, else null. */
-  internal fun verifiedFeed(envelope: ByteArray, key: PublicKey = releaseKey()): ByteArray? = runCatching {
+  /** The feed inside [envelope] when [key] signed it for [channel], else null. */
+  internal fun verifiedFeed(envelope: ByteArray, key: PublicKey = releaseKey(), channel: String = this.channel): ByteArray? = runCatching {
     val e = json.decodeFromString<Envelope>(envelope.decodeToString())
     val feed = Base64.getDecoder().decode(e.feed)
     val s = Signature.getInstance("SHA256withECDSA")
     s.initVerify(key)
-    s.update(PREFIX.toByteArray() + feed)
+    s.update(prefix(channel).toByteArray() + feed)
     if (s.verify(e.sig.chunked(2).map { it.toInt(16).toByte() }.toByteArray())) feed else null
   }.getOrNull()
 
@@ -117,7 +119,7 @@ object DesktopUpdates {
 
   private fun sha256(f: File): String {
     val md = MessageDigest.getInstance("SHA-256")
-    f.inputStream().use { DigestInputStream(it, md).readAllBytes() }   // streamed: packages are ~100 MB
+    f.forEachBlock { block, n -> md.update(block, 0, n) }   // in blocks: packages are ~100 MB
     return md.digest().joinToString("") { "%02x".format(it) }
   }
 

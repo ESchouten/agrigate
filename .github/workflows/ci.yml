@@ -161,9 +161,7 @@ jobs:
       - name: Windows installer that updates itself (Velopack, without build secrets)
         working-directory: native
         shell: bash
-        run: |
-          dotnet tool install -g vpk --version 1.2.161
-          ./gradlew :composeApp:velopack --console=plain
+        run: ./gradlew :composeApp:velopack --console=plain
       - uses: actions/upload-artifact@v7
         with:
           name: scraper-control-windows

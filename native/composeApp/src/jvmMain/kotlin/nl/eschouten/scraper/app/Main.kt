@@ -5,15 +5,19 @@
 //   SCRAPER_SIMULATOR=<simulator script> ./gradlew :composeApp:run   a simulated robot (see the driver)
 package nl.eschouten.scraper.app
 
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.input.key.Key
@@ -27,6 +31,7 @@ import androidx.compose.ui.window.rememberWindowState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import nl.eschouten.scraper.api.ApiServer
 import nl.eschouten.scraper.texts.tr
@@ -51,6 +56,41 @@ private fun appIcon(): BitmapPainter? =
     BitmapPainter(org.jetbrains.skia.Image.makeFromEncoded(it.readAllBytes()).toComposeImageBitmap())
   }
 
+// A newer signed release (looked for at start, then daily): asked, never installed by itself.
+// The app closes for it only when no robot session is running.
+@Composable
+private fun UpdatePrompt(controller: RobotController) {
+  var update by remember { mutableStateOf<DesktopUpdates.Update?>(null) }
+  var installing by remember { mutableStateOf(false) }
+  var failed by remember { mutableStateOf<String?>(null) }
+  val scope = rememberCoroutineScope()
+  LaunchedEffect(Unit) {
+    while (true) {
+      DesktopUpdates.check()?.let { update = it }
+      delay(24.hours)
+    }
+  }
+  val u = update ?: return
+  val done = { update = null; failed = null }
+  AppTheme {
+    val why = failed
+    when {
+      why != null -> AlertDialog(done, confirmButton = { TextButton(done) { Text(tr.close) } }, text = { Text(why) })
+      installing -> AlertDialog(
+        {}, confirmButton = {}, title = { Text(tr.updateInstalling(u.version)) },
+        text = { LinearProgressIndicator(modifier = Modifier.fillMaxWidth()) },
+      )
+      else -> ConfirmDialog(Confirm(Glyph.Refresh, tr.updateAvailable(u.version), tr.updateBody, tr.updateInstall, tr.later), done) {
+        installing = true
+        scope.launch {
+          failed = tr.updateFailed(DesktopUpdates.install(u, idle = { controller.state.first { !it.isBusy } }) { controller.dispose() })
+          installing = false
+        }
+      }
+    }
+  }
+}
+
 fun main(args: Array<String>) {
   DesktopUpdates.appRun(args)   // first: the installer's and updater's hooks run (and exit) here
   val icon = appIcon()
@@ -59,16 +99,6 @@ fun main(args: Array<String>) {
   ApiServer(controller).follow(CoroutineScope(Dispatchers.IO))   // Settings > Web page and API
   val nav = Nav()
   application {
-    // A newer signed release (at start, then daily): asked, never installed by itself.
-    var update by remember { mutableStateOf<DesktopUpdates.Update?>(null) }
-    var failed by remember { mutableStateOf<String?>(null) }
-    val scope = rememberCoroutineScope()
-    LaunchedEffect(Unit) {
-      while (true) {
-        DesktopUpdates.check()?.let { update = it }
-        delay(24.hours)
-      }
-    }
     Window(
       onCloseRequest = {
         controller.dispose()
@@ -80,18 +110,7 @@ fun main(args: Array<String>) {
       onPreviewKeyEvent = { e -> e.type == KeyEventType.KeyDown && e.key == Key.Escape && nav.back() },
     ) {
       App(controller, DesktopHost, nav)
-      update?.let { u ->
-        ConfirmDialog(Confirm(Glyph.Refresh, tr.updateAvailable(u.version), tr.updateBody, tr.updateInstall, tr.later), { update = null }) {
-          update = null
-          scope.launch {
-            while (controller.state.value.isBusy) delay(500)   // never in the middle of a robot session
-            failed = tr.updateFailed(DesktopUpdates.install(u) { controller.dispose() })
-          }
-        }
-      }
-      failed?.let { why ->
-        AlertDialog({ failed = null }, confirmButton = { TextButton({ failed = null }) { Text(tr.close) } }, text = { Text(why) })
-      }
+      UpdatePrompt(controller)
     }
   }
 }

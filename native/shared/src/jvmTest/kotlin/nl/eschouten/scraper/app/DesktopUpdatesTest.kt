@@ -36,17 +36,18 @@ class DesktopUpdatesTest {
 
   @Test fun aFeedFromTheReleaseSignerIsAccepted() {
     val k = keys()
-    assertContentEquals(feed.toByteArray(), DesktopUpdates.verifiedFeed(signed(k), k.public))
+    assertContentEquals(feed.toByteArray(), DesktopUpdates.verifiedFeed(signed(k), k.public, "osx"))
   }
 
-  @Test fun anotherKeyOrAChangedFeedIsRefused() {
+  @Test fun anotherKeySystemOrAChangedFeedIsRefused() {
     val k = keys()
     val env = signed(k).decodeToString()
-    assertNull(DesktopUpdates.verifiedFeed(env.toByteArray(), keys().public))
+    assertNull(DesktopUpdates.verifiedFeed(env.toByteArray(), keys().public, "osx"))
+    assertNull(DesktopUpdates.verifiedFeed(env.toByteArray(), k.public, "win"))   // signed as the macOS feed
     val other = Base64.getEncoder().encodeToString(feed.replace("1.6.190", "1.6.999").toByteArray())
     val tampered = env.replace(Regex("\"feed\": \"[^\"]*\""), "\"feed\": \"$other\"")
-    assertNull(DesktopUpdates.verifiedFeed(tampered.toByteArray(), k.public))
-    assertNull(DesktopUpdates.verifiedFeed("nonsense".toByteArray(), k.public))
+    assertNull(DesktopUpdates.verifiedFeed(tampered.toByteArray(), k.public, "osx"))
+    assertNull(DesktopUpdates.verifiedFeed("nonsense".toByteArray(), k.public, "osx"))
   }
 
   @Test fun theNewestFullReleaseAboveThisOne() {

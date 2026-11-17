@@ -106,6 +106,7 @@ class Tr(val code: String) {
   fun updateAvailable(version: String): String = t("Versie $version is er", "Version $version is out")
   val updateBody: String get() = t("Nu installeren? De app sluit en start daarna vanzelf opnieuw.", "Install it now? The app closes and then starts again by itself.")
   val updateInstall: String get() = t("Installeren", "Install")
+  fun updateInstalling(version: String): String = t("Versie $version installeren…", "Installing version $version…")
   fun updateFailed(why: String): String = t("Bijwerken lukte niet: $why", "The update did not go through: $why")
   val routeContinuesMsg: String get() = t("De robot rijdt de route verder.", "The robot drives on with the route.")
   val routeCancelledMsg: String get() = t(

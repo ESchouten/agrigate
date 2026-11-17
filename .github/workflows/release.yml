@@ -5,7 +5,10 @@ name: release
 #                                 releases/latest (settings > Wifi > Update, or automatically)
 #   scraper-control-<board>-<v>.bin  the firmware per board (now: m5stack-core = the M5 buttons)
 #   scraper-control-<v>.apk       Android app (install by hand, or keep it updated with Obtainium)
-#   Scraper Control desktop       macOS .dmg, Linux .deb, Windows .exe (installers, not signed)
+#   scraper-control-<v>-windows.exe, -macos.pkg   the desktop app's installers (not signed);
+#                                 the app then updates itself from releases.<win|osx>.signed.json
+#                                 (signed with the release key) and the -full.nupkg it names
+#   scraper-control_<v>_amd64.deb the Linux app; also in the apt repository on GitHub Pages
 # Run it by hand (Actions > release > Run workflow) when a version should go out.
 # The M5s download from github.com/<FW_REPO>/releases/latest, so every release must carry the
 # firmware: that is why the apps are not released separately.
@@ -13,10 +16,12 @@ name: release
 # Secrets:
 #   BUILD_SECRETS                the secrets built into the apps and firmware: NAME=value lines,
 #                                the same as ~/.scraper-control/secrets (tools/secrets.py)
-#   FIRMWARE_SIGNING_KEY         ECDSA P-256 PEM; public half in firmware/src/ReleaseKey.h
+#   FIRMWARE_SIGNING_KEY         the release key, ECDSA P-256 PEM; public half in
+#                                firmware/src/ReleaseKey.h and the desktop app (DesktopUpdates)
 #   ANDROID_KEYSTORE             the app's signing keystore, base64 (same key for every version,
 #                                or Android refuses to install an update over the old app)
 #   ANDROID_KEYSTORE_PASSWORD    its password (alias "scraper-control")
+#   APT_SIGNING_KEY              OpenPGP private key (armored, no passphrase) of the apt repository
 on:
   workflow_dispatch:
 
@@ -185,7 +190,6 @@ jobs:
             ./gradlew :composeApp:packageDeb --console=plain
             cp composeApp/build/compose/binaries/main/deb/*.deb ../out/
           else
-            dotnet tool install -g vpk --version 1.2.161
             ./gradlew :composeApp:velopack --console=plain
             v=composeApp/build/velopack
             cp $v/*-full.nupkg $v/releases.*.json ../out/   # the app updates from these (publish signs the feed)
@@ -244,11 +248,11 @@ jobs:
           apt-ftparchive -o APT::FTPArchive::Release::Origin="Scraper Control" -o APT::FTPArchive::Release::Label="Scraper Control" \
             -o APT::FTPArchive::Release::Suite=stable -o APT::FTPArchive::Release::Codename=stable \
             -o APT::FTPArchive::Release::Architectures=amd64 -o APT::FTPArchive::Release::Components=main \
-            release dists/stable > dists/stable/Release
+            release dists/stable > Release   # written outside dists/stable, or it lists itself
+          mv Release dists/stable/
           export GNUPGHOME="$RUNNER_TEMP/gnupg" && mkdir -m 700 "$GNUPGHOME"
           echo "$APT_SIGNING_KEY" | gpg --batch --import
           gpg --batch --yes --clearsign -o dists/stable/InRelease dists/stable/Release
-          gpg --batch --yes --armor --detach-sign -o dists/stable/Release.gpg dists/stable/Release
           gpg --export > scraper-control.gpg   # the key apt checks (signed-by)
       - uses: actions/upload-pages-artifact@v5
         with:

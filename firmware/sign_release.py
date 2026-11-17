@@ -23,7 +23,7 @@ import sys
 import tempfile
 
 BOARD = "m5stack-core"
-FEED_PREFIX = "scraper-control desktop feed v1\n"   # as DesktopUpdates.PREFIX
+FEED_PREFIX = "scraper-control desktop feed v1 %s\n"   # % the system: as DesktopUpdates.prefix
 FIELDS = ("version", "build", "size", "sha256")
 
 
@@ -70,7 +70,8 @@ def main():
     a = ap.parse_args()
     if a.feed:   # the desktop apps check this (native/shared/.../app/DesktopUpdates.kt)
         feed = open(a.feed, "rb").read()
-        print(json.dumps({"feed": base64.b64encode(feed).decode(), "sig": sign(FEED_PREFIX + feed.decode(), a.key)}))
+        system = os.path.basename(a.feed).split(".")[1]   # releases.<win|osx>.json
+        print(json.dumps({"feed": base64.b64encode(feed).decode(), "sig": sign(FEED_PREFIX % system + feed.decode(), a.key)}))
         return
     if a.message:
         for m in parse(open(a.message).read()).values():
