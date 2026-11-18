@@ -127,7 +127,7 @@ fun RunSheet(controller: RobotController, route: String, onClose: () -> Unit) {
       Spacer(Modifier.height(Space.xl))
       when (v.phase) {
         RunPhase.Confirm -> ConfirmPart(v, onSlide = { start(false) }, onDryRun = { start(true) })
-        RunPhase.Running -> RunningPart(v)
+        RunPhase.Running -> RunningPart(v) { flow.cancel() }
         RunPhase.Done -> DonePart(v) { kind ->
           when (kind) {
             ActionKind.StartForReal, ActionKind.TryAgain -> flow.back()
@@ -171,7 +171,7 @@ private fun ConfirmPart(v: RunSheetView, onSlide: () -> Unit, onDryRun: () -> Un
 }
 
 @Composable
-private fun RunningPart(v: RunSheetView) {
+private fun RunningPart(v: RunSheetView, onCancel: () -> Unit) {
   val c = MaterialTheme.colorScheme
   Column(Modifier.testTag("run-progress")) {
     ProgressView(v.progress!!)
@@ -180,6 +180,10 @@ private fun RunningPart(v: RunSheetView) {
       Icon(Glyph.Phone.icon, null, Modifier.size(16.dp), tint = c.onSurfaceVariant)
       Spacer(Modifier.width(Space.s))
       Text(v.keepOpen, fontSize = 13.sp, color = c.onSurfaceVariant)
+    }
+    v.cancel?.let {
+      Spacer(Modifier.height(Space.xl))
+      ActionButton(it, onClick = onCancel)
     }
   }
 }

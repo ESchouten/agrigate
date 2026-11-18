@@ -66,6 +66,15 @@ int main(int argc, char** argv) {
   Robot r(t, std::string(argv[1]) == "-" ? Bytes{} : fromHex(argv[1]), ver);
   r.log = [](const std::string& s) { fprintf(stderr, "LOG %s\n", s.c_str()); };
   if (const char* owed = getenv("LELY_OWED")) r.setOwedPlanning(atoi(owed));   // from a dropped session
+  // The user cancels once the core reports this step (0 = before anything), as a second press
+  // on the M5 would.
+  bool cancel = false;
+  if (const char* at = getenv("LELY_CANCEL_AT")) {
+    int step = atoi(at);
+    cancel = step == 0;
+    t.cancelled = [&cancel] { return cancel; };
+    r.onStep = [&cancel, step](Step s) { if ((int)s == step) cancel = true; };
+  }
   Result res = r.connect();
   std::string cmd = argv[3];
   if (res == Result::Ok) {

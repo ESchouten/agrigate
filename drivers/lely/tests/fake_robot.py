@@ -197,6 +197,11 @@ class FakeRobot:
         elif self.mode == "notice":   # at login until Esc, as captured 2026-11-14 (any language: unknown screen)
             f += [can([3, 33, 0, 0, 63, 127, 1]), can([3, 33, 0, 0, 12, 127, 1])]
             f += text(3, 43, "MELDING") + text(22, 1, "Route is niet volgens\rspecificaties!!\r-minder betrouwbaar\r-zie routeanalyse\r-zie handleiding")
+        elif self.mode == "submenu":   # a settings list someone left open (Instellingen > ...): title, rows, no answers
+            f += text(3, 28, "INSTELLINGEN", 1) + text(14, 4, "RealTime Klok") + text(22, 4, "Taal") + text(30, 4, "Gyroscoop")
+        elif self.mode == "charger":   # HANDM. LADER as seen 2026-11-11: L / R on the bottom row like a question
+            f += text(3, 25, "HANDM. LADER", 1) + text(22, 40, "13.5 V") + text(30, 40, "0.1 A")
+            f += text(54, 18, "L") + text(54, 103, "R")
         elif self.mode == "question":
             f += text(3, 28, t["menu"], 1) + text(14, 4, t["question"])
             f += text(54, 15, t["yes"]) + text(54, 97, t["no"])
@@ -328,6 +333,8 @@ class FakeRobot:
                 return
         elif self.mode == "notice" and k == "back":
             self.mode = "home"
+        elif self.mode == "submenu" and k == "back":
+            self.mode, self.main_sel = "mainmenu", 3
         elif self.mode == "question" and k in ("soft1", "soft3"):
             self.answer = "ja" if k == "soft1" else "nee"
             self.mode = "driving"

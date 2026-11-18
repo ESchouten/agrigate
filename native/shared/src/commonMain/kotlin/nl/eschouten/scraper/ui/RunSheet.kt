@@ -57,6 +57,8 @@ data class RunSheetView(
   // running
   val progress: Progress? = null,
   val keepOpen: String = "",
+  /** Cancel the run ([RunFlow.cancel]): until the robot starts the route; null after that. */
+  val cancel: Action? = null,
   // done
   val resultGlyph: Glyph? = null,
   val resultTone: Tone? = null,
@@ -94,6 +96,9 @@ class RunFlow(private val controller: RobotController, val route: String) {
     return o
   }
 
+  /** The cancel button while running: the robot is put back as it was. */
+  fun cancel() = controller.cancel()
+
   /** Back to the start (after a dry run, "try again", or a changed PIN). */
   fun back() {
     _state.value = RunFlowState()
@@ -106,6 +111,7 @@ class RunFlow(private val controller: RobotController, val route: String) {
         robotUid = cs.robot.uid,
         route = route,
         line = when {
+          o.problem == Problem.Cancelled -> "$t: ${tr.cancelledTitle}"
           !o.ok -> "$t: ${o.message}"
           o.stopped -> tr.routeStoppedTitle
           dryRun -> tr.dryRunDoneShort(t)
@@ -139,8 +145,9 @@ class RunFlow(private val controller: RobotController, val route: String) {
         dryRunLabel = tr.dryRunFirst,
       )
       RunPhase.Running -> base.copy(
-        progress = progress(cs.model, cs.steps, cs.link, intent(st), title),
+        progress = progress(cs.model, cs.steps, cs.link, intent(st), title).let { if (cs.cancelling) it.copy(headline = tr.cancelling) else it },
         keepOpen = tr.keepAppOpen,
+        cancel = if (cs.canCancel || cs.cancelling) Action(tr.cancel, ActionKind.Cancel, "run-cancel", primary = false, enabled = !cs.cancelling) else null,
       )
       RunPhase.Done -> done(base, cs, st)
     }
@@ -148,6 +155,12 @@ class RunFlow(private val controller: RobotController, val route: String) {
 
   private fun done(base: RunSheetView, cs: ControllerState, st: RunFlowState): RunSheetView {
     val o = st.outcome!!
+    if (o.problem == Problem.Cancelled) {
+      return base.copy(
+        resultGlyph = Glyph.Restart, resultTone = Tone.Ok, resultTitle = tr.cancelledTitle, resultBody = tr.cancelledBody,
+        actions = listOf(Action(tr.done, ActionKind.Done, "run-done")),
+      )
+    }
     if (o.ok) {
       val stopped = o.stopped
       return base.copy(

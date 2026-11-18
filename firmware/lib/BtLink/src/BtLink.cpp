@@ -117,9 +117,11 @@ bool BtLink::connect() {
   // stuck starts clean (Erik 2026-11-16: two presses failed, after a power cycle it worked).
   for (int i = 0; i < 3; i++) {
     if (i) delay(1000);
+    if (cancelled && cancelled()) return false;   // the user cancelled: no more tries
     if (classic_ ? connectClassic() : connectBle()) return true;
     release();
   }
+  if (cancelled && cancelled()) return false;
   // Robot moved: search once and retry. A BLE robot stays BLE: no classic search (8 s) then.
   std::string keepAddress = address_;
   bool keepClassic = classic_;

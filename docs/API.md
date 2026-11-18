@@ -47,6 +47,10 @@ A device without any PIN set is open.
 One call at a time: the device runs it to the end, connecting and disconnecting the robot, and
 then answers.
 
+| Call | What |
+|---|---|
+| `POST /api/cancel` | Cancel the call that runs now, until the robot starts the route: it ends with `Cancelled` and the robot is back as it was. Answers at once. Computers only: the buttons answer `404` (press a button on them to cancel). |
+
 ## The panel
 
 Only the desktop app answers these (the buttons: `404`), for the robot's own panel and manual
@@ -89,7 +93,7 @@ JSON, the same for every call but the log, in the apps' generic terms (any robot
 | Field | What |
 |---|---|
 | `ok` | The robot did it |
-| `fault` | Why not: `NotFound` (robot not reachable), `AuthRejected` (the robot refused the PIN), `Busy` (not ready, nothing was pressed), `NoConfirmation` (sent, but the robot's confirmation was not seen), `Failed` |
+| `fault` | Why not: `NotFound` (robot not reachable), `AuthRejected` (the robot refused the PIN), `Busy` (not ready, nothing was pressed), `NoConfirmation` (sent, but the robot's confirmation was not seen), `Cancelled` (`/api/cancel` stopped it in time, the robot is back as it was), `Failed` |
 | `message` | What happened, in words |
 | `age` | Seconds since `status` was read, `null` before the first read |
 | `status` | The robot as last seen, `null` before the first read: `planning` on/off (`null` unknown), `nextRun` as the robot shows it, `batteryMv` (`null` unknown), `activity` and `route` while driving, `busy` (not ready for a command), `driving` (a route runs), `finishQuestion` (waiting for `/api/answer`) |

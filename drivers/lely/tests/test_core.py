@@ -19,11 +19,13 @@ def build():
                            os.path.join(HERE, "host_main.cpp"), "-o", BIN])
 
 
-def drive(robot_kwargs, pin="4321", version="-", cmd=("status",), owed=None):
+def drive(robot_kwargs, pin="4321", version="-", cmd=("status",), owed=None, cancel_at=None):
     pin_hex = encrypt_pin(pin).hex() if pin else "-"
     env = dict(os.environ)
     if owed is not None:
         env["LELY_OWED"] = str(owed)
+    if cancel_at is not None:
+        env["LELY_CANCEL_AT"] = str(cancel_at)
     t0 = time.monotonic()
     proc = subprocess.Popen([BIN, pin_hex, version, *cmd], stdin=subprocess.PIPE,
                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
@@ -223,6 +225,40 @@ for lang in ("en", "xx"):
     case(f"{lang}: driving: nothing pressed", {"lang": lang, "mode": "driving"}, ("route", "A"), lambda r, e: r.pressed == [] and "RESULT robot is bezig" in e)
     case(f"{lang}: route button while driving stops it", {"lang": lang, "mode": "driving"}, ("button", "B"),
          lambda r, e: r.pressed == ["start_stop"] and r.stopped and r.mode == "abort")
+
+# Cancel (Erik 2026-11-18: a second press during an action): stop before the next key and put
+# the robot back as it was; after Start the route runs. Steps: 1 linked, 3 screen ready,
+# 4 planning off, 6 route menu, 7 route selected, 8 Start pressed.
+CANCELLED = "RESULT geannuleerd"
+case("cancel while connecting: nothing pressed", {"planning": True}, ("route", "C"), cancel_at=1,
+     ok=lambda r, e: r.pressed == [] and r.mode == "home" and r.planning and CANCELLED in e)
+case("cancel before anything: not even connected", {"planning": True}, ("route", "C"), cancel_at=0,
+     ok=lambda r, e: r.pressed == [] and CANCELLED in e)
+case("cancel after connect: nothing pressed for the route", {"planning": True}, ("route", "C"), cancel_at=3,
+     ok=lambda r, e: r.pressed == [] and r.mode == "home" and r.planning and CANCELLED in e)
+for slow in (False, True):
+    for at in (4, 6):
+        case(f"cancel at step {at}{' (slow)' if slow else ''}: back home, planning on again, nothing started",
+             {"planning": True, "slow": slow}, ("route", "D"), cancel_at=at,
+             ok=lambda r, e: r.mode == "home" and r.planning and r.answer is None and "start_stop" in r.pressed
+             and not {"soft1", "soft3"} & set(r.pressed) and "OWED -1" in e and CANCELLED in e)
+case("cancel with the route chosen, just before Start: back home", {"planning": True}, ("route", "D"), cancel_at=7,
+     ok=lambda r, e: r.mode == "home" and r.planning and r.answer is None and CANCELLED in e)
+case("cancel after Start: too late, the route runs", {"planning": True}, ("route", "C"), cancel_at=8,
+     ok=lambda r, e: r.mode == "driving" and r.answer == "ja" and "RESULT ok" in e)
+case("cancel the planning switch after connect: unchanged", {"planning": True}, ("toggle",), cancel_at=3,
+     ok=lambda r, e: r.pressed == [] and r.planning and CANCELLED in e)
+case("cancel manual control in the route menu: Nee never needed, back home, planning on", {"planning": True}, ("manual",), cancel_at=6,
+     ok=lambda r, e: r.mode == "home" and r.planning and "soft1" not in r.pressed and "INMANUAL" not in e and CANCELLED in e)
+case("cancel reading routes after planning off: back home, planning on", {"planning": True}, ("routes",), cancel_at=4,
+     ok=lambda r, e: r.mode == "home" and r.planning and "ROUTES" not in e and CANCELLED in e)
+# Back to the home screen from any screen that asks nothing (Erik 2026-11-18).
+case("submenu left open: Esc to the main menu, then home, route started", {"planning": False, "mode": "submenu"}, ("route", "B"),
+     ok=lambda r, e: r.pressed[0] == "back" and r.mode == "driving" and r.sel == 1 and "RESULT ok" in e)
+case("submenu left open: planning switched from there", {"planning": False, "mode": "submenu"}, ("toggle",),
+     ok=lambda r, e: r.mode == "home" and r.planning and "RESULT ok" in e)
+case("charger control (L / R like a question): nothing pressed", {"planning": False, "mode": "charger"}, ("route", "A"),
+     ok=lambda r, e: r.pressed == [] and "RESULT robot is bezig" in e)
 
 
 if __name__ == "__main__":

@@ -12,6 +12,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.concurrent.Volatile
 
 /** The link to the robot: bytes to it and bytes from it. Each platform provides one per kind
  *  of link the drivers ask for (link/LinkSpec.kt). */
@@ -64,12 +65,26 @@ class Robot(
 
   val isConnected: Boolean get() = core != null
 
+  @Volatile private var cancelled = false
+
+  /** The user cancelled (any thread): the running command ends with [CoreResult.Cancelled],
+   *  the robot back as it was ([CoreSession.cancel]); also while the link still opens. */
+  fun cancel() {
+    cancelled = true
+    core?.cancel()
+  }
+
   /** Set after [connect] when the robot reported a new image version: store it. */
   var newImageVersion: ByteArray? = null
     private set
 
   suspend fun connect() {
+    cancelled = false
     link.connect()
+    if (cancelled) {
+      link.disconnect()
+      throw RobotException(CoreResult.Cancelled, coreResultText(CoreResult.Cancelled, language))
+    }
     val s = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     val out = Channel<ByteArray>(Channel.UNLIMITED)
     val c = CoreSession(onWrite = { out.trySend(it) }, pin = pin, imageVersion = imageVersion, onStep = onStep, language = language)
@@ -91,7 +106,7 @@ class Robot(
       }
     }
     c.owedPlanning = owedPlanning
-    val r = c.connect()
+    val r = if (cancelled) CoreResult.Cancelled else c.connect()
     noteOwed()
     val (version, changed) = c.imageVersion()
     if (changed) {
@@ -146,6 +161,7 @@ class Robot(
 
   private suspend fun run(command: suspend (CoreSession) -> CoreResult) {
     val c = core ?: throw RobotException(CoreResult.ConnectFailed, coreResultText(CoreResult.ConnectFailed, language))
+    cancelled = false
     val r = command(c)
     noteOwed()
     if (r != CoreResult.Ok) throw error(r)

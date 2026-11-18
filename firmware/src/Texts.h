@@ -43,6 +43,8 @@ struct Texts {
   const char *notReadYet, *readEvery, *justNow, *minAgo, *hourAgo;
   // settings > wifi: where apps and other tools reach the M5's web API (Api.h)
   const char *apiRow, *apiOffline, *linkApp;
+  // any button during an action cancels it, until Start is pressed on the robot
+  const char *pressToCancel, *cancelling, *cancelled, *putBack;
 };
 
 static const Texts kNl = {
@@ -76,6 +78,7 @@ static const Texts kNl = {
     "Nog niet gelezen", "Leest de robot elke 15 min", "zojuist",
     "%d min geleden", "%d uur geleden",
     "Web-API", "zodra de wifi verbonden is", "App koppelen",
+    "Knop = annuleren", "Annuleren...", "Geannuleerd", "De robot staat weer zoals hij was.",
 };
 
 static const Texts kEn = {
@@ -109,6 +112,7 @@ static const Texts kEn = {
     "Not read yet", "Reads the robot every 15 min", "just now",
     "%d min ago", "%d h ago",
     "Web API", "once Wi-Fi is connected", "Link the app",
+    "Button = cancel", "Cancelling...", "Cancelled", "The robot is back as it was.",
 };
 
 // "nl" -> Dutch, anything else -> English.

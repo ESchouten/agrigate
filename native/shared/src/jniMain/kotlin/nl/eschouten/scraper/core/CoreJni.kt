@@ -18,6 +18,7 @@ internal object CoreJni {
   external fun nativePress(h: Long, key: Int): Int
   external fun nativeHold(h: Long, key: Int): Int
   external fun nativeUnhold(h: Long)
+  external fun nativeCancel(h: Long)
   external fun nativeFinish(h: Long): Int
   external fun nativeSetOwedPlanning(h: Long, owed: Int)
   external fun nativeOwedPlanning(h: Long): Int
@@ -43,6 +44,7 @@ private class JniCore(private val h: Long) : CoreNative {
   override fun press(key: Int) = CoreJni.nativePress(h, key)
   override fun hold(key: Int) = CoreJni.nativeHold(h, key)
   override fun unhold() = CoreJni.nativeUnhold(h)
+  override fun cancel() = CoreJni.nativeCancel(h)
   override fun finish() = CoreJni.nativeFinish(h)
   override fun setOwedPlanning(owed: Int) = CoreJni.nativeSetOwedPlanning(h, owed)
   override fun owedPlanning() = CoreJni.nativeOwedPlanning(h)

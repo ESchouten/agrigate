@@ -87,6 +87,9 @@ struct RunSheet: View {
         Glyph.phone.image.font(.system(size: scaled(14))).foregroundStyle(C.onSurfaceVariant)
         Text(v.keepOpen).font(.system(size: scaled(13))).foregroundStyle(C.onSurfaceVariant)
       }
+      if let a = v.cancel {
+        ActionButton(a: a, glyph: nil) { flow.cancel() }.padding(.top, Space.s)
+      }
     }
     .screenId("run-progress")
   }

@@ -16,7 +16,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlin.concurrent.Volatile
 
 /** Result codes of the core (scraper_c.h). */
-enum class CoreResult { Ok, ConnectFailed, PinRejected, NoScreen, Busy, Unexpected, StartedNoAnswer, InProgress;
+enum class CoreResult { Ok, ConnectFailed, PinRejected, NoScreen, Busy, Unexpected, StartedNoAnswer, Cancelled, InProgress;
 
   val code: Int get() = if (this == InProgress) 100 else ordinal
 
@@ -70,6 +70,8 @@ data class CoreStatus(
   val syncPercent: Int? = null,
   /** On the manual control screen: what the robot shows there as images, else null. */
   val manual: ManualState? = null,
+  /** A command runs that [CoreSession.cancel] can still stop (until Start for a route). */
+  val cancellable: Boolean = false,
 ) {
   companion object {
     fun fromJson(json: String): CoreStatus {
@@ -84,6 +86,7 @@ data class CoreStatus(
         busy = b("busy") ?: true, driving = b("driving") ?: false, stopQuestion = b("stopQuestion") ?: false,
         screen = s("screen"), highlighted = s("highlighted"), language = s("language"),
         syncPercent = i("sync")?.takeIf { it >= 0 },
+        cancellable = b("cancellable") ?: false,
         manual = (d["manual"] as? JsonObject)?.let { m ->
           fun f(k: String) = when (m[k]?.jsonPrimitive?.intOrNull) { 1 -> true; 0 -> false; else -> null }
           ManualState(f("left"), f("right"), f("forward"))
@@ -114,6 +117,7 @@ internal interface CoreNative {
   fun press(key: Int): Int
   fun hold(key: Int): Int
   fun unhold()
+  fun cancel()
   fun finish(): Int
   fun setOwedPlanning(owed: Int)
   fun owedPlanning(): Int
@@ -195,6 +199,10 @@ class CoreSession(
   }) { it.hold(key) }
 
   suspend fun finish() = command { it.finish() }
+
+  /** The user cancelled: the running command stops before its next key and ends with
+   *  [CoreResult.Cancelled], the robot back as it was. Any thread; does not wait. */
+  fun cancel() { native?.cancel() }
 
   /** Planning owed after a dropped link: 1 / 0, -1 = none (see scraper_c.h). Hand a remembered
    *  value to the next session before [connect]; read it after each command and keep it. */
