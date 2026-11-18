@@ -14,7 +14,7 @@ import json
 import os
 from pathlib import Path
 
-OK, CONNECT_FAILED, PIN_REJECTED, NO_SCREEN, BUSY, UNEXPECTED, STARTED_NO_ANSWER = range(7)
+OK, CONNECT_FAILED, PIN_REJECTED, NO_SCREEN, BUSY, UNEXPECTED, STARTED_NO_ANSWER, CANCELLED = range(8)
 IN_PROGRESS = 100
 
 WRITE_FN = ctypes.CFUNCTYPE(None, ctypes.c_void_p, ctypes.POINTER(ctypes.c_uint8), ctypes.c_int32)
@@ -53,6 +53,7 @@ def lib():
         L.scraper_feed.argtypes = [S, ctypes.c_char_p, ctypes.c_int32]
         L.scraper_release.argtypes = [ctypes.POINTER(ctypes.c_uint8)]
         L.scraper_link_down.argtypes = [S]
+        L.scraper_cancel.argtypes = [S]
         for name, extra in (("scraper_connect", []), ("scraper_start_route", [ctypes.c_char, ctypes.c_int32]),
                             ("scraper_set_planning", [ctypes.c_int32]), ("scraper_press", [ctypes.c_int32]),
                             ("scraper_finish", []), ("scraper_stop_route", []), ("scraper_wait", []),
@@ -119,6 +120,11 @@ class CoreSession:
 
     def link_down(self) -> None:
         lib().scraper_link_down(self._s)
+
+    def cancel(self) -> None:
+        """Cancel the running command from another thread (e.g. on Ctrl+C): it ends with
+        CANCELLED and the robot back as it was, until Start is pressed for a route."""
+        lib().scraper_cancel(self._s)
 
     # commands (blocking)
     def _run(self, started: int) -> int:

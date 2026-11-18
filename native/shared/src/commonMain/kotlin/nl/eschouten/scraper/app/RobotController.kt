@@ -34,7 +34,7 @@ import kotlin.time.Clock
 enum class LinkState { Idle, Searching, Connecting, Connected, Working }
 
 /** What went wrong, so the UI can offer the right way out. */
-enum class Problem { None, BluetoothOff, NotFound, PinRejected, Busy, NoAnswer, Failed }
+enum class Problem { None, BluetoothOff, NotFound, PinRejected, Busy, NoAnswer, Cancelled, Failed }
 
 data class Outcome(
   val ok: Boolean,
@@ -67,10 +67,16 @@ data class ControllerState(
   /** A stopped route asks "finish it?": show [nl.eschouten.scraper.ui.finishQuestion] and
    *  call [RobotController.answerFinish]. The link stays open meanwhile. */
   val finishQuestion: Boolean = false,
+  /** The user cancelled the running action; it ends once the robot is back as it was. */
+  val cancelling: Boolean = false,
   /** Bumped on every change, so even equal-looking states redraw (live panel). */
   val revision: Long = 0,
 ) {
   val isBusy get() = link == LinkState.Searching || link == LinkState.Connecting || link == LinkState.Working
+
+  /** [RobotController.cancel] can still stop the running action: until the robot starts
+   *  the route (Erik 2026-11-18); a type's own screens and the panel are not actions. */
+  val canCancel get() = isBusy && !cancelling && (link != LinkState.Working || live?.cancellable == true)
   val model: ScraperModel get() = robot.type
   val snapshot: RobotSnapshot? get() = robot.snapshot
 
@@ -108,6 +114,7 @@ class RobotController(
   private var last: Outcome? = null
   @Volatile private var revision = 0L
   @Volatile private var finishAnswer: CompletableDeferred<Boolean?>? = null
+  @Volatile private var cancelling = false
 
   /** The robot in use as last read, also on a driving or menu screen, with when (the web API). */
   @Volatile var lastSeen: Pair<ScraperStatus, Long>? = null
@@ -315,6 +322,19 @@ class RobotController(
   /** Swift: [answerFinish] without a nullable Boolean. */
   fun finishLater() = answerFinish(null)
 
+  /** The user cancels the running action (any thread, does not wait): it ends with
+   *  [Problem.Cancelled] once the robot is back as it was. Nothing once the route started. */
+  fun cancel() {
+    if (!state.value.canCancel) return
+    cancelling = true
+    robot?.cancel()
+    emit()
+  }
+
+  private fun checkCancel() {
+    if (cancelling) throw ScraperException(ScraperFault.Cancelled, tr.cancelledBody)
+  }
+
   suspend fun setPlanning(on: Boolean): Outcome = job(
     work = {
       robot!!.setPlanning(on)
@@ -393,6 +413,7 @@ class RobotController(
   private suspend fun job(work: suspend () -> Outcome, record: ((Outcome) -> HistoryEvent)? = null): Outcome = mutex.withLock {
     steps = emptyList()
     last = null
+    cancelling = false
     val began = now()
     val out: Outcome = try {
       if (!isConnected) open()
@@ -407,6 +428,7 @@ class RobotController(
           ScraperFault.AuthRejected -> Problem.PinRejected
           ScraperFault.Busy -> Problem.Busy
           ScraperFault.NoConfirmation -> Problem.NoAnswer
+          ScraperFault.Cancelled -> Problem.Cancelled
           ScraperFault.Failed -> Problem.Failed
         },
       )
@@ -418,7 +440,8 @@ class RobotController(
       Outcome(false, tr.noConnection(e.message), problem = Problem.NotFound)
     }
     last = out
-    if (record != null) {
+    cancelling = false
+    if (record != null && out.problem != Problem.Cancelled) {   // nothing happened: not in the logbook
       val e = record(out).copy(ms = now() - began)
       history = (listOf(e) + history).take(History.MAX)
       runCatching { History.add(store, e) }
@@ -435,6 +458,7 @@ class RobotController(
     if (p.robotId == null && p.via.isEmpty()) {
       set(LinkState.Searching)
       val found = p.type.discover(p.robotName.ifEmpty { null })
+      checkCancel()
       if (found.isEmpty()) throw NoRobot()
       val f = found.first()
       p = p.copy(robotId = f.id, robotName = p.robotName.ifEmpty { f.name }, link = f.link)
@@ -446,6 +470,7 @@ class RobotController(
     var r: ScraperSession
     var tries = 0
     while (true) {
+      checkCancel()
       r = if (settings.robot.via.isNotEmpty()) ApiSession(settings.robot) else settings.robot.type.openSession(
         settings.robot,
         onStep = { s ->
@@ -467,6 +492,10 @@ class RobotController(
         steps = emptyList()
         delay(1_000)
       }
+    }
+    if (cancelling) {   // the connection opened before the session could hear it
+      runCatching { r.disconnect() }
+      checkCancel()
     }
     scope.launch {
       r.awaitClosed()
@@ -546,6 +575,7 @@ class RobotController(
     apiOn = settings.apiOn,
     apiPort = settings.apiPort,
     finishQuestion = finishAnswer != null,
+    cancelling = cancelling,
     revision = revision++,
   )
 

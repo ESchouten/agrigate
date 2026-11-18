@@ -109,6 +109,9 @@ class Tr(val code: String) {
   fun updateInstalling(version: String): String = t("Versie $version installeren…", "Installing version $version…")
   fun updateFailed(why: String): String = t("Bijwerken lukte niet: $why", "The update did not go through: $why")
   val routeContinuesMsg: String get() = t("De robot rijdt de route verder.", "The robot drives on with the route.")
+  val cancelledTitle: String get() = t("Geannuleerd", "Cancelled")
+  val cancelledBody: String get() = t("De robot staat weer zoals hij was.", "The robot is back as it was.")
+  val cancelling: String get() = t("Annuleren…", "Cancelling…")
   val routeCancelledMsg: String get() = t(
     "Route afgebroken. De tijdsplanning blijft uit.",
     "Route cancelled. The schedule stays off.",

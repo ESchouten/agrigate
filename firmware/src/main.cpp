@@ -240,6 +240,7 @@ static void drawProgress(const String& title, const String& now, int done, int t
   int y = wrap(now, 80, 68, 220, kTitle, kInk, 126);
   text(String(tx->stepOf) + " " + String(done + 1 > total ? total : done + 1) + " " + tx->of + " " + String(total), 80, y + 2, kBody, kMuted);
   progressBar(24, 164, 272, done, total);
+  if (now != tx->cancelling) hint(tx->pressToCancel);
 }
 
 // Only the fields the robot's current screen shows (while driving, planning and
@@ -382,6 +383,19 @@ static Result runOnce(const String& title, Kind kind, const Job& job, Status& st
   Robot robot(link, encryptPin(pin.c_str()), storedVersion);
   if (owedPlanning >= 0 && millis() - owedAt < kOwedForMs) robot.setOwedPlanning(owedPlanning);
   robot.onOwed = setOwed;
+  // Any button while it runs cancels it (Erik 2026-11-18): the core asks between steps, puts
+  // the robot back as it was, and after Start it no longer asks (the route runs).
+  bool cancel = false;
+  link.cancelled = [&] {
+    if (cancel) return true;
+    M5.update();
+    cancel = M5.BtnA.wasPressed() || M5.BtnB.wasPressed() || M5.BtnC.wasPressed();
+    if (cancel) {
+      M5.Speaker.tone(1000, 60);
+      drawProgress(title, tx->cancelling, done, expectedSteps(kind, planningOn));
+    }
+    return cancel;
+  };
   robot.lang = langFromCode(tx->code);
   robot.log = [](const std::string& s) { Serial.println(s.c_str()); };
   robot.onStep = [&](Step s) {
@@ -398,7 +412,7 @@ static Result runOnce(const String& title, Kind kind, const Job& job, Status& st
     }
     done++;
     last = int(s);
-    drawProgress(title, nextStep(kind, last, planningOn), done, expectedSteps(kind, planningOn));
+    drawProgress(title, cancel ? String(tx->cancelling) : nextStep(kind, last, planningOn), done, expectedSteps(kind, planningOn));
   };
 
   Result r = robot.connect();
@@ -406,7 +420,7 @@ static Result runOnce(const String& title, Kind kind, const Job& job, Status& st
   bool connected = r == Result::Ok;
   if (r == Result::Ok) r = job(robot);
   err = robot.lastError();
-  if (r == Result::Ok || r == Result::Unexpected) robot.finish();   // planning as found
+  if (r == Result::Ok || r == Result::Unexpected || r == Result::Cancelled) robot.finish();   // planning as found
   st = robot.status();
   if (connected) seenForApi(st);
   robot.disconnect();
@@ -448,6 +462,11 @@ static void showResult(const String& title, Kind kind, Result r, const Status& s
     took = String(" (") + (tenths / 10) + (tx->code[0] == 'n' ? "," : ".") + (tenths % 10) + " s)";
   }
 
+  if (r == Result::Cancelled) {   // not a failure: the robot is back as it was
+    drawResult(title, true, tx->cancelled, st, tx->putBack);
+    M5.Speaker.tone(1000, 150);
+    return;
+  }
   if (r == Result::Ok) {
     String heading = kind == Kind::Route      ? (routeStopped == Stopped::No          ? title + " " + tx->started
                                                  : routeStopped == Stopped::Continues ? String(tx->routeContinues)
@@ -1353,6 +1372,7 @@ static void handleApi() {
                       : r == Result::PinRejected     ? "AuthRejected"
                       : r == Result::Busy            ? "Busy"
                       : r == Result::StartedNoAnswer ? "NoConfirmation"
+                      : r == Result::Cancelled       ? "Cancelled"
                                                      : "Failed";
   std::string message = r == Result::Ok ? "" : resultText(r, langFromCode(tx->code));
   if (!err.empty() && r != Result::Ok) message += " (" + err + ")";

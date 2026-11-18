@@ -84,7 +84,7 @@ std::string jsonString(const std::string& s) {
 }
 
 // [manual]: the HANDBEDIENING screen's motors and direction (1 / 0 / -1 unknown), null elsewhere.
-std::string statusJson(const Status& st, const Screen& scr, int sync) {
+std::string statusJson(const Status& st, const Screen& scr, int sync, bool cancellable) {
   std::string highlighted = scr.isManual() ? "" : scr.highlighted();   // there the boxes are the motors
   std::string screen = scr.text();
   std::string o = "{";
@@ -103,6 +103,7 @@ std::string statusJson(const Status& st, const Screen& scr, int sync) {
   o += ",\"highlighted\":" + jsonString(highlighted);
   o += ",\"language\":" + jsonString(st.language);
   o += ",\"sync\":" + std::to_string(sync);
+  o += std::string(",\"cancellable\":") + (cancellable ? "true" : "false");
   if (scr.isManual()) {
     ManualState m = scr.manual();
     o += ",\"manual\":{\"left\":" + std::to_string(m.left) + ",\"right\":" + std::to_string(m.right) +
@@ -133,6 +134,7 @@ struct scraper_session {
       robotHandler(b, n);
       snapshot();
     };
+    link.cancelled = [this] { return cancelGen.load() == runningGen.load(); };
     worker = std::thread([this] { run(); });
   }
 
@@ -151,6 +153,7 @@ struct scraper_session {
     if (busy) return SCRAPER_IN_PROGRESS;
     busy = true;
     pendingCmd = cmd;
+    pendingGen = ++cmdGen;
     pending = std::move(job);
     cv.notify_all();
     return SCRAPER_OK;
@@ -163,7 +166,8 @@ struct scraper_session {
   }
 
   void snapshot() {   // worker thread
-    std::string js = statusJson(robot.status(), robot.screen, robot.syncPercent());
+    bool canCancel = runningCancellable && robot.cancellable();
+    std::string js = statusJson(robot.status(), robot.screen, robot.syncPercent(), canCancel);
     std::lock_guard<std::mutex> g(mu);
     status = js;
     error = robot.lastError();
@@ -179,13 +183,16 @@ struct scraper_session {
       {
         std::lock_guard<std::mutex> g(mu);
         if (quit) break;
-        if (pending) { job.swap(pending); cmd = pendingCmd; }
+        if (pending) { job.swap(pending); cmd = pendingCmd; runningGen = pendingGen; }
+        runningCancellable = cmd == SCRAPER_CMD_CONNECT || cmd == SCRAPER_CMD_ROUTE || cmd == SCRAPER_CMD_PLANNING || cmd == SCRAPER_CMD_ROUTES;
       }
       if (!job) {
         robot.idle(50);   // keep-alive while connected and idle
         continue;
       }
+      robot.clearCancel();
       Result r = job();
+      runningCancellable = false;
       if (cmd == SCRAPER_CMD_CONNECT && r == Result::Ok) connected = true;
       snapshot();
       {
@@ -212,6 +219,10 @@ struct scraper_session {
   bool busy = false, quit = false, connected = false, versionChanged = false;
   int32_t owed = -1, owedIn = -1;
   std::atomic<int> holdGen{0}, releasedGen{0};   // a hold runs until its number is released
+  // scraper_cancel marks the command with this number (0 = none yet): only that one stops
+  int pendingGen = 0, cmdGen = 0;
+  std::atomic<int> runningGen{-1}, cancelGen{0};
+  bool runningCancellable = false;   // worker thread: the running command takes scraper_cancel
   std::string status = "{}", error, routes = "{}";
   uint8_t versionCopy[9] = {0};
   std::thread worker;
@@ -330,6 +341,12 @@ int32_t scraper_hold(scraper_session* s, int32_t key) {
 
 void scraper_unhold(scraper_session* s) {
   if (s) s->releasedGen = s->holdGen.load();
+}
+
+void scraper_cancel(scraper_session* s) {
+  if (!s) return;
+  std::lock_guard<std::mutex> g(s->mu);
+  if (s->busy) s->cancelGen = s->cmdGen;
 }
 
 int32_t scraper_finish(scraper_session* s) {

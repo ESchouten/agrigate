@@ -38,6 +38,7 @@ import nl.eschouten.scraper.core.c.scraper_press
 import nl.eschouten.scraper.core.c.scraper_hold
 import nl.eschouten.scraper.core.c.scraper_release
 import nl.eschouten.scraper.core.c.scraper_unhold
+import nl.eschouten.scraper.core.c.scraper_cancel
 import nl.eschouten.scraper.core.c.scraper_result_text_lang
 import nl.eschouten.scraper.core.c.scraper_set_language
 import nl.eschouten.scraper.core.c.scraper_set_planning
@@ -77,6 +78,7 @@ private class IosCore(
   override fun press(key: Int) = scraper_press(s, key)
   override fun hold(key: Int) = scraper_hold(s, key)
   override fun unhold() = scraper_unhold(s)
+  override fun cancel() = scraper_cancel(s)
   override fun finish() = scraper_finish(s)
   override fun setOwedPlanning(owed: Int) = scraper_set_owed_planning(s, owed)
   override fun owedPlanning() = scraper_owed_planning(s)

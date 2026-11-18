@@ -95,6 +95,23 @@ class ControllerTest {
     assertTrue(o.message.contains("staat nog op de robot"), o.message)
   }
 
+  /** Cancel while the route is being started (Erik 2026-11-18): nothing drives, the schedule
+   *  is on again, nothing in the logbook. */
+  @Test fun cancelBeforeStartPutsTheRobotBack() = runBlocking {
+    simulate("--planning", "on")
+    val c = controller()
+    val run = async(Dispatchers.Default) { c.startRoute("C") }
+    withTimeout(10_000) { c.state.first { it.link == LinkState.Working && it.canCancel } }
+    c.cancel()
+    val o = withTimeout(20_000) { run.await() }
+    assertEquals(Problem.Cancelled, o.problem, o.message)
+    assertFalse(c.state.value.cancelling)
+    assertTrue(c.state.value.history.isEmpty())
+    val seen = links.last().report()
+    // no route started (that asks a question, answered with a soft key), back home, schedule on
+    assertTrue("soft" !in seen && "\"mode\": \"home\"" in seen && "\"planning\": true" in seen, seen)
+  }
+
   @Test fun dryRunStartsNothing() = runBlocking {
     simulate("--planning", "on")
     val c = controller()

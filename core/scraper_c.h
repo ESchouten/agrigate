@@ -42,6 +42,7 @@ enum {
   SCRAPER_BUSY = 4,
   SCRAPER_UNEXPECTED = 5,
   SCRAPER_STARTED_NO_ANSWER = 6,
+  SCRAPER_CANCELLED = 7, /* scraper_cancel: stopped before its next key, robot put back as it was */
   SCRAPER_IN_PROGRESS = 100, /* returned by a command call while another one runs */
 };
 
@@ -106,6 +107,13 @@ SCRAPER_API int32_t scraper_press(scraper_session* s, int32_t key); /* the drive
  * comes after the key went up. scraper_unhold does not wait and may come from any thread. */
 SCRAPER_API int32_t scraper_hold(scraper_session* s, int32_t key);
 SCRAPER_API void scraper_unhold(scraper_session* s);
+/* Cancel the running command (the user pressed Cancel); any thread, does not wait. It stops
+ * before its next key and puts the robot back as it was (home screen, planning as before);
+ * on_done reports SCRAPER_CANCELLED. A route can be cancelled until Start is pressed on the
+ * robot: after that it runs, and scraper_stop_route stops it. */
+SCRAPER_API void scraper_cancel(scraper_session* s);
+/* The status JSON's "cancellable" is true while a command runs that scraper_cancel can still
+ * stop (show a Cancel button then); false otherwise. */
 /* Read what routes A..D consist of (HANDM. ROUTE), then back as before. Afterwards
  * scraper_routes_json gives {"A":"1","B":"2 3","C":"1 2 3","D":"4"} ("{}" before). */
 SCRAPER_API int32_t scraper_read_routes(scraper_session* s);

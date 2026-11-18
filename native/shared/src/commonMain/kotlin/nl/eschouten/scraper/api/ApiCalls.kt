@@ -26,14 +26,28 @@ import kotlin.concurrent.Volatile
 
 class ApiCalls(private val c: RobotController, private val scope: CoroutineScope = CoroutineScope(Dispatchers.Default), private val now: () -> Long) {
   private val one = Mutex()   // one call at a time, like the buttons
+  private val pins = Mutex()   // the PIN check, also for a cancel during a call
   private var wrong = 0
   private var lockedUntil = 0L
 
   /** HTTP status and JSON body. [authorization]: that header. */
-  suspend fun handle(method: String, path: String, authorization: String?): Pair<Int, String> = one.withLock {
-    val call = callFor(method, path) ?: return@withLock 404 to "{}"
-    val gate = check(authorization?.removePrefix("Bearer ")?.takeIf { authorization.startsWith("Bearer ") } ?: "")
-    if (gate != 200) return@withLock gate to "{}"
+  suspend fun handle(method: String, path: String, authorization: String?): Pair<Int, String> {
+    // Cancel goes past the one call at a time: it is for the call that runs now.
+    if (method == "POST" && path == "/api/cancel") {
+      val gate = pins.withLock { check(bearer(authorization)) }
+      if (gate != 200) return gate to "{}"
+      c.cancel()
+      return 200 to apiJson.encodeToString(ApiAnswer.serializer(), ApiAnswer(ok = true))
+    }
+    return one.withLock { answer(method, path, authorization) }
+  }
+
+  private fun bearer(authorization: String?) = authorization?.removePrefix("Bearer ")?.takeIf { authorization.startsWith("Bearer ") } ?: ""
+
+  private suspend fun answer(method: String, path: String, authorization: String?): Pair<Int, String> {
+    val call = callFor(method, path) ?: return 404 to "{}"
+    val gate = pins.withLock { check(bearer(authorization)) }
+    if (gate != 200) return gate to "{}"
     val o = call()
     val seen = c.lastSeen
     val answer = ApiAnswer(
@@ -43,7 +57,7 @@ class ApiCalls(private val c: RobotController, private val scope: CoroutineScope
       age = seen?.let { (now() - it.second) / 1000 },
       status = seen?.first,
     )
-    (if (answer.ok) 200 else 502) to apiJson.encodeToString(ApiAnswer.serializer(), answer)
+    return (if (answer.ok) 200 else 502) to apiJson.encodeToString(ApiAnswer.serializer(), answer)
   }
 
   /** null: not a call of the API. The call itself returns null for nothing done (a plain status). */
@@ -134,6 +148,7 @@ class ApiCalls(private val c: RobotController, private val scope: CoroutineScope
     Problem.PinRejected -> ScraperFault.AuthRejected
     Problem.Busy -> ScraperFault.Busy
     Problem.NoAnswer -> ScraperFault.NoConfirmation
+    Problem.Cancelled -> ScraperFault.Cancelled
     Problem.None, Problem.Failed -> ScraperFault.Failed
   }
 }

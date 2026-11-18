@@ -28,6 +28,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlin.concurrent.Volatile
 import nl.eschouten.scraper.app.RobotProfile
 import nl.eschouten.scraper.model.ScraperException
 import nl.eschouten.scraper.model.ScraperFault
@@ -111,13 +112,30 @@ class ApiSession(private val p: RobotProfile) : ScraperSession {
     }
   }
 
-  override fun status() = status
+  @Volatile private var acting = false
+
+  /** While a command runs on the device, it may still be cancellable there. */
+  override fun status() = if (acting) status.copy(cancellable = true) else status
+
+  /** Cancel the command running on the device (a device that cannot answers 404: nothing happens). */
+  override fun cancel() {
+    if (acting) scope.launch { runCatching { call(HttpMethod.Post, "cancel") } }
+  }
   override val revision: Any get() = changes
 
-  override suspend fun startRoute(slot: String, dryRun: Boolean) = call(HttpMethod.Post, "route/$slot" + if (dryRun) "/dryRun" else "")
-  override suspend fun setPlanning(on: Boolean) = call(HttpMethod.Post, "planning/" + if (on) "on" else "off")
+  override suspend fun startRoute(slot: String, dryRun: Boolean) = acting { call(HttpMethod.Post, "route/$slot" + if (dryRun) "/dryRun" else "") }
+  override suspend fun setPlanning(on: Boolean) = acting { call(HttpMethod.Post, "planning/" + if (on) "on" else "off") }
   override suspend fun stopRoute() = call(HttpMethod.Post, "stop")
   override suspend fun answerStop(finish: Boolean) = call(HttpMethod.Post, "answer/" + if (finish) "yes" else "no")
+
+  private suspend fun acting(block: suspend () -> Unit) {
+    acting = true
+    try {
+      block()
+    } finally {
+      acting = false
+    }
+  }
 
   private suspend fun call(method: HttpMethod, path: String) {
     val res = try {

@@ -21,6 +21,10 @@ class Transport {
   virtual uint32_t now() = 0;                 // milliseconds
   virtual bool linkUp() { return true; }      // false once the link dropped: waits stop early
   std::function<void(const uint8_t*, size_t)> onData;
+  // Optional, set by the host: true once the user cancelled the running command (a second
+  // press on the M5, Cancel in an app). Stays true until the host clears it. The robot asks
+  // it between steps, never halfway through one; a link may also ask it between its tries.
+  std::function<bool()> cancelled;
 };
 
 enum class Result {
@@ -31,6 +35,7 @@ enum class Result {
   Busy,            // not on home screen / route menu (driving?): nothing pressed
   Unexpected,      // a step did not show the expected screen; robot was put back
   StartedNoAnswer, // Start pressed but the planning question did not appear
+  Cancelled,       // the user cancelled before Start: the robot was put back as it was
 };
 // Language of the texts the core produces (results, error details, log): "nl" or "en".
 enum class Lang { Nl, En };
@@ -61,6 +66,13 @@ class Robot {
 
   Result connect();
   void disconnect();
+  // A command cancelled through Transport::cancelled stops before its next key and puts the
+  // robot back as it was (home screen, planning as before). Until Start is pressed for a
+  // route: from then on the route runs, and stopping it is stopRoute(). The host clears its
+  // own flag and calls this before a new command in the same session.
+  void clearCancel() { cancel_ = committed_ = false; }
+  // False once a command passed its point of no return (Start pressed for a route).
+  bool cancellable() const { return !committed_; }
   Status status() const { return parseStatus(screen); }
   Result startRoute(char letter, bool dryRun = false);
   // Read what routes A..D consist of from HANDM. ROUTE (planning off for a moment, Enter,
@@ -144,6 +156,8 @@ class Robot {
   // the robot ignored a key, always the 400 ms, until the next connect.
   void settle(const Pred& expected = nullptr);
   Result goHome();
+  bool cancelNow();                 // the user cancelled (asks Transport::cancelled once it is)
+  Result putBack(bool wasOn);       // cancelled: back home, planning as before, Result::Cancelled
   Result switchPlanning(bool on);   // setPlanning without changing what finish() restores
   bool onMainMenu() const;
   void mainMenuToHome();
@@ -175,6 +189,9 @@ class Robot {
   uint32_t lastAlive_ = 0;
   bool named_ = false;              // the robot answered with its node settings (2001)
   bool patient_ = false;            // the robot ignored a key: see settle()
+  bool cancel_ = false;             // see cancelNow()
+  bool committed_ = false;          // Start pressed: cancel no longer applies
+  bool connecting_ = false;         // connect() also ends its waits on a cancel
   int images_ = 0, imageNr_ = -1;   // image set: count, number of the image now coming
   uint32_t lastRx_ = 0;             // when the robot last sent anything
 };

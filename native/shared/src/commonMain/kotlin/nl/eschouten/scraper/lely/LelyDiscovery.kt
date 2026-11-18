@@ -165,8 +165,11 @@ class LelySession(
       planning = s.planning, nextRun = s.nextRide, batteryMv = s.batteryMv, activity = s.action,
       route = s.route, busy = s.busy, driving = s.driving, finishQuestion = s.stopQuestion,
       screen = s.screen, highlighted = s.highlighted, extra = s.manual?.let { Manual.write(it) } ?: emptyMap(),
+      cancellable = s.cancellable,
     )
   }
+
+  override fun cancel() { robot?.cancel() }
 
   override val revision: Any get() = robot?.status()?.let { "${it.screen}\u0000${it.highlighted}" } ?: ""
 
@@ -220,6 +223,7 @@ class LelySession(
     } catch (e: RobotException) {
       throw when (e.result) {
         CoreResult.StartedNoAnswer -> ScraperException(ScraperFault.NoConfirmation, tr.noQuestionAfterStart)
+        CoreResult.Cancelled -> ScraperException(ScraperFault.Cancelled, tr.cancelledBody)
         CoreResult.ConnectFailed -> ScraperException(ScraperFault.NotFound, firstLine(e.message ?: ""))
         else -> ScraperException(ScraperFault.Failed, firstLine(e.message ?: ""))
       }

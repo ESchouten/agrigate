@@ -44,6 +44,7 @@ data class ScraperStatus(
   val screen: String = "",
   val highlighted: String = "",
   val extra: Map<String, String> = emptyMap(),
+  val cancellable: Boolean = false, // a command runs that ScraperSession.cancel() can still stop
 )
 
 /** One step of a running command, for the progress bar. [id] is defined by the type. */
@@ -59,6 +60,7 @@ enum class ScraperFault {
   AuthRejected, // wrong PIN / password
   Busy, // not ready; nothing was done
   NoConfirmation, // command sent but the robot's confirmation was not seen
+  Cancelled, // the user cancelled it in time: the robot was put back as it was
   Failed, // anything else
 }
 
@@ -121,6 +123,11 @@ interface ScraperSession {
 
   /** Changes whenever the robot's state changed (for polling). */
   val revision: Any
+
+  /** The user cancels the running command (any thread, does not wait): it throws
+   *  [ScraperFault.Cancelled] once the robot is back as it was. Only while
+   *  [ScraperStatus.cancellable]; a route that started runs on ([stopRoute] stops it). */
+  fun cancel() {}
 
   /** Start the stored route [slot] with all of the type's safety rules. */
   suspend fun startRoute(slot: String, dryRun: Boolean = false)
