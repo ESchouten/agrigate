@@ -244,7 +244,8 @@ Result Robot::connect() {
   auto first = [shown](const Screen& s) { return s.isSplash() || shown(s); };
   uint32_t start = lastRx_ = t_.now();
   bool ok = false;
-  while (!ok && t_.linkUp() && t_.now() - lastRx_ < 10000 && t_.now() - start < 240000) ok = waitUntil(first, 1000);
+  // A cancel makes waitUntil return at once: leave the loop then, not spin until 10 s of quiet.
+  while (!ok && t_.linkUp() && !cancel_ && t_.now() - lastRx_ < 10000 && t_.now() - start < 240000) ok = waitUntil(first, 1000);
   if (ok && screen.isSplash()) {
     t_.write(key(0, Key::Back));
     t_.pump(80);
