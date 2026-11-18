@@ -18,7 +18,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.uuid.Uuid
 import nl.eschouten.scraper.core.RobotLink
@@ -68,7 +67,9 @@ class BleSerialLink(
   private val spec: LinkSpec.BleSerial,
   override val id: String,
   private val name: String? = null,
-  private val connectTimeoutMs: Long = 10_000,
+  /** A robot in reach is connected within 1 to 3 s (measured): a try that takes longer fails
+   *  sooner and the next one comes sooner (Erik 2026-11-18). */
+  private val connectTimeoutMs: Long = 4_000,
 ) : RobotLink {
   private val rx = characteristicOf(Uuid.parse(spec.service), Uuid.parse(spec.rx)) // write to robot
   private val tx = characteristicOf(Uuid.parse(spec.service), Uuid.parse(spec.tx)) // notifications
@@ -87,7 +88,9 @@ class BleSerialLink(
       Peripheral(adv)
     }
     peripheral = p
-    val conn = withTimeout(connectTimeoutMs) { p.connect() }
+    // withTimeoutOrNull, not withTimeout: its timeout is a CancellationException, which the
+    // callers pass on as a cancel instead of a failed try (the app stayed on "connecting").
+    val conn = withTimeoutOrNull(connectTimeoutMs) { p.connect() } ?: throw IllegalStateException("no connection within ${connectTimeoutMs / 1000} s")
     p.scope.launch {
       p.state.drop(1).first { it is State.Disconnected }
       closed.complete(Unit)
@@ -97,7 +100,7 @@ class BleSerialLink(
     conn.launch {
       p.observe(tx, onSubscription = { subscribed.complete(Unit) }).collect { frames.trySend(it) }
     }
-    withTimeout(5_000) { subscribed.await() }
+    withTimeoutOrNull(3_000) { subscribed.await() } ?: throw IllegalStateException("robot did not open its data channel")
   }
 
   override suspend fun awaitClosed() = closed.await()

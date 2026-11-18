@@ -13,5 +13,7 @@ struct WiFiT {
   String SSID(); String psk(); int onEvent(WiFiEventCb, arduino_event_id_t = ARDUINO_EVENT_MAX); void removeEvent(int);
 };
 extern WiFiT WiFi;
+struct WiFiClient { int available(); int read(); size_t readBytes(uint8_t*, size_t); bool connected(); explicit operator bool(); void stop(); bool connect(const char*, uint16_t);
+  size_t print(const String&); size_t write(const uint8_t*, size_t); };
 struct EspT { void restart(); uint32_t getFreeHeap() { return 0; } uint32_t getMaxAllocHeap() { return 0; } };
 extern EspT ESP;

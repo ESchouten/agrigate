@@ -105,6 +105,10 @@ case("status, image version learned", {}, ok=lambda r, e: "STATUS planning=1 nex
      and "VERSION 444953303031385434 changed=1" in e and r.images_sent == 52)
 case("image version skips download", {}, version="444953303031385434", ok=lambda r, e: r.images_sent == 0 and "changed=0" in e)
 case("wrong pin", {}, pin="0000", ok=lambda r, e: "RESULT pincode geweigerd" in e)
+case("silent after the link: once more, then in", {"silent_pins": 1}, ok=lambda r, e: "RESULT ok" in e and "robot zegt niets, nog een keer" in e)
+case("silent after the PIN: once more, then in", {"mute_after_pin": 1}, ok=lambda r, e: "RESULT ok" in e and "robot zegt niets, nog een keer" in e)
+case("silent after the PIN twice: fails in seconds", {"mute_after_pin": 2}, ok=lambda r, e: "RESULT verbinden mislukt" in e and "FOUT: robot zegt niets na de pincode" in e and r.took < 15)
+case("silent twice: no answer to PIN", {"silent_pins": 2}, ok=lambda r, e: "RESULT verbinden mislukt" in e and "FOUT: geen antwoord op pincode" in e)
 case("route C, planning on -> Ja", {"planning": True}, ("route", "C"),
      lambda r, e: r.mode == "driving" and r.sel == 2 and r.answer == "ja" and "RESULT ok" in e)
 case("route B, planning off -> Nee", {"planning": False}, ("route", "B"), lambda r, e: r.mode == "driving" and r.sel == 1 and r.answer == "nee")

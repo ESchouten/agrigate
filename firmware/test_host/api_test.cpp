@@ -29,6 +29,11 @@ int main() {
   c = parseCall("POST", "/api/answer/no");
   assert(c.kind == ApiCall::Answer && !c.yes);
   assert(parseCall("GET", "/").kind == ApiCall::None);
+  assert(parseCall("GET", "/api/log").kind == ApiCall::Log);
+  assert(parseCall("GET", "/api/log/live").kind == ApiCall::LogLive);
+  assert(parseCall("GET", "/api/crash").kind == ApiCall::Crash);
+  assert(parseCall("POST", "/api/log").kind == ApiCall::None);
+  assert(parseCall("GET", "/api/log/all").kind == ApiCall::None);
 
   PinGate g;
   assert(g.check("Bearer 1234", "1234", 1000) == 200);

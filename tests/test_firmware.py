@@ -50,6 +50,10 @@ def editors_and_manifest():
     subprocess.check_call(["g++", "-std=c++17", "-Wall",
                            os.path.join(ROOT, "firmware", "test_host", "api_test.cpp"), "-o", exe])
     subprocess.check_call([exe])
+    exe = BIN + "_log"
+    subprocess.check_call(["g++", "-std=c++17", "-Wall",
+                           os.path.join(ROOT, "firmware", "test_host", "log_test.cpp"), "-o", exe])
+    subprocess.check_call([exe])
     exe = BIN + "_text"
     subprocess.check_call(["g++", "-std=c++17", "-Wall",
                            os.path.join(ROOT, "firmware", "test_host", "text_editor_test.cpp"), "-o", exe])

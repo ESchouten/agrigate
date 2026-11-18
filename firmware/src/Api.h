@@ -5,7 +5,7 @@
 #include <string>
 
 struct ApiCall {
-  enum Kind { None, Status, Route, Stop, Planning, Answer } kind = None;
+  enum Kind { None, Status, Route, Stop, Planning, Answer, Log, LogLive, Crash } kind = None;
   char route = 0;      // Route: 'A'..'D'
   bool yes = false;    // Planning: on, Answer: yes (finish the route)
   bool fresh = false;  // Status: read the robot now
@@ -25,6 +25,8 @@ inline ApiCall parseCall(const std::string& method, const std::string& path) {
   if (method == "GET" && (path == "/api/status" || path == "/api/status/fresh")) {
     c.kind = ApiCall::Status;
     c.fresh = path.size() > 11;
+  } else if (method == "GET" && (path == "/api/log" || path == "/api/log/live" || path == "/api/crash")) {
+    c.kind = path == "/api/crash" ? ApiCall::Crash : path.size() > 8 ? ApiCall::LogLive : ApiCall::Log;
   } else if (method != "POST") {
     return c;   // everything else changes something: never from a link opened in a browser
   } else if (path.rfind("/api/route/", 0) == 0 && path.size() >= 12 && (path.size() == 12 || path.compare(12, std::string::npos, "/dryRun") == 0)) {
