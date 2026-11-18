@@ -158,34 +158,53 @@ void Robot::settle(const Pred& expected) {
 Result Robot::connect() {
   granted_ = -1;
   named_ = patient_ = false;
-  if (!t_.connect()) return fail(Result::ConnectFailed, tr("BLE-verbinding mislukt", "BLE connection failed"));
-  step(Step::Linked);
-  t_.write(computerType());
-  t_.write(getNodeSetting());
-  uint32_t end = t_.now() + 300;   // the robot answers with its name; without an answer, go on
-  while (!named_ && t_.linkUp() && (int32_t)(t_.now() - end) < 0) t_.pump(20);
-  t_.write(askPermission(pin_));
-  end = t_.now() + 10000;
-  while (granted_ < 0 && t_.linkUp() && (int32_t)(t_.now() - end) < 0) t_.pump(20);
-  if (granted_ != 1) {   // only a real "no" (2020 = 00) means a wrong PIN
-    t_.disconnect();
-    return granted_ == 0 ? fail(Result::PinRejected, tr("pincode geweigerd", "PIN rejected"))
-                         : fail(Result::ConnectFailed, tr("geen antwoord op pincode", "no answer to PIN"));
+  // The robot answers the PIN within half a second and starts sending at once. Now and then the
+  // link comes up and the robot stays silent (no answer to the PIN, or nothing after it): then
+  // one more link right away instead of a long wait, which nearly always works (Erik 2026-11-18).
+  for (int tries = 0;; tries++) {
+    if (tries) {
+      t_.disconnect();
+      say(tr("robot zegt niets, nog een keer", "robot silent, once more"));
+      granted_ = -1;
+    }
+    if (!t_.connect()) return fail(Result::ConnectFailed, tr("BLE-verbinding mislukt", "BLE connection failed"));
+    if (!tries) step(Step::Linked);
+    t_.write(computerType());
+    t_.write(getNodeSetting());
+    uint32_t end = t_.now() + 300;   // the robot answers with its name; without an answer, go on
+    while (!named_ && t_.linkUp() && (int32_t)(t_.now() - end) < 0) t_.pump(20);
+    t_.write(askPermission(pin_));
+    end = t_.now() + 3000;
+    while (granted_ < 0 && t_.linkUp() && (int32_t)(t_.now() - end) < 0) t_.pump(20);
+    if (granted_ == 0) {   // only a real "no" (2020 = 00) means a wrong PIN
+      t_.disconnect();
+      return fail(Result::PinRejected, tr("pincode geweigerd", "PIN rejected"));
+    }
+    if (granted_ == 1) {
+      if (!tries) step(Step::Granted);
+      t_.write(connectWithLevel(1));
+      t_.write(connectPanel());
+      uint32_t at = lastRx_ = t_.now() - 1;   // it answers within a second; nothing in 5 s: silent
+      while (t_.linkUp() && (int32_t)(lastRx_ - at) <= 0 && t_.now() - at < 5000) t_.pump(20);
+      if ((int32_t)(lastRx_ - at) > 0) break;
+    }
+    if (tries == 1) {
+      t_.disconnect();
+      return fail(Result::ConnectFailed, granted_ < 0 ? tr("geen antwoord op pincode", "no answer to PIN")
+                                                     : tr("robot zegt niets na de pincode", "robot silent after the PIN"));
+    }
   }
-  step(Step::Granted);
-  t_.write(connectWithLevel(1));
-  t_.write(connectPanel());
   connected_ = true;
   lastAlive_ = t_.now() - 1000;
   // A robot whose image set we lack sends it first (about 75 s over BLE, longer on a slow
-  // link): wait 90 s, and on while it is still sending, up to 4 minutes.
+  // link): wait while it is sending, up to 4 minutes; 10 s without anything: it stopped.
   auto shown = [](const Screen& s) { return s.isHome() || s.isRouteMenu() || !s.lines().empty(); };
   // First the robot shows its splash image for about a second: Esc skips it (measured at the
   // barn 2026-11-14: the splash takes the Esc, also with planning OFF; home 0.9 s sooner).
   auto first = [shown](const Screen& s) { return s.isSplash() || shown(s); };
   uint32_t start = lastRx_ = t_.now();
-  bool ok = waitUntil(first, 90000);
-  while (!ok && t_.linkUp() && t_.now() - lastRx_ < 5000 && t_.now() - start < 240000) ok = waitUntil(first, 5000);
+  bool ok = false;
+  while (!ok && t_.linkUp() && t_.now() - lastRx_ < 10000 && t_.now() - start < 240000) ok = waitUntil(first, 1000);
   if (ok && screen.isSplash()) {
     t_.write(key(0, Key::Back));
     t_.pump(80);

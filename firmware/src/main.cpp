@@ -1589,6 +1589,7 @@ void setup() {
     stopServing();
     wifiDown();
   };
+  BtLink::log = [](const char* why) { say("%s\n", why); };
   classicAtStart = btClassicInUse();
   BtLink::start();
   logHeap("bluetooth");

@@ -110,7 +110,7 @@ TEXTS = {
 
 
 class FakeRobot:
-    def __init__(self, address=None, on_data=None, *, planning=True, mode="home", version=b"DIS0018T4", slow=False, after=0.0, lang="nl", stop_asks=True):
+    def __init__(self, address=None, on_data=None, *, planning=True, mode="home", version=b"DIS0018T4", slow=False, after=0.0, lang="nl", stop_asks=True, silent_pins=0, mute_after_pin=0):
         self.on, self.planning, self.mode, self.sel = on_data, planning, mode, 0
         self.version, self.pressed, self.answer, self.images_sent = version, [], None, 0
         self._images_announced = False
@@ -120,6 +120,8 @@ class FakeRobot:
         self.forward = True
         self.stopped = False       # a running route was stopped with Start/Stop
         self.stop_asks = stop_asks # Stop during a route asks "route afmaken?" (seen 2026-11-11)
+        self.silent_pins = silent_pins  # this many PIN requests get no answer (a link that came up silent)
+        self.mute_after_pin, self._muted = mute_after_pin, False   # this many links: PIN ok, then nothing
         self.drive_events = []     # Start/Stop events in HANDBEDIENING: 0 down, 1 repeat, 7 up
         self.t = TEXTS[lang]
         self.main_sel = 3          # main menu (Instellingen highlighted, as seen): Werken, Routes, Testen, Instellingen, Alarmen, Service
@@ -236,10 +238,14 @@ class FakeRobot:
         for msg in parse(self._buf):
             if msg.msg_id == 2000:
                 self._out(Msg(2001, 244, 57, b"\xaf\x00\xa0\x00stal\x00").to_bytes())
+            elif msg.msg_id == 2018 and self.silent_pins:
+                self.silent_pins -= 1
             elif msg.msg_id == 2018:
                 ok = bool(msg.payload) and decrypt_pin(msg.payload) == "4321"
+                self._muted = ok and self.mute_after_pin > 0
+                self.mute_after_pin -= self._muted
                 self._out(Msg(2020, 244, 57, bytes([ok])).to_bytes())
-            elif msg.msg_id == 1536:
+            elif msg.msg_id == 1536 and not self._muted:
                 for d, ln in can_records(msg.payload):
                     self._can(d, ln)
 

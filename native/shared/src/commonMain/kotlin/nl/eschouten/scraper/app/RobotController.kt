@@ -443,8 +443,11 @@ class RobotController(
     }
     set(LinkState.Connecting)
     // Bluetooth sometimes fails once and works the next time: three tries, a second apart.
+    // What went wrong in each goes into the message (and the logbook): where it fails tells
+    // how to make it better (Erik 2026-11-18).
     var r: ScraperSession
     var tries = 0
+    val whys = mutableListOf<String>()
     while (true) {
       r = if (settings.robot.via.isNotEmpty()) ApiSession(settings.robot) else settings.robot.type.openSession(
         settings.robot,
@@ -462,7 +465,9 @@ class RobotController(
         r.connect()
         break
       } catch (e: ScraperException) {
-        if (e.fault != ScraperFault.NotFound || ++tries == 3) throw e
+        if (e.fault != ScraperFault.NotFound) throw e
+        whys += e.message ?: ""
+        if (++tries == 3) throw ScraperException(e.fault, tr.triesFailed(whys))
         runCatching { r.disconnect() }
         steps = emptyList()
         delay(1_000)
