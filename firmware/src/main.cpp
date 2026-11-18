@@ -16,11 +16,15 @@
 #include <WebServer.h>
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
+#include <esp_core_dump.h>
+#include <esp_flash.h>
+#include <esp_log.h>
 #include <esp_wps.h>
 #include <mbedtls/pk.h>
 #include <mbedtls/sha256.h>
 
 #include <algorithm>
+#include <cstdarg>
 #include <cctype>
 #include <cstring>
 #include <functional>
@@ -29,6 +33,7 @@
 
 #include "Api.h"
 #include "HttpLite.h"
+#include "Log.h"
 #include "Manifest.h"
 #include "PinEditor.h"
 #include "ReleaseKey.h"
@@ -73,6 +78,89 @@ static void setOwed(int v) {
   owedAt = millis();
   rtcOwed = v;
   rtcOwedCheck = ~v;
+}
+
+// ---- the log: USB serial, GET /api/log and /api/log/live (Log.h) ----------------------------
+// Everything the M5 prints, its own lines and ESP-IDF's (Bluetooth, wifi), also goes into a
+// 4 KB ring in RTC memory: no heap, and a crash or restart keeps it (a power cut does not).
+// A live listener gets each new line from its own small task, so a slow phone never holds up
+// the robot (the task starts at the first listener and stays).
+RTC_NOINIT_ATTR static LogRing logRing;
+static SemaphoreHandle_t logLock;
+static TaskHandle_t liveTask = nullptr;
+static WiFiClient liveNext;   // handed to liveTask (an empty one ends the listening)
+static bool liveNew = false;
+
+static int logVprintf(const char* fmt, va_list ap) {
+  char b[256];
+  int n = vsnprintf(b, sizeof b, fmt, ap);
+  if (n <= 0) return n;
+  size_t len = std::min(size_t(n), sizeof b - 1);
+  Serial.write(b, len);
+  xSemaphoreTake(logLock, portMAX_DELAY);
+  logRing.add(b, len);
+  xSemaphoreGive(logLock);
+  if (liveTask) xTaskNotifyGive(liveTask);
+  return n;
+}
+
+static void say(const char* fmt, ...) {
+  va_list ap;
+  va_start(ap, fmt);
+  logVprintf(fmt, ap);
+  va_end(ap);
+}
+
+static void liveLoop(void*) {
+  WiFiClient c;
+  uint32_t pos = 0;
+  char b[256];
+  for (;;) {
+    ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(1000));
+    for (;;) {
+      WiFiClient next;
+      xSemaphoreTake(logLock, portMAX_DELAY);
+      bool handed = liveNew;
+      if (handed) {
+        std::swap(next, liveNext);
+        liveNew = false;
+        pos = logRing.firstLine();   // the log so far first, then each new line
+      }
+      size_t n = handed ? 0 : logRing.read(pos, b, sizeof b);
+      xSemaphoreGive(logLock);
+      if (handed) c = next;   // the previous listener's connection closes here, outside the lock
+      else if (n == 0 || !c.connected()) break;
+      else if (c.write(reinterpret_cast<uint8_t*>(b), n) != n) c.stop();
+    }
+  }
+}
+
+// The listener: the request's connection (headers sent), or none to stop listening.
+static void setLive(WiFiClient c) {
+  if (!liveTask && !c) return;
+  if (!liveTask) xTaskCreate(liveLoop, "log", 3072, nullptr, 1, &liveTask);
+  xSemaphoreTake(logLock, portMAX_DELAY);
+  liveNext = c;
+  liveNew = true;
+  xSemaphoreGive(logLock);
+  xTaskNotifyGive(liveTask);
+}
+
+// Into the log at every start: the version, why it restarted, and after a crash where (the
+// release's .elf turns the addresses into code: xtensa-esp32-elf-addr2line -pfiaC -e <elf> <addresses>).
+static void logStart() {
+  logLock = xSemaphoreCreateMutex();
+  logRing.begin();
+  esp_log_set_vprintf(logVprintf);
+  esp_reset_reason_t why = esp_reset_reason();
+  say("\n---- start %s, reset reason %d\n", FW_VERSION, int(why));
+  esp_core_dump_summary_t crash;
+  if ((why == ESP_RST_PANIC || why == ESP_RST_INT_WDT || why == ESP_RST_TASK_WDT || why == ESP_RST_WDT) &&
+      esp_core_dump_get_summary(&crash) == ESP_OK) {
+    say("crash in task %s at 0x%08lx, backtrace:", crash.exc_task, (unsigned long)crash.exc_pc);
+    for (uint32_t i = 0; i < crash.exc_bt_info.depth; i++) say(" 0x%08lx", (unsigned long)crash.exc_bt_info.bt[i]);
+    say("%s\n", crash.exc_bt_info.corrupted ? " (corrupted)" : "");
+  }
 }
 // The robot as the M5 last saw it (RAM only): the home screen shows it, with its age.
 // Read at every command and every 15 minutes in the background (syncTick).
@@ -165,7 +253,7 @@ static String volts(int mv) { return String(mv / 1000) + (tx == &kNl ? "," : "."
 // they fill up while held) and the three routes (red: a tap starts or stops that route).
 // The memory margin in the log (Bluetooth, wifi and the screen share little RAM).
 static void logHeap(const char* where) {
-  Serial.printf("heap %s: %u free, %u largest\n", where, (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMaxAllocHeap());
+  say("heap %s: %u free, %u largest\n", where, (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMaxAllocHeap());
 }
 
 static void idle() {
@@ -383,7 +471,7 @@ static Result runOnce(const String& title, Kind kind, const Job& job, Status& st
   if (owedPlanning >= 0 && millis() - owedAt < kOwedForMs) robot.setOwedPlanning(owedPlanning);
   robot.onOwed = setOwed;
   robot.lang = langFromCode(tx->code);
-  robot.log = [](const std::string& s) { Serial.println(s.c_str()); };
+  robot.log = [](const std::string& s) { say("%s\n", s.c_str()); };
   robot.onStep = [&](Step s) {
     if (s == Step::Syncing) {   // first connection: the robot sends its image set, part by part
       int p = robot.syncPercent();
@@ -743,13 +831,14 @@ static void serve() {
   server.begin();
   serving = true;
   if (MDNS.begin(hostName().c_str())) MDNS.addService("http", "tcp", 80);
-  Serial.printf("web API: http://%s/api\n", WiFi.localIP().toString().c_str());
+  say("web API: http://%s/api\n", WiFi.localIP().toString().c_str());
   logHeap("wifi");
 }
 
 static void stopServing() {
   if (!serving) return;
   server.stop();
+  setLive(WiFiClient());   // a listener's connection too: an update download needs the memory
   MDNS.end();
   serving = false;
 }
@@ -1060,7 +1149,7 @@ static bool signatureOk(const Manifest& m) {
 // 0 installed (boots next time), 1 failed, 2 not the signed file, 3 stopped by a button
 static int download(const Manifest& m, bool stopOnPress = false) {
   using namespace ui;
-  Serial.printf("update: %u bytes heap free, %u largest\n", (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMaxAllocHeap());
+  say("update: %u bytes heap free, %u largest\n", (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMaxAllocHeap());
   WiFiClientSecure client;
   long length = -1;
   if (!httpsGet(client, String(String(kReleaseUrl) + m.file.c_str()).c_str(), length) ||
@@ -1258,7 +1347,7 @@ static Result readRobotQuietly(std::string& err) {
   BtLink link(savedAddress, savedClassic);
   Robot robot(link, encryptPin(pin.c_str()), storedVersion);
   robot.lang = langFromCode(tx->code);
-  robot.log = [](const std::string& s) { Serial.println(s.c_str()); };
+  robot.log = [](const std::string& s) { say("%s\n", s.c_str()); };
   Result r = robot.connect();
   Status st = robot.status();
   err = robot.lastError();
@@ -1305,12 +1394,53 @@ static void syncTick() {
 static PinGate gate;
 static uint32_t resultUntil = 0;   // an API command's result is on screen until then (0 = none)
 
+// GET /api/log: the log so far, as it is in the ring.
+static void sendLog() {
+  server.setContentLength(CONTENT_LENGTH_UNKNOWN);
+  server.send(200, "text/plain; charset=utf-8", "");
+  char b[256];
+  uint32_t pos = 0;
+  for (bool first = true;; first = false) {
+    xSemaphoreTake(logLock, portMAX_DELAY);
+    if (first) pos = logRing.firstLine();
+    size_t n = logRing.read(pos, b, sizeof b);
+    xSemaphoreGive(logLock);
+    if (!n) break;
+    server.sendContent(b, n);
+  }
+}
+
+// GET /api/log/live: the answer's head now, the log itself from liveLoop.
+static void sendLive() {
+  WiFiClient c = server.client();
+  c.print("HTTP/1.1 200 OK\r\nContent-Type: text/plain; charset=utf-8\r\nX-Content-Type-Options: nosniff\r\n"
+          "Cache-Control: no-store\r\nConnection: close\r\n\r\n");
+  setLive(c);
+}
+
+// GET /api/crash: the core dump as the crash left it in flash.
+static void sendCrash() {
+  size_t addr = 0, size = 0;
+  if (esp_core_dump_image_get(&addr, &size) != ESP_OK) return server.send(404, "application/json", "{}");
+  server.setContentLength(size);
+  server.send(200, "application/octet-stream", "");
+  char b[512];
+  for (size_t off = 0; off < size; off += sizeof b) {
+    size_t n = std::min(sizeof b, size - off);
+    if (esp_flash_read(nullptr, b, addr + off, n) != ESP_OK) break;
+    server.sendContent(b, n);
+  }
+}
+
 static void handleApi() {
   HTTPMethod m = server.method();
   ApiCall c = parseCall(m == HTTP_GET ? "GET" : m == HTTP_POST ? "POST" : "", server.uri().c_str());
   if (c.kind == ApiCall::None) return server.send(404, "application/json", "{}");
   int code = gate.check(server.header("Authorization").c_str(), pin.c_str(), millis());
   if (code != 200) return server.send(code, "application/json", "{}");
+  if (c.kind == ApiCall::Log) return sendLog();
+  if (c.kind == ApiCall::LogLive) return sendLive();
+  if (c.kind == ApiCall::Crash) return sendCrash();
   Result r = Result::Ok;
   std::string err;
   if (c.kind == ApiCall::Status) {
@@ -1439,6 +1569,7 @@ void setup() {
   M5.begin(cfg);
   ui::begin();   // LVGL: the screens (Ui.h)
   Serial.begin(115200);
+  logStart();
   prefs.begin(DRIVER_STORE, false);
   if (rtcOwedCheck == ~rtcOwed && (rtcOwed == 0 || rtcOwed == 1)) owedPlanning = rtcOwed;   // from before a restart
   if (prefs.getBytesLength("imgver") == 9) prefs.getBytes("imgver", storedVersion, 9);
