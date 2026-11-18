@@ -36,6 +36,8 @@ class BtLink : public driver::Transport {
   // Called right before Bluetooth starts: its start fails, and crashes, when the memory is
   // taken (the M5 turns its wifi off here, and on again after).
   static std::function<void()> makeRoom;
+  // Optional: where each failed try says what went wrong (the M5's log).
+  static std::function<void(const char*)> log;
 
   // address: the robot's address, or "" to search for one; classic: how it was found.
   explicit BtLink(std::string address = "", bool classic = false);

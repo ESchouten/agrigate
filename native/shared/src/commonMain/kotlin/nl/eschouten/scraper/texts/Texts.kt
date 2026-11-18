@@ -124,6 +124,12 @@ class Tr(val code: String) {
   val noRobotNearby: String get() = t("Geen robot gevonden in de buurt.", "No robot found nearby.")
   val noConnection: String get() = t("Geen verbinding met de robot.", "No connection with the robot.")
   /** With the system's own words, when it gave any (e.g. a Windows error code). */
+  /** The last try's message, and what went wrong in each try when that differed. */
+  fun triesFailed(whys: List<String>): String {
+    val last = whys.last()
+    if (whys.distinct().size == 1) return last + t(" (${whys.size} pogingen)", " (${whys.size} tries)")
+    return last + " (" + whys.mapIndexed { i, w -> "${i + 1}: ${w.removeSuffix(".")}" }.joinToString("; ") + ")"
+  }
   fun noConnection(detail: String?): String =
     if (detail.isNullOrBlank()) noConnection else t("Geen verbinding met de robot ($detail).", "No connection with the robot ($detail).")
   // ---- home-screen widget -------------------------------------------------------------

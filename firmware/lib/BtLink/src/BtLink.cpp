@@ -48,6 +48,14 @@ void sortByRssi(std::vector<FoundRobot>& v) {
 }  // namespace
 
 std::function<void()> BtLink::makeRoom;
+std::function<void(const char*)> BtLink::log;
+
+namespace {
+bool failed(const char* why) {
+  if (BtLink::log) BtLink::log(why);
+  return false;
+}
+}  // namespace
 
 void BtLink::start() { startBle(); }
 
@@ -131,12 +139,14 @@ bool BtLink::connectBle() {
   esp_bd_addr_t a;
   if (sscanf(address_.c_str(), "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx", &a[0], &a[1], &a[2], &a[3], &a[4], &a[5]) == 6)
     esp_ble_gap_set_prefer_conn_params(a, 6, 12, 0, 400);
-  if (!client->connect(BLEAddress(address_.c_str()), BLE_ADDR_TYPE_PUBLIC, 3000)) return false;
+  uint32_t t0 = millis();
+  if (!client->connect(BLEAddress(address_.c_str()), BLE_ADDR_TYPE_PUBLIC, 3000))
+    return failed(millis() - t0 >= 2900 ? "BLE: no connection within 3 s (robot busy with another device, or out of reach?)" : "BLE: connection refused");
   BLERemoteService* svc = client->getService(BLEUUID(kService));
-  if (!svc) { client->disconnect(); return false; }
+  if (!svc) { client->disconnect(); return failed("BLE: connected, but no serial service"); }
   rx_ = svc->getCharacteristic(BLEUUID(kRx));
   BLERemoteCharacteristic* tx = svc->getCharacteristic(BLEUUID(kTx));
-  if (!rx_ || !tx) { client->disconnect(); return false; }
+  if (!rx_ || !tx) { client->disconnect(); return failed("BLE: connected, but no serial characteristics"); }
   notifyTo = this;
   tx->registerForNotify([](BLERemoteCharacteristic*, uint8_t* d, size_t n, bool) { if (notifyTo) notifyTo->received(d, n); });
   return true;
@@ -144,7 +154,7 @@ bool BtLink::connectBle() {
 
 bool BtLink::connectClassic() {
   if (!startClassic()) return false;
-  return spp.connect(BTAddress(String(address_.c_str())), 0, ESP_SPP_SEC_NONE, ESP_SPP_ROLE_MASTER);
+  return spp.connect(BTAddress(String(address_.c_str())), 0, ESP_SPP_SEC_NONE, ESP_SPP_ROLE_MASTER) || failed("classic: no connection");
 }
 
 bool BtLink::linkUp() {

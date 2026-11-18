@@ -28,6 +28,7 @@ class TextsTest {
             String::class.java -> "X"
             Int::class.javaPrimitiveType -> 2
             Boolean::class.javaPrimitiveType -> true
+            List::class.java -> listOf("X", "Y")
             else -> "X"
           }
         }.toTypedArray()
