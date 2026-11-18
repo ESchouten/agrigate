@@ -15,7 +15,11 @@ inline String operator+(const char*a,const String&b){return String(std::string(a
 uint32_t millis(); void delay(uint32_t);
 bool btClassicInUse(void);   // esp32-hal-bt
 #define RTC_NOINIT_ATTR
-struct SerialT{ void begin(int){} void println(const char*){} void printf(const char*,...){} }; extern SerialT Serial;
+struct SerialT{ void begin(int){} void println(const char*){} void printf(const char*,...){} size_t write(const char*,size_t){return 0;} }; extern SerialT Serial;
+typedef void* SemaphoreHandle_t; typedef void* TaskHandle_t; enum { pdTRUE = 1 }; const uint32_t portMAX_DELAY = ~0u;   // FreeRTOS
+SemaphoreHandle_t xSemaphoreCreateMutex(); int xSemaphoreTake(SemaphoreHandle_t, uint32_t); int xSemaphoreGive(SemaphoreHandle_t);
+int xTaskCreate(void (*)(void*), const char*, uint32_t, void*, int, TaskHandle_t*); void xTaskNotifyGive(TaskHandle_t); uint32_t ulTaskNotifyTake(int, uint32_t); uint32_t pdMS_TO_TICKS(uint32_t);
+enum esp_reset_reason_t { ESP_RST_POWERON, ESP_RST_PANIC, ESP_RST_INT_WDT, ESP_RST_TASK_WDT, ESP_RST_WDT }; esp_reset_reason_t esp_reset_reason();
 enum { TFT_BLACK, TFT_WHITE, TFT_YELLOW, TFT_GREEN, TFT_RED };
 namespace m5 { struct Button_Class { bool wasPressed(); bool wasReleased(); bool isPressed(); };
   struct Power_Class { enum is_charging_t { is_discharging, is_charging, charge_unknown }; int getBatteryLevel(); is_charging_t isCharging(); }; }

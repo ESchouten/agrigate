@@ -59,9 +59,26 @@ driving in the apps and on the web page.
 | `POST /api/panel/<key>/down` | The key goes down and stays down. Repeat it a few times a second while it is held: a second after the last repeat the key comes up by itself, so a page that is closed or a phone that leaves the network never keeps the robot driving. |
 | `POST /api/panel/<key>/up` | The key comes up. |
 
+## The log
+
+Only the buttons answer these (the desktop app: `404`), to see what happened without a USB
+cable.
+
+| Call | What |
+|---|---|
+| `GET /api/log` | The last 4 KB of the log, as text: what the buttons did with the robot, the wifi and updates, the free memory. A restart or crash keeps it, a power cut does not. |
+| `GET /api/log/live` | The log so far, and then each new line as it happens, until the caller closes it (also while a robot command runs). One listener at a time: a new one takes over. |
+| `GET /api/crash` | The last crash (a core dump), as a file; `404` when there is none. It stays until the next crash. After a crash the log names where it happened. Each release carries the firmware's `.elf`, which turns the addresses into code (`esp-coredump` from `pip install esp-coredump`, version and board as on the buttons). |
+
+```bash
+curl -N -H "Authorization: Bearer 1234" http://scraper-control-1a2b.local/api/log/live
+curl -o crash.bin -H "Authorization: Bearer 1234" http://scraper-control-1a2b.local/api/crash
+esp-coredump info_corefile -t raw -c crash.bin scraper-control-m5stack-core-1.6.211.elf
+```
+
 ## Answers
 
-JSON, the same for every call, in the apps' generic terms (any robot type):
+JSON, the same for every call but the log, in the apps' generic terms (any robot type):
 
 ```json
 {"ok": true, "fault": null, "message": "", "age": 4,

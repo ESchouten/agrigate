@@ -4,6 +4,7 @@ name: release
 #                                 that board's file. The only fixed name: devices look for it in
 #                                 releases/latest (settings > Wifi > Update, or automatically)
 #   scraper-control-<board>-<v>.bin  the firmware per board (now: m5stack-core = the M5 buttons)
+#   scraper-control-<board>-<v>.elf  the same with its symbols, to read a crash (GET /api/crash)
 #   scraper-control-<v>.apk       Android app (install by hand, or keep it updated with Obtainium)
 #   scraper-control-<v>-windows.exe, -macos.pkg   the desktop app's installers (not signed);
 #                                 the app then updates itself from releases.<win|osx>.signed.json
@@ -94,6 +95,7 @@ jobs:
           BIN="out/scraper-control-m5stack-core-$VERSION.bin"
           grep -q "$VERSION" firmware/.pio/build/m5stack-core/firmware.bin || { echo "the firmware does not carry version $VERSION"; exit 1; }
           cp firmware/.pio/build/m5stack-core/firmware.bin "$BIN"
+          cp firmware/.pio/build/m5stack-core/firmware.elf "${BIN%.bin}.elf"   # reads a crash (docs/API.md)
           echo "# Scraper Control $VERSION: one block per board" > out/update.ini
           python3 firmware/sign_release.py "$BIN" --board m5stack-core --key "$FIRMWARE_SIGNING_KEY" --version "$VERSION" --build "$BUILD" >> out/update.ini
           cat out/update.ini
