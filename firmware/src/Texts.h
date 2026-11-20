@@ -22,6 +22,9 @@ struct Texts {
   // manual drive
   const char *manual, *left, *direction, *right, *forward, *backward, *driving, *releaseToStop,
       *done, *drive, *motorL, *motorR;
+  // to the charger (HANDM. LADER): the screen's title, the hold key in manual control, the
+  // side tiles' value, the middle hold key
+  const char *charger, *chargerWord, *chargerHere, *startWord;
   // PIN
   const char *pinTitle, *cancelWord, *digitMinus, *digitPlus, *next, *pinRejected, *enterPin, *newPin;
   // settings (hold right): PIN / robot / wifi
@@ -58,6 +61,7 @@ static const Texts kNl = {
     "Status van de robot", "Kijk even bij de robot en controleer het tijdpad.", "Route gestopt",
     "Handbediening", "Links", "Richting", "Rechts", "Vooruit", "Achteruit", "Rijdt",
     "Loslaten om te stoppen", "Klaar", "Rijden", "Motor L", "Motor R",
+    "Naar de lader", "Lader", "Lader hier", "Start",
     "Pincode", "Annuleren", "Cijfer -", "Cijfer +", "Volgende",
     "Pincode geweigerd. Probeer opnieuw:", "Vul de pincode van de robot in:", "Nieuwe pincode:",
     "Instellingen", "Robot", "Update", "Robot", "automatisch (sterkste)", "Wifi", "niet ingesteld",
@@ -92,6 +96,7 @@ static const Texts kEn = {
     "Robot status", "Please check the robot and its schedule.", "Route stopped",
     "Manual control", "Left", "Direction", "Right", "Forward", "Backward", "Driving",
     "Release to stop", "Done", "Drive", "Motor L", "Motor R",
+    "To the charger", "Charger", "Charger here", "Start",
     "PIN", "Cancel", "Digit -", "Digit +", "Next",
     "PIN rejected. Try again:", "Enter the robot's PIN:", "New PIN:",
     "Settings", "Robot", "Update", "Robot", "automatic (strongest)", "Wi-Fi", "not set",

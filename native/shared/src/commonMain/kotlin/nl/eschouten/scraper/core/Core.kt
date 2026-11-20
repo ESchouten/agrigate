@@ -48,6 +48,9 @@ enum class RobotKey(val code: Int) {
 /** The manual control screen's motors and direction; null = not known. */
 data class ManualState(val left: Boolean?, val right: Boolean?, val forward: Boolean?)
 
+/** The charger approach screen (HANDM. LADER): the charger's side and the battery as shown. */
+data class ChargerState(val left: Boolean, val right: Boolean, val volt: String, val amp: String)
+
 /** What the core read from the robot's screen (scraper_status_json). */
 data class CoreStatus(
   /** Time planning on/off; null = not on the home screen. */
@@ -70,6 +73,8 @@ data class CoreStatus(
   val syncPercent: Int? = null,
   /** On the manual control screen: what the robot shows there as images, else null. */
   val manual: ManualState? = null,
+  /** On the charger approach screen: the charger's side and the battery, else null. */
+  val charger: ChargerState? = null,
   /** A command runs that [CoreSession.cancel] can still stop (until Start for a route). */
   val cancellable: Boolean = false,
 ) {
@@ -90,6 +95,10 @@ data class CoreStatus(
         manual = (d["manual"] as? JsonObject)?.let { m ->
           fun f(k: String) = when (m[k]?.jsonPrimitive?.intOrNull) { 1 -> true; 0 -> false; else -> null }
           ManualState(f("left"), f("right"), f("forward"))
+        },
+        charger = (d["charger"] as? JsonObject)?.let { c ->
+          fun s(k: String) = c[k]?.jsonPrimitive?.content ?: ""
+          ChargerState(c["left"]?.jsonPrimitive?.intOrNull == 1, c["right"]?.jsonPrimitive?.intOrNull == 1, s("volt"), s("amp"))
         },
       )
     }

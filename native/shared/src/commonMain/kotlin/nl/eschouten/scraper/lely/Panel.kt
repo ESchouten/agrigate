@@ -103,17 +103,25 @@ class PanelFlow(private val controller: RobotController) {
 
   fun view(cs: ControllerState, st: PanelState = _state.value): PanelScreen {
     val live = cs.live
-    return panelScreen(cs, st.held, st.error, live?.screen, live?.highlighted, live?.extra?.let(Manual::read))
+    return panelScreen(cs, st.held, st.error, live?.screen, live?.highlighted, live?.extra?.let(Manual::read), live?.extra?.let(Manual::readCharger))
   }
 }
 
 /** The manual control screen's motors and direction in [nl.eschouten.scraper.model.ScraperStatus.extra]:
- *  "manual" -> left, right, forward as 1 / 0 / ? (not known), e.g. "10?". */
+ *  "manual" -> left, right, forward as 1 / 0 / ? (not known), e.g. "10?". The charger approach
+ *  screen: "charger" -> side, volt and amp, e.g. "10|12.9|0.0". */
 internal object Manual {
   private const val KEY = "manual"
+  private const val CHARGER = "charger"
 
-  fun write(m: ManualState): Map<String, String> =
-    mapOf(KEY to listOf(m.left, m.right, m.forward).joinToString("") { when (it) { true -> "1"; false -> "0"; null -> "?" } })
+  fun write(m: ManualState?, c: ChargerState?): Map<String, String> = buildMap {
+    if (m != null) put(KEY, listOf(m.left, m.right, m.forward).joinToString("") { when (it) { true -> "1"; false -> "0"; null -> "?" } })
+    if (c != null) put(CHARGER, "${if (c.left) 1 else 0}${if (c.right) 1 else 0}|${c.volt}|${c.amp}")
+  }
+
+  fun readCharger(extra: Map<String, String>): ChargerState? = extra[CHARGER]?.split('|')?.takeIf { it.size == 3 }?.let { (side, volt, amp) ->
+    ChargerState(side.getOrNull(0) == '1', side.getOrNull(1) == '1', volt, amp)
+  }
 
   fun read(extra: Map<String, String>): ManualState? = extra[KEY]?.let { v ->
     fun b(i: Int) = when (v.getOrNull(i)) { '1' -> true; '0' -> false; else -> null }
@@ -151,7 +159,8 @@ data class PanelScreen(
 )
 
 /** [held]: this screen asked for the connection; [error]: why that failed. */
-fun panelScreen(s: ControllerState, held: Boolean, error: String?, screen: String?, highlighted: String?, manual: ManualState?): PanelScreen {
+fun panelScreen(s: ControllerState, held: Boolean, error: String?, screen: String?, highlighted: String?, manual: ManualState?,
+                charger: ChargerState? = null): PanelScreen {
   val connected = s.connected && held
   val connecting = held && !s.connected
   val text = when {
@@ -172,6 +181,13 @@ fun panelScreen(s: ControllerState, held: Boolean, error: String?, screen: Strin
         ManualCell(tr.direction, m.forward?.let { if (it) tr.forward else tr.backward } ?: "?", false,
           m.forward?.let { if (it) Glyph.Forward else Glyph.Backward }, "manual-direction"),
         ManualCell(tr.motorRight, motor(m.right), m.right == true, null, "manual-right"),
+      )
+    } ?: charger?.takeIf { connected }?.let { c ->
+      // the charger approach: the charger's side over Soft1 / Soft3, the battery in the middle
+      listOf(
+        ManualCell(tr.chargerLeft, if (c.left) tr.chargerHere else "–", c.left, null, "charger-left"),
+        ManualCell(tr.battery, "${c.volt} V" + if (c.amp.isEmpty()) "" else " · ${c.amp} A", false, null, "charger-battery"),
+        ManualCell(tr.chargerRight, if (c.right) tr.chargerHere else "–", c.right, null, "charger-right"),
       )
     },
     keysEnabled = connected,

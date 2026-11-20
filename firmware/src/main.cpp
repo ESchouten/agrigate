@@ -1,6 +1,7 @@
 // Scraper Control buttons for M5Stack Basic: left / middle / right button start route A / B / C.
 // Each press: connect (~2 s), start the route with all checks, disconnect.
-// Hold the middle button 1.5 s for manual drive (HANDBEDIENING), see manualSession().
+// Hold the middle button 1.5 s for manual drive (HANDBEDIENING), see manualSession(); there
+// hold the right button for the charger approach (HANDM. LADER).
 // The screens follow the Scraper Control app's look (red header, light cards), drawn with LVGL (Ui.h).
 // Hold the left button 1.5 s to switch the planning (tijdpad) on or off.
 // Hold the right button 1.5 s for the settings: PIN, which robot, wifi (set up on the M5
@@ -384,11 +385,43 @@ static void drawManual(const ManualState& m, bool driving) {
     lv_obj_set_style_bg_grad_dir(b, LV_GRAD_DIR_VER, 0);
     centred(String(ICON_PLAY) + "  " + tx->driving, kW / 2, 141, kTitle, kWhite);
     centred(tx->releaseToStop, kW / 2, 168, kBody, kWhite);
-  } else {   // hold keys, as on the home screen: left held = done, middle held = drive
+  } else {   // hold keys, as on the home screen: left held = done, middle held = drive, right held = charger
     holdKey(0, 134, 60, tx->holdWord, ICON_OK, tx->done);
     holdKey(1, 134, 60, tx->holdWord, ICON_PLAY, tx->drive, kDriveAfterMs);
+    holdKey(2, 134, 60, tx->holdWord, ICON_BOLT, tx->chargerWord);
   }
   String label[3] = {tx->motorL, tx->direction, tx->motorR};
+  Pill style[3] = {Pill::Primary, Pill::Primary, Pill::Primary};
+  pills(label, style);
+}
+
+// HANDM. LADER: the charger's side as the robot keeps it (left / right tile), the battery in
+// the middle. Taps choose the side, middle held = Start held on the robot.
+static void drawCharger(const ChargerState& c, bool held) {
+  using namespace ui;
+  ui::Screen scr(tx->charger);
+  for (int i = 0; i < 3; i += 2) {
+    bool on = (i == 0 ? c.left : c.right) == 1;
+    int x = kBtnX[i] - 47;
+    box(x, 56, 94, 70, 12, on ? kOkSoft : kCard, on ? kOk : kLine, on ? 2 : 1);
+    centred(i == 0 ? tx->left : tx->right, kBtnX[i], 62, kBody, kMuted);
+    centred(ICON_BOLT, kBtnX[i], 82, kBold, on ? kOk : kMuted);
+    centred(on ? tx->chargerHere : "-", kBtnX[i], 101, kBold, on ? kOk : kInk);
+  }
+  box(kBtnX[1] - 47, 56, 94, 70, 12, kCard, kLine, 1);
+  centred(ICON_BATTERY, kBtnX[1], 62, kBody, kMuted);
+  centred(c.volt.empty() ? String("?") : String(c.volt.c_str()) + " V", kBtnX[1], 82, kBold, kInk);
+  centred(c.amp.empty() ? String("") : String(c.amp.c_str()) + " A", kBtnX[1], 101, kBold, kInk);
+  if (held) {
+    lv_obj_t* b = box(10, 134, 300, 60, 14, kRed);
+    lv_obj_set_style_bg_grad_color(b, col(kRedDeep), 0);
+    lv_obj_set_style_bg_grad_dir(b, LV_GRAD_DIR_VER, 0);
+    centred(String(ICON_PLAY) + "  " + tx->startWord, kW / 2, 150, kTitle, kWhite);
+  } else {
+    holdKey(0, 134, 60, tx->holdWord, ICON_OK, tx->done);
+    holdKey(1, 134, 60, tx->holdWord, ICON_PLAY, tx->startWord, kDriveAfterMs);
+  }
+  String label[3] = {String(tx->chargerWord) + " L", "", String(tx->chargerWord) + " R"};   // a tap in the middle: nothing
   Pill style[3] = {Pill::Primary, Pill::Primary, Pill::Primary};
   pills(label, style);
 }
@@ -602,25 +635,33 @@ static void togglePlanning() {
 }
 
 // Manual drive, while connected. Short: left = left motor, middle = direction, right =
-// right motor (settings only). Middle held (> 0.4 s) = drive while held. Left held 1.5 s,
-// or 2 minutes without a press = done: back to the home screen, planning as before.
+// right motor (settings only). Middle held (> 0.4 s) = drive while held. Right held 1.5 s =
+// to the charger (HANDM. LADER): there left / right choose the charger's side and middle held
+// = Start held. Left held 1.5 s, or 2 minutes without a press = done: back to the home
+// screen, planning as before.
 static Result manualSession(Robot& r) {
   Result res = r.enterManual();
   if (res != Result::Ok) return res;
   bool drive = false;
-  drawManual(r.manualState(), drive);
+  auto draw = [&r, &drive] {
+    if (r.inCharger()) drawCharger(r.chargerState(), drive);
+    else drawManual(r.manualState(), drive);
+  };
+  draw();
   uint32_t down[3] = {0, 0, 0}, last = millis(), driveSince = 0;
   m5::Button_Class* btn[3] = {&M5.BtnA, &M5.BtnB, &M5.BtnC};
   for (;;) {
     M5.update();
     if (!r.linked()) return Result::ConnectFailed;
+    bool there = r.inManual() || r.inCharger();
     for (int i = 0; i < 3; i++)
       if (btn[i]->wasPressed()) { down[i] = millis(); last = down[i]; }
     // middle held: drive while it stays down
     // The screen first, then the key: the robot drives only while "held" repeats every 100 ms
     // after the key went down, so nothing may come between the two.
-    if (!drive && down[1] && M5.BtnB.isPressed() && millis() - down[1] >= kDriveAfterMs && r.inManual()) {
-      drawManual(r.manualState(), true);
+    if (!drive && down[1] && M5.BtnB.isPressed() && millis() - down[1] >= kDriveAfterMs && there) {
+      drive = true;
+      draw();
       drive = r.driveBegin() == Result::Ok;
       driveSince = millis();
     }
@@ -629,18 +670,24 @@ static Result manualSession(Robot& r) {
       drive = false;
       down[1] = 0;
       last = millis();
-      drawManual(r.manualState(), drive);
+      draw();
     }
     if (drive) { r.driveHold(20); continue; }
+    if (holdFired(M5.BtnA, down[0])) return r.exitManual();   // left held = done
+    if (!r.inCharger() && holdFired(M5.BtnC, down[2])) {        // right held = to the charger
+      down[2] = 0;
+      res = r.enterCharger();
+      if (res != Result::Ok) return res;
+      draw();
+    }
     for (int i = 0; i < 3; i++) {
-      if (i == 0 && holdFired(M5.BtnA, down[0])) return r.exitManual();   // left held = done
       if (!btn[i]->wasReleased() || !down[i]) continue;
       down[i] = 0;
-      Key k = i == 0 ? Key::Soft1 : i == 1 ? Key::Soft2 : Key::Soft3;
-      r.manualKey(k);
-      drawManual(r.manualState(), drive);
+      if (r.inCharger() && i == 1) continue;   // nothing under the middle there
+      r.manualKey(i == 0 ? Key::Soft1 : i == 1 ? Key::Soft2 : Key::Soft3);
+      draw();
     }
-    if (millis() - last > 120000 || !r.inManual()) return r.exitManual();
+    if (millis() - last > 120000 || !there) return r.exitManual();
     r.idle(20);
   }
 }

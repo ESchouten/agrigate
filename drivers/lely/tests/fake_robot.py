@@ -118,6 +118,7 @@ class FakeRobot:
         # manual drive (HANDBEDIENING, seen 2026-11-05): soft keys toggle, Start held = drive
         self.left = self.right = False
         self.forward = True
+        self.charger_side = "L"   # HANDM. LADER: the side the robot keeps
         self.stopped = False       # a running route was stopped with Start/Stop
         self.stop_asks = stop_asks # Stop during a route asks "route afmaken?" (seen 2026-11-11)
         self.silent_pins = silent_pins  # this many PIN requests get no answer (a link that came up silent)
@@ -201,7 +202,9 @@ class FakeRobot:
             f += text(3, 28, "INSTELLINGEN", 1) + text(14, 4, "RealTime Klok") + text(22, 4, "Taal") + text(30, 4, "Gyroscoop")
         elif self.mode == "charger":   # HANDM. LADER as seen 2026-11-11: L / R on the bottom row like a question
             f += text(3, 25, "HANDM. LADER", 1) + text(22, 40, "13.5 V") + text(30, 40, "0.1 A")
+            f += [can([3, 33, 51, 0, 12, 42, 1]), can([3, 33, 51, 85, 12, 42, 1])]
             f += text(54, 18, "L") + text(54, 103, "R")
+            f += [can([3, 37, 52, 1, 11, 41, 2]) if self.charger_side == "L" else can([3, 37, 52, 86, 11, 41, 2])]
         elif self.mode == "question":
             f += text(3, 28, t["menu"], 1) + text(14, 4, t["question"])
             f += text(54, 15, t["yes"]) + text(54, 97, t["no"])
@@ -277,7 +280,7 @@ class FakeRobot:
                 self._images_announced = True
                 self._send(can([5, 2, 1, 52]), *[can([5, 6, i, i]) for i in range(52)],
                            can([5, 4, 0] + list(self.version[:5])), can([5, 4, 1] + list(self.version[5:9])), can([5, 2, 0, 0]))
-        if ln == 4 and self.mode == "manual" and KEY.get(key) == "start_stop":
+        if ln == 4 and self.mode in ("manual", "charger") and KEY.get(key) == "start_stop":
             self.drive_events.append(ev)
             return
         if ln != 4 or ev != 0 or key not in KEY:
@@ -329,8 +332,15 @@ class FakeRobot:
                 self._send(can([3, 37, 52, 86, 11, 41, 2]))
             elif k == "back":
                 self.mode = "menu"
-            if k != "back":
+            elif k == "enter":   # assumed (Lely's manual: the next menu after manual driving)
+                self.mode = "charger"
+            if k not in ("back", "enter"):
                 return
+        elif self.mode == "charger":   # side: L / R, kept by the robot (Briek); Esc assumed back to manual
+            if k in ("soft1", "soft3"):
+                self.charger_side = "L" if k == "soft1" else "R"
+            elif k == "back":
+                self.mode = "manual"
         elif self.mode == "notice" and k == "back":
             self.mode = "home"
         elif self.mode == "submenu" and k == "back":

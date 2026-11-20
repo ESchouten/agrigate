@@ -119,6 +119,21 @@ int main(int argc, char** argv) {
           res = r.exitManual();
         }   // manual-drop: disconnect while driving, which must still send "up"
       }
+    } else if (cmd == "charger" || cmd == "charger-finish") {   // M5: right held in manual control
+      res = r.enterCharger();
+      auto show = [&r](const char* when) {
+        ChargerState c = r.chargerState();
+        fprintf(stderr, "CHARGER %s left=%d right=%d volt=%s amp=%s\n", when, c.left, c.right, c.volt.c_str(), c.amp.c_str());
+      };
+      if (res == Result::Ok) show("start");
+      if (res == Result::Ok) res = r.manualKey(Key::Soft3);
+      if (res == Result::Ok) show("R");
+      if (res == Result::Ok) res = r.driveBegin();
+      if (res == Result::Ok) {
+        r.driveHold(250);
+        r.driveEnd();
+        if (cmd == "charger") res = r.exitManual();   // charger-finish: finish() leaves it
+      }
     } else if (cmd == "keys" || cmd == "keys-drop") {   // raw panel keys, like the app's panel screen: s=start/stop e=enter b=back u/d
       for (const char* k = argv[4]; *k; k++)
         r.press(*k == 's' ? Key::StartStop : *k == 'e' ? Key::Enter : *k == 'b' ? Key::Back : *k == 'u' ? Key::Up : Key::Down);

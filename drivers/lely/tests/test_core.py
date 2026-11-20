@@ -260,6 +260,16 @@ case("submenu left open: planning switched from there", {"planning": False, "mod
 case("charger control (L / R like a question): nothing pressed", {"planning": False, "mode": "charger"}, ("route", "A"),
      ok=lambda r, e: r.pressed == [] and "RESULT robot is bezig" in e)
 
+# Drive onto the charger (HANDM. LADER, Briek 2026-11-20): one Enter after HANDBEDIENING.
+for cmd in ("charger", "charger-finish"):
+    case(f"{cmd}: manual control, Enter, side R, Start held, back home, planning on again", {"planning": True}, (cmd,),
+         lambda r, e: r.pressed[1:6] == ["enter", "enter", "soft1", "enter", "soft3"] and r.charger_side == "R"
+         and r.drive_events[0] == 0 and r.drive_events[-1] == 7 and r.mode == "home" and r.planning and "RESULT ok" in e
+         and "CHARGER start left=1 right=0 volt=13.5 amp=0.1" in e and "CHARGER R left=0 right=1" in e)
+case("charger while driving a route: nothing pressed", {"mode": "driving"}, ("charger",), lambda r, e: r.pressed == [] and "RESULT robot is bezig" in e)
+case("next session pays back: HANDM. LADER -> home, planning on", {"planning": False, "mode": "charger"}, ("nofinish",), owed=1,
+     ok=lambda r, e: r.mode == "home" and r.planning and "OWED -1" in e)
+case("status on HANDM. LADER: busy, planning off", {"planning": False, "mode": "charger"}, ok=lambda r, e: "planning=0" in e and "busy=1" in e)
 
 if __name__ == "__main__":
     build()

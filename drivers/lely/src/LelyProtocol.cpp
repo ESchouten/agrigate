@@ -245,6 +245,21 @@ ManualState Screen::manual() const {
   return m;
 }
 
+ChargerState Screen::charger() const {
+  ChargerState c;
+  ManualState m = manual();   // the same inverted boxes at the bottom
+  c.left = m.left;
+  c.right = m.right;
+  for (auto& kv : items_) {
+    std::string t = trim(kv.second);
+    if (t.size() > 2 && t[t.size() - 2] == ' ' && isdigit((unsigned char)t[0])) {
+      if (t.back() == 'V') c.volt = t.substr(0, t.size() - 2);
+      if (t.back() == 'A') c.amp = t.substr(0, t.size() - 2);
+    }
+  }
+  return c;
+}
+
 // ---- screen recognition by layout ---------------------------------------------------
 int Screen::rowItems(int y0, int y1, int x0, int x1) const {
   int n = 0;
@@ -329,6 +344,11 @@ bool Screen::isQuestion() const {
   return left == 1 && right == 1 && mid == 0;
 }
 
+bool Screen::isCharger() const {
+  return !isHome() && rowItems(52, 56, 0, 40) == 1 && rowItems(52, 56, 41, 59) == 0 && rowItems(52, 56, 60, 127) == 1 &&
+         !charger().volt.empty();
+}
+
 bool Screen::isSplash() const {   // seen 2026-11-14: op 1, image 10 at 0,0, nothing else
   auto it = images_.find({0, 0});
   return it != images_.end() && it->second == 10 && items_.empty();
@@ -366,7 +386,7 @@ Status parseStatus(const Screen& s) {
   st.driving = s.isDriving();
   st.stopQuestion = s.isStopQuestion();
   st.planning = s.planning();
-  if (st.planning < 0 && (s.isRouteMenu() || s.isManual())) st.planning = 0;   // only reachable with planning OFF
+  if (st.planning < 0 && (s.isRouteMenu() || s.isManual() || s.isCharger())) st.planning = 0;   // only reachable with planning OFF
   st.busy = !(s.isHome() || s.isRouteMenu());
   for (auto& l : s.lines())
     if (l.size() >= 10 && l[2] == ':' && l[5] == ':' && st.clock.empty()) st.clock = l.substr(0, 8);

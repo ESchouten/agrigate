@@ -280,11 +280,11 @@ Result Robot::connect() {
 void Robot::payBack() {
   int want = owed_;
   planningAtConnect_ = want;   // finish() of this session restores the same state
-  bool safe = screen.isHome() || screen.isRouteMenu() || screen.isMainMenu() || screen.isManual();
+  bool safe = screen.isHome() || screen.isRouteMenu() || screen.isMainMenu() || screen.isManual() || screen.isCharger();
   if (!safe) { say(tr("tijdpad nog niet hersteld: robot is bezig", "planning not restored yet: robot is busy")); return; }
   say(tr("vorige verbinding viel weg: robot terug zoals hij was", "previous link dropped: putting the robot back as it was"));
   std::string e = err_;
-  if (screen.isManual()) { manualWasOn_ = false; exitManual(); }
+  if (screen.isManual() || screen.isCharger()) { manualWasOn_ = false; exitManual(); }
   if (screen.isRouteMenu() || screen.isMainMenu()) goHome();
   if (screen.isHome() && screen.planning() >= 0 && screen.planning() != want) switchPlanning(want == 1);
   track();
@@ -355,7 +355,9 @@ Result Robot::setPlanning(bool on) {
 Result Robot::finish() {
   if (!connected_ || !t_.linkUp()) return Result::Ok;
   driveEnd();
-  if (screen.isManual()) exitManual();
+  // HANDM. LADER only when this session (or the panel's keys) took the robot there: one found
+  // there at connect may be on its way onto the charger.
+  if (screen.isManual() || (screen.isCharger() && owed_ >= 0)) exitManual();
   if (screen.isRouteMenu() || screen.isMainMenu()) goHome();
   if (planningAtConnect_ < 0 || !screen.isHome()) return Result::Ok;
   int now = screen.planning();
@@ -515,16 +517,33 @@ Result Robot::enterManual() {
   return Result::Ok;
 }
 
+Result Robot::enterCharger() {
+  if (inCharger()) return Result::Ok;
+  if (!inManual()) {
+    Result r = enterManual();
+    if (r != Result::Ok) return r;
+  }
+  tap(Key::Enter, [](const Screen& s) { return s.isCharger(); });
+  if (!inCharger()) {
+    std::string e = tr("laderscherm niet gezien", "charger screen not seen");
+    exitManual();
+    return fail(Result::Unexpected, e);
+  }
+  say(tr("naar de lader", "to the charger"));
+  return Result::Ok;
+}
+
 Result Robot::manualKey(Key k) {
   if (k != Key::Soft1 && k != Key::Soft2 && k != Key::Soft3) return fail(Result::Unexpected, tr("alleen softkeys", "soft keys only"));
-  if (!inManual()) return fail(Result::Busy, tr("niet in handbediening; niets gedrukt", "not in manual control; nothing pressed"));
+  bool side = inCharger() && k != Key::Soft2;   // the charger's side
+  if (!inManual() && !side) return fail(Result::Busy, tr("niet in handbediening; niets gedrukt", "not in manual control; nothing pressed"));
   if (held_) return fail(Result::Busy, tr("rijdt; eerst loslaten", "driving; release first"));
   tap(k, [](const Screen&) { return false; }, 300);
   return Result::Ok;
 }
 
 Result Robot::driveBegin() {
-  if (!inManual()) return fail(Result::Busy, tr("niet in handbediening; niets gedrukt", "not in manual control; nothing pressed"));
+  if (!inManual() && !inCharger()) return fail(Result::Busy, tr("niet in handbediening; niets gedrukt", "not in manual control; nothing pressed"));
   if (driving()) return Result::Ok;
   holdBegin(Key::StartStop);
   say(tr("rijden: start ingedrukt", "drive: start pressed"));

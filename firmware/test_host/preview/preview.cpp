@@ -69,6 +69,9 @@ static void all() {
   drawManual(m, false); ui::fillHold(0, 1100); shot("7b-manual-holding");
   m.right = 1;
   drawManual(m, true); shot("8-driving");
+  ChargerState c; c.left = 1; c.volt = "12.9"; c.amp = "0.0";
+  drawCharger(c, false); shot("8b-charger");
+  drawCharger(c, true); shot("8c-charger-start");
   PinEditor e("4321"); e.next();
   drawPin(e, tx->enterPin); shot("6-pin");
   drawSettings(); shot("9-settings");

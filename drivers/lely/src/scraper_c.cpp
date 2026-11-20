@@ -84,8 +84,9 @@ std::string jsonString(const std::string& s) {
 }
 
 // [manual]: the HANDBEDIENING screen's motors and direction (1 / 0 / -1 unknown), null elsewhere.
+// [charger]: HANDM. LADER's side (left / right 1 / 0) and the battery's volt and amp, null elsewhere.
 std::string statusJson(const Status& st, const Screen& scr, int sync, bool cancellable) {
-  std::string highlighted = scr.isManual() ? "" : scr.highlighted();   // there the boxes are the motors
+  std::string highlighted = scr.isManual() || scr.isCharger() ? "" : scr.highlighted();   // there the boxes are settings
   std::string screen = scr.text();
   std::string o = "{";
   o += "\"planning\":" + std::to_string(st.planning);
@@ -110,6 +111,13 @@ std::string statusJson(const Status& st, const Screen& scr, int sync, bool cance
          ",\"forward\":" + std::to_string(m.forward) + "}";
   } else {
     o += ",\"manual\":null";
+  }
+  if (scr.isCharger()) {
+    ChargerState c = scr.charger();
+    o += ",\"charger\":{\"left\":" + std::to_string(c.left) + ",\"right\":" + std::to_string(c.right) +
+         ",\"volt\":" + jsonString(c.volt) + ",\"amp\":" + jsonString(c.amp) + "}";
+  } else {
+    o += ",\"charger\":null";
   }
   return o + "}";
 }

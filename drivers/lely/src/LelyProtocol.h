@@ -64,6 +64,9 @@ class Parser {
 // HANDBEDIENING screen (seen 2026-11-05): the L and R boxes are inverted (op 37) while that
 // motor is on; the image in the middle box is 16 forward, 15 backward. 1 / 0, -1 unknown.
 struct ManualState { int left = -1, right = -1, forward = -1; };
+// HANDM. LADER, the charger approach (seen 2026-11-11, photo 2026-11-20): the charger's side as
+// an inverted L or R box (1 / 0), the battery's voltage and current as the robot shows them.
+struct ChargerState { int left = 0, right = 0; std::string volt, amp; };
 
 class Screen {
  public:
@@ -78,6 +81,7 @@ class Screen {
   std::string valueAt(int y) const;           // a row's text right of its label (x > 8)
   int planning() const;                       // 1 = ON, 0 = OFF, -1 = not shown
   ManualState manual() const;                 // only meaningful on the HANDBEDIENING screen
+  ChargerState charger() const;               // only meaningful on the HANDM. LADER screen
   // The robot's own language, from words on the screen: "nl", "en", or "" if not known
   // (another language, or a screen without known words). Only for choosing the language
   // of a user interface: screen recognition never depends on it.
@@ -97,6 +101,9 @@ class Screen {
   bool isStopQuestion() const;
   bool isSplash() const;      // the full-screen image (10) shown for a second at every connect
   bool isManual() const;      // HANDBEDIENING: L/R boxes and the direction image at the bottom
+  // HANDM. LADER (one Enter after HANDBEDIENING): one answer left and right on the bottom row
+  // (L / R, the charger's side) and a voltage ("12.9 V"), which no question has.
+  bool isCharger() const;
   bool isDriving() const;     // ROUTE->TIJDPAD: title with "->" on top, no clock, label rows at x = 4
   uint32_t version() const { return version_; }   // counts redraws (not the clock and battery)
   // The robot draws each screen in a fixed order (captures/): true once the last piece of the
