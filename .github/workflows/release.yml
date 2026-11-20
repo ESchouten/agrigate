@@ -246,6 +246,7 @@ jobs:
           APT_SIGNING_KEY: ${{ secrets.APT_SIGNING_KEY }}
         run: |
           test -n "$APT_SIGNING_KEY" || { echo "secret APT_SIGNING_KEY is missing"; exit 1; }
+          command -v apt-ftparchive || sudo apt-get install -y --no-install-recommends apt-utils   # gone from the runner image (2026-11-20)
           mkdir -p site/apt/pool/main site/apt/dists/stable/main/binary-amd64
           cp linux/*.deb site/apt/pool/main/
           cd site/apt
