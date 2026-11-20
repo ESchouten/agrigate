@@ -115,6 +115,18 @@ class FakeRobotTest {
     run { r -> assertEquals(null, r.status().manual) }
   }
 
+  /** Briek 2026-11-20: onto the charger (HANDM. LADER), one Enter after manual control. */
+  @Test fun chargerSideAndBatteryFromTheScreen() {
+    run(FakeRobotOptions(mode = "manual")) { r ->
+      r.press(RobotKey.Enter)
+      assertEquals(ChargerState(left = true, right = false, volt = "13.5", amp = "0.1"), r.status().charger)
+      assertEquals(null, r.status().manual)
+      r.press(RobotKey.Soft3)
+      assertEquals(true, r.status().charger?.right)
+      assertEquals(ChargerState(false, true, "13.5", "0.1"), Manual.readCharger(Manual.write(null, r.status().charger)))
+    }
+  }
+
   @Test fun quickTapStillHoldsBriefly() {
     val l = run(FakeRobotOptions(mode = "manual")) { r -> r.hold(RobotKey.StartStop, CompletableDeferred(Unit)) }
     assertEquals(listOf(0, 7), listOf(l.log.drive.first(), l.log.drive.last()))

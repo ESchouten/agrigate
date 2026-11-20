@@ -69,6 +69,10 @@ Windows, remove the old "Scraper Control" first).
 | Middle | Route B | Drive by hand |
 | Right | Route C | Settings |
 
+Driving by hand: tap left / middle / right = left motor, direction, right motor; hold middle =
+drive; hold right = onto the charger (choose its side with left / right, hold middle = Start);
+hold left = done.
+
 ## How it fits together
 
 | Folder | What |

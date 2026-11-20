@@ -164,7 +164,7 @@ class LelySession(
     return ScraperStatus(
       planning = s.planning, nextRun = s.nextRide, batteryMv = s.batteryMv, activity = s.action,
       route = s.route, busy = s.busy, driving = s.driving, finishQuestion = s.stopQuestion,
-      screen = s.screen, highlighted = s.highlighted, extra = s.manual?.let { Manual.write(it) } ?: emptyMap(),
+      screen = s.screen, highlighted = s.highlighted, extra = Manual.write(s.manual, s.charger),
       cancellable = s.cancellable,
     )
   }

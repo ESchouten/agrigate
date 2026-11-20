@@ -19,6 +19,7 @@ was checked on a real Discovery (November 2026), unless stated otherwise.
 | `await set_planning(True)` | `setPlanning(true)` | schedule (time planning) on/off |
 | `await press("enter")` | `press(Key::Enter)` | one panel key |
 | – (M5, apps) | `enterManual()` / `manualKey(Soft1..3)` / `driveBegin()` · `driveHold(ms)` · `driveEnd()` / `exitManual()` | manual driving, see below; `enterManual()` on "finish the route?" answers Nee first (the user chose to drive the robot back by hand) |
+| – (M5) | `enterCharger()` | onto the charger, see below; `manualKey(Soft1 / Soft3)` = its side, `driveBegin()` = Start |
 | – | `readRoutes(out)` | what routes A–D consist of (only reads) |
 | (in `disconnect()`) | `finish()` | leave the robot as it was found: back to the home screen from a safe menu, schedule as at connect (unless `set_planning` changed it on purpose) |
 | (after every command) | `owedPlanning()` / `setOwedPlanning(v)` | if the link drops before `finish()` could run, the host keeps what the robot is still "owed" (schedule 1/0, -1 = nothing) and hands it to the next session; `connect()` then first puts the robot back. While the robot drives or shows another screen the value stays owed. Apps: per robot, at most 6 hours old; M5: in RTC memory (survives a restart, not a power cut), 6 hours |
@@ -76,6 +77,20 @@ otherwise).
    event 7 (up) = stop. **When the connection drops while driving, the robot stops at once and turns its motors off** (tested 2026-11-11); it stays on the manual
    screen.
 5. Back: Esc → route menu → Esc → home screen, schedule back as it was.
+
+### Onto the charger (charger approach, NOT yet seen at the robot)
+From the robot maker's manual: the menu after manual driving, for a robot 1.5–3 m in front of
+its charger, pointing at it. `enterCharger()`: manual driving (above), then **Enter**.
+1. The screen: title, battery voltage and current (`12.9 V`, `0.0 A`), **Soft1** = charger on
+   the left, **Soft3** = on the right (inverted box = the chosen side; the robot keeps it).
+2. **Start/Stop** starts the approach, held like the manual drive key (`driveBegin()`). The
+   manual says the robot then drives onto the charger and stops by itself.
+3. Back: Esc until the home screen (`exitManual()`), schedule back as it was. `finish()` only
+   leaves this screen when the session went there itself: a robot found there at connect may be
+   on its way.
+
+To check at the robot: that Enter on the manual screen opens it, what Esc does there, whether
+Start must be held or a tap starts the approach, and what the screen shows while it drives.
 
 ## 2. Transport
 
@@ -160,7 +175,8 @@ Recognition by shape (`Screen::isHome()` etc., works in every language):
 | stop question | bottom row (y 54) with three words: left (x 15, Soft1 = Yes), middle (x 49, Soft2 = Pause) and right (x 97, Soft3 = No); a box "HAND" above the middle one |
 | manual | arrow picture 15/16 in the middle box at the bottom |
 | driving | title with `->` at the top (y ≤ 5), no clock, labels at x 4 (y 14…46): only `stop_route` presses here |
-| other | none of the above: nothing is pressed (seen, for example: the charger's manual screen) |
+| charger approach | one word left and right on the bottom row (L / R) and a voltage `12.9 V`; the inverted box is the charger's side |
+| other | none of the above: nothing is pressed |
 
 The **robot's language** (`Screen::language()`, `"language"` in the status JSON: `nl`, `en` or
 empty) does come from words. It is only used for the language of a user interface (the M5 follows

@@ -93,7 +93,7 @@ class Robot {
   Result answerStop(bool finish);
   Result setPlanning(bool on);     // the user's choice: finish() keeps the new state
   // Before disconnecting: leave the robot as it was found. Back to the home screen if it is
-  // in a safe menu (route menu, main menu, HANDBEDIENING) and the planning back to what it
+  // in a safe menu (route menu, main menu, HANDBEDIENING, HANDM. LADER) and the planning back to what it
   // was at connect. Touches nothing while the robot drives or shows another screen.
   Result finish();
   Result press(Key k);
@@ -119,10 +119,18 @@ class Robot {
   bool inManual() const;
   // Soft1 = left motor on/off, Soft2 = forward/backward, Soft3 = right motor on/off.
   // Settings only, nothing moves. Busy if HANDBEDIENING is not on the screen.
+  // On HANDM. LADER: Soft1 / Soft3 = the charger is on the left / right.
   Result manualKey(Key k);
+  // HANDM. LADER, to drive onto the charger (Briek 2026-11-20, the camera's depth is poor for
+  // the charge strips): one Enter after HANDBEDIENING (enterManual() first if needed). There
+  // the robot shows the charger's side (L / R, kept by the robot) and the battery's voltage
+  // and current; Start/Stop starts the approach (driveBegin()). exitManual() leaves it too.
+  Result enterCharger();
+  bool inCharger() const { return screen.isCharger(); }
+  ChargerState chargerState() const { return screen.charger(); }
   // A key held as on the robot's own panel: holdBegin sends "down", driveHold keeps it held
   // (repeat every 100 ms) and must be called in a loop, holdEnd sends "up". The robot drives
-  // while Start/Stop is held in manual control: driveBegin checks that screen first.
+  // while Start/Stop is held in manual control: driveBegin checks that screen (or HANDM. LADER) first.
   // disconnect() and exitManual() also end a hold.
   void holdBegin(Key k);
   void holdEnd();
@@ -132,7 +140,7 @@ class Robot {
   bool driving() const { return held_ == (int)Key::StartStop; }
   ManualState manualState() const { return screen.manual(); }
   bool linked() { return t_.linkUp(); }
-  // Leave HANDBEDIENING: Esc back to the home screen (via the main menu if needed) and
+  // Leave HANDBEDIENING or HANDM. LADER: Esc back to the home screen (via the main menu if needed) and
   // switch the planning back on if enterManual switched it off.
   Result exitManual();
   void idle(uint32_t ms);          // stay connected: handle incoming data + keep-alive

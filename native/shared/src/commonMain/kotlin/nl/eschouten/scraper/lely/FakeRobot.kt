@@ -86,6 +86,7 @@ class FakeRobotLink(
   private var left = false
   private var right = false
   private var forward = true
+  private var chargerSide = "L" // HANDM. LADER: the side the robot keeps
   private var gotV1: ByteArray? = null
   private var imagesAnnounced = false // the ready after the image count asks for the images, not the screen
   private val buf = mutableListOf<Byte>()
@@ -218,6 +219,13 @@ class FakeRobotLink(
         f += text(3, 43, "MELDING") + text(22, 1, "Route is niet volgens\rspecificaties!!\r-minder betrouwbaar\r-zie routeanalyse\r-zie handleiding")
       }
       "question" -> f += text(3, 28, t.menu, 1) + text(14, 4, t.question) + text(54, 15, t.yes) + text(54, 97, t.no)
+      // HANDM. LADER as seen 2026-11-11: L / R on the bottom row like a question, the side inverted
+      "charger" -> {
+        f += text(3, 25, "HANDM. LADER", 1) + text(22, 40, "13.5 V") + text(30, 40, "0.1 A")
+        f += cr(3, 33, 51, 0, 12, 42, 1); f += cr(3, 33, 51, 85, 12, 42, 1)
+        f += text(54, 18, "L") + text(54, 103, "R")
+        f += if (chargerSide == "L") cr(3, 37, 52, 1, 11, 41, 2) else cr(3, 37, 52, 86, 11, 41, 2)
+      }
       else -> {
         f += text(3, 20, t.drive.first, 1) + text(14, 4, t.drive.second)
         f += text(14, 90, "1") + text(22, 90, "11") + text(30, 48, "WANDVOLG_DST")
@@ -245,7 +253,7 @@ class FakeRobotLink(
     } else if (b[0] == 5 && b[1] == 3) { if (imagesAnnounced) imagesAnnounced = false else draw() }
     val ev = b[0] or (b[1] shl 8)
     val key = b[2] or (b[3] shl 8)
-    if (ln == 4 && mode == "manual" && KEYS[key] == "start_stop") {
+    if (ln == 4 && (mode == "manual" || mode == "charger") && KEYS[key] == "start_stop") {
       log.drive += ev
       return
     }
@@ -285,8 +293,14 @@ class FakeRobotLink(
           "soft2" -> { forward = !forward; send(listOf(cr(3, 36, 53, 58, if (forward) 16 else 15))) }
           "soft3" -> { right = !right; send(listOf(cr(3, 37, 52, 86, 11, 41, 2))) }
           "back" -> mode = "menu"
+          "enter" -> mode = "charger" // assumed (Lely's manual: the next menu after manual driving)
         }
-        if (k != "back") return
+        if (k != "back" && k != "enter") return
+      }
+      // side L / R, kept by the robot (Briek); Esc assumed back to manual control
+      "charger" -> when (k) {
+        "soft1", "soft3" -> chargerSide = if (k == "soft1") "L" else "R"
+        "back" -> mode = "manual"
       }
       "notice" -> if (k == "back") mode = "home"
       "question" -> if (k == "soft1" || k == "soft3") {
