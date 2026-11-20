@@ -245,7 +245,7 @@ fun TextInputDialog(d: TextDialog, help: String? = null, onDismiss: () -> Unit, 
           Spacer(Modifier.height(16.dp))
         }
         OutlinedTextField(
-          v, { v = if (d.secret) it.filter(Char::isDigit) else it.take(24) },
+          v, { v = if (d.secret) it.filter(Char::isDigit) else it },
           Modifier.fillMaxWidth().testTag("dialog-field"),
           placeholder = { Text(d.hint) },
           singleLine = true,
