@@ -21,9 +21,15 @@ Python script.
 
 ## Supported robots
 
-| Robot | Connection | Driver |
-|---|---|---|
-| Lely Discovery | Bluetooth LE, or classic Bluetooth on older robots (not on iOS) | [`drivers/lely`](drivers/lely) |
+| Robot | Kind | Connection | Driver |
+|---|---|---|---|
+| Lely Discovery | Manure scraper | Bluetooth LE, or classic Bluetooth on older robots (not on iOS) | [`drivers/lely`](drivers/lely) |
+| Lely Astronaut | Milking robot, read only | The farm's T4C server on the local network | [`drivers/t4c`](drivers/t4c/API.md) |
+| Fullwood M²erlin | Milking robot, read only | The farm's FULLSENSE server on the local network | [`drivers/fullsense`](drivers/fullsense/API.md) |
+
+Milking robots are new: their state, alarms and figures can be read with Python (`farm.py`),
+not yet in the apps or on the buttons, and the drivers have not met a real server yet (see each
+driver's page).
 
 ## Install
 
@@ -77,15 +83,16 @@ hold left = done.
 
 | Folder | What |
 |---|---|
-| `core/` | The robot API (`scraper_c.h`), the same for every robot |
-| `drivers/` | One folder per robot type: everything specific to that robot |
+| `core/` | The robot APIs, one per kind of robot and the same for every make: `scraper_c.h` (manure scrapers), `robot_c.h` with `milking_c.h` (robots read through the farm's server) |
+| `drivers/` | One folder per robot type or server software: everything specific to it |
 | `firmware/` | The M5Stack buttons (PlatformIO) |
 | `native/` | The apps: shared Kotlin, Compose for Android and desktop, SwiftUI for iOS ([README](native/README.md)) |
-| `python/` | The Python library `scraper_control` and the command line `scraper.py` |
+| `python/` | The Python library `scraper_control` and the command lines `scraper.py` and `farm.py` |
 | `tools/` | Build secrets |
 
-Every client only provides the link to the robot (bytes in, bytes out); the driver says which
-kind of link it needs. A new robot type is a new folder in `drivers/`.
+Every client only provides the link to the robot (bytes in, bytes out, or a request and its
+answer); the driver says which kind of link it needs. A new robot type is a new folder in
+`drivers/`, and a new kind of robot one more API in `core/`: [docs/DRIVERS.md](docs/DRIVERS.md).
 
 ## Build
 
@@ -103,7 +110,7 @@ connect.
 
 ```bash
 python3 tests/test_firmware.py                    # the buttons' firmware on a computer
-for t in drivers/*/tests/test_*.py; do python3 $t; done  # each driver against its simulated robot
+for t in drivers/*/tests/test_*.py; do python3 $t; done  # each driver against its simulated robot or server
 cd native && ./gradlew :shared:jvmTest :composeApp:jvmTest
 ```
 
