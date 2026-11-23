@@ -36,7 +36,13 @@ int Session::read(void (*start)(Session&)) {
 
 void Session::next() {   // nothing is open: log in first, then the read itself
   loggingIn_ = headers.empty();
-  if (loggingIn_) driver.login(*this); else start_(*this);
+  if (!loggingIn_) return start_(*this);
+  driver.login(*this);
+  // a login that needs no request (a key the user gave, set straight into the headers): read now
+  if (queue_.empty() && result_ == ROBOT_OK && !headers.empty()) {
+    loggingIn_ = false;
+    start_(*this);
+  }
 }
 
 std::string Session::request() const {
@@ -83,7 +89,7 @@ namespace robot {
 
 // Every kind of robot a driver can know: a new kind adds its line here, its read to Driver and
 // its header to core/.
-const struct { const char* name; void (*Driver::*read)(Session&); } kKinds[] = {{"milking", &Driver::milking}};
+const struct { const char* name; void (*Driver::*read)(Session&); } kKinds[] = {{"milking", &Driver::milking}, {"herd", &Driver::herd}};
 
 int32_t copyOut(const std::string& s, char* buf, int32_t size) {
   if (buf && size > 0) {

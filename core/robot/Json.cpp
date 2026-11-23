@@ -1,5 +1,6 @@
 #include "Json.h"
 
+#include <cctype>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -114,6 +115,15 @@ Json Json::parse(const std::string& text, bool* ok) {
 
 const Json& Json::operator[](const char* key) const {
   for (const auto& m : members) if (m.first == key) return m.second;
+  // servers differ in case for the same field (T4C's description says "data", a real T4C answers
+  // "Data"): a key not found as written is looked up again ignoring ASCII case
+  for (const auto& m : members) {
+    const char* k = key;
+    size_t i = 0;
+    for (; i < m.first.size() && k[i]; i++)
+      if (tolower((unsigned char)m.first[i]) != tolower((unsigned char)k[i])) break;
+    if (i == m.first.size() && !k[i]) return m.second;
+  }
   return kNull;
 }
 

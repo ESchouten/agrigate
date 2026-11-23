@@ -18,6 +18,7 @@ struct Json {
   /** Null (and [ok] false) for text that is not JSON. */
   static Json parse(const std::string& text, bool* ok = nullptr);
 
+  /** The member [key]; exactly as written, else ignoring ASCII case. */
   const Json& operator[](const char* key) const;
   const Json& at(size_t index) const;
   bool isNull() const { return type == Null; }
