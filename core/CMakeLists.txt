@@ -10,11 +10,12 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 set(SCRAPER_DRIVER "" CACHE STRING "robot driver (a folder in drivers/)")
 if(SCRAPER_DRIVER STREQUAL "")
-  file(GLOB FOUND LIST_DIRECTORIES true ${CMAKE_CURRENT_LIST_DIR}/../drivers/*/src)
+  file(GLOB FOUND ${CMAKE_CURRENT_LIST_DIR}/../drivers/*/src/scraper_c.cpp)   # the scraper drivers
   list(LENGTH FOUND N)
   if(NOT N EQUAL 1)
     message(FATAL_ERROR "set SCRAPER_DRIVER to a folder in drivers/")
   endif()
+  get_filename_component(FOUND ${FOUND} DIRECTORY)
   get_filename_component(FOUND ${FOUND} DIRECTORY)
   get_filename_component(SCRAPER_DRIVER ${FOUND} NAME)
 endif()

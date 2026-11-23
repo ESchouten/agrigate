@@ -44,8 +44,8 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install cryptography
-      - name: Every robot driver's own tests (against its simulated robot), side by side
-        run: ls drivers/*/tests/test_*.py | xargs -P 4 -n 1 python
+      - name: Every robot driver's own tests (against its simulated robot) and the farm service's, side by side
+        run: ls drivers/*/tests/test_*.py tests/test_farm_server.py | xargs -P 4 -n 1 python
 
   firmware:
     if: ${{ !cancelled() && (github.event_name == 'workflow_dispatch' || needs.changes.outputs.firmware == 'true') }}
