@@ -37,12 +37,12 @@ def server() -> FakeFarm:
 
 def read(farm, password="geheim"):
     with Farm("fullsense", farm.address, "erik", password) as f:
-        return f.milking()["robots"]
+        return f.milk()["robots"]
 
 
 def test_driver_is_listed():
     d = next(d for d in drivers() if d["id"] == "fullsense")
-    assert d["kinds"] == ["milking"] and d["link"]["port"] == 12080
+    assert d["kinds"] == ["milk"] and d["link"]["port"] == 12080
 
 
 def test_robots_states_and_alarm():
@@ -99,16 +99,16 @@ def test_wrong_password():
 def test_a_new_login_when_it_ran_out():
     farm = server()
     with Farm("fullsense", farm.address, "erik", "geheim") as f:
-        f.milking()
+        f.milk()
         farm.token = "login-2"
-        assert len(f.milking()["robots"]) == 3 and farm.count(LOGIN) == 2
+        assert len(f.milk()["robots"]) == 3 and farm.count(LOGIN) == 2
 
 
 def test_a_missing_status_is_left_out():
     farm = server()
     del farm.routes["GET /api/MerlinStatus/GetMerlinStatus?merlinStatusId=s-1"]
     with Farm("fullsense", farm.address, "erik", "geheim") as f:
-        robots = f.milking()["robots"]
+        robots = f.milk()["robots"]
         assert robots[0]["state"] == "unknown" and robots[1]["state"] == "assistance" and "HTTP 404" in f.notes
 
 

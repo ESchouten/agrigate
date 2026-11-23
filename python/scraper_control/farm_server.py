@@ -75,7 +75,7 @@ class FarmService:
         password = s.get("password") or os.environ.get("FARM_SERVER_PASSWORD", "")
         try:
             with self._farm_cls(s["driver"], s["address"], s.get("user", ""), password) as farm:
-                animals = farm.herd()["animals"]
+                animals = farm.cow()["animals"]
             with self._lock:
                 self._herd, self._herd_at, self._herd_error = animals, now_ms(), ""
                 self._by_responder = {a["responder"]: a for a in animals if a.get("responder")}

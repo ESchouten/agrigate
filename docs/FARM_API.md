@@ -8,7 +8,7 @@ nothing in it changes anything on the farm.
 - **Live**, from the robots themselves (`core/live_c.h`): the robot says which cow it identified
   the moment it reads her responder. One listener per robot, so a farm with ten robots works the
   same as one with one. Driver: `lfw`.
-- **The herd**, from the farm's server (`core/herd_c.h`): name, numbers, lactation, days in milk,
+- **The herd**, from the farm's server (`core/cow_c.h`): name, numbers, lactation, days in milk,
   reproduction, inseminations, pregnancy checks. Read again every 5 minutes. Driver: `t4c`.
 
 Each live event and each robot's animal carries the herd's fields next to what the robot said, so
@@ -106,7 +106,7 @@ Every robot with the animal it identified last:
 
 ### `GET /api/animals` and `GET /api/animals/<number | responder | life number>`
 
-The herd as the server knows it (`core/herd_c.h` describes every field), plus `atRobot`:
+The herd as the server knows it (`core/cow_c.h` describes every field), plus `atRobot`:
 `{"robot", "since"}` when the animal is a robot's current animal, else `null`.
 
 ```json

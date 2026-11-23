@@ -1,5 +1,5 @@
-// The herd API (core/herd_c.h) on a session.
-#include "herd_c.h"
+// The herd API (core/cow_c.h) on a session.
+#include "cow_c.h"
 
 #include <algorithm>
 #include <cstdio>
@@ -8,7 +8,7 @@
 #include "Robot.h"
 
 namespace robot {
-namespace herd {
+namespace cow {
 namespace {
 
 std::string number(double v) {
@@ -79,19 +79,19 @@ std::string Herd::json() const {
   return o + "]}";
 }
 
-}  // namespace herd
+}  // namespace cow
 }  // namespace robot
 
 extern "C" {
 
-int32_t herd_read(robot_session* s) {
-  if (!s->driver.herd) return ROBOT_UNSUPPORTED;
+int32_t cow_read(robot_session* s) {
+  if (!s->driver.cow) return ROBOT_UNSUPPORTED;
   return s->read([](robot::Session& session) {
-    session.herd = {};
-    session.driver.herd(session);
+    session.cow = {};
+    session.driver.cow(session);
   });
 }
 
-int32_t herd_json(robot_session* s, char* buf, int32_t size) { return robot::copyOut(s->herd.json(), buf, size); }
+int32_t cow_json(robot_session* s, char* buf, int32_t size) { return robot::copyOut(s->cow.json(), buf, size); }
 
 }  // extern "C"

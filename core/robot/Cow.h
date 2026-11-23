@@ -1,4 +1,4 @@
-// A farm's herd as a driver fills it in: the data behind core/herd_c.h, where every field is
+// A farm's herd as a driver fills it in: the data behind core/cow_c.h, where every field is
 // described.
 #pragma once
 
@@ -6,7 +6,7 @@
 #include <vector>
 
 namespace robot {
-namespace herd {
+namespace cow {
 
 namespace production {
 constexpr const char* Milking = "milking";
@@ -50,5 +50,5 @@ struct Herd {
  *  a farm's midnight lies within 12 hours of UTC. "" for anything else. */
 std::string day(const std::string& when);
 
-}  // namespace herd
+}  // namespace cow
 }  // namespace robot

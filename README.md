@@ -87,7 +87,7 @@ hold left = done.
 
 | Folder | What |
 |---|---|
-| `core/` | The robot APIs, one per kind of robot and the same for every make: `scraper_c.h` (manure scrapers), `robot_c.h` with `milking_c.h` and `herd_c.h` (read through the farm's server), `live_c.h` (what a robot says on the farm network) |
+| `core/` | The robot APIs, one per kind of robot and the same for every make: `scraper_c.h` (manure scrapers), `robot_c.h` with `milk_c.h` and `cow_c.h` (read through the farm's server), `live_c.h` (what a robot says on the farm network) |
 | `drivers/` | One folder per robot type or server software: everything specific to it |
 | `firmware/` | The M5Stack buttons (PlatformIO) |
 | `native/` | The apps: shared Kotlin, Compose for Android and desktop, SwiftUI for iOS ([README](native/README.md)) |

@@ -1,5 +1,5 @@
-// The milking robot API (core/milking_c.h) on a session.
-#include "milking_c.h"
+// The milking robot API (core/milk_c.h) on a session.
+#include "milk_c.h"
 
 #include <cstdio>
 
@@ -7,7 +7,7 @@
 
 namespace robot {
 
-namespace milking {
+namespace milk {
 namespace {
 std::string number(double v) {
   if (v < 0) return "null";
@@ -35,19 +35,19 @@ std::string Farm::json() const {
   return o + "]}";
 }
 
-}  // namespace milking
+}  // namespace milk
 }  // namespace robot
 
 extern "C" {
 
-int32_t milking_read(robot_session* s) {
-  if (!s->driver.milking) return ROBOT_UNSUPPORTED;
+int32_t milk_read(robot_session* s) {
+  if (!s->driver.milk) return ROBOT_UNSUPPORTED;
   return s->read([](robot::Session& session) {
-    session.milking = {};
-    session.driver.milking(session);
+    session.milk = {};
+    session.driver.milk(session);
   });
 }
 
-int32_t milking_json(robot_session* s, char* buf, int32_t size) { return robot::copyOut(s->milking.json(), buf, size); }
+int32_t milk_json(robot_session* s, char* buf, int32_t size) { return robot::copyOut(s->milk.json(), buf, size); }
 
 }  // extern "C"

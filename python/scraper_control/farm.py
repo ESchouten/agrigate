@@ -2,9 +2,9 @@
 
     from scraper_control.farm import Farm
     with Farm("t4c", "192.168.1.10", "user", "password") as farm:
-        for robot in farm.milking()["robots"]:      # core/milking_c.h describes every field
+        for robot in farm.milk()["robots"]:      # core/milk_c.h describes every field
             print(robot["name"], robot["state"])
-        for cow in farm.herd()["animals"]:          # core/herd_c.h
+        for cow in farm.cow()["animals"]:          # core/cow_c.h
             print(cow["number"], cow["name"], cow["reproduction"])
 
 A T4C server also takes the farm's licence key instead of a login: Farm("t4c", address, "", key).
@@ -41,9 +41,9 @@ def _lib():
         L.robot_close.argtypes = [S]
         L.robot_response.argtypes = [S, ctypes.c_int32, ctypes.c_char_p, ctypes.c_int32]
         L.robot_drivers_json.argtypes = text
-        for name in ("robot_request_json", "robot_last_error", "milking_json", "herd_json"):
+        for name in ("robot_request_json", "robot_last_error", "milk_json", "cow_json"):
             getattr(L, name).argtypes = [S] + text
-        for name in ("robot_result", "milking_read", "herd_read"):
+        for name in ("robot_result", "milk_read", "cow_read"):
             getattr(L, name).argtypes = [S]
     return L
 
@@ -81,13 +81,13 @@ class Farm:
     def __exit__(self, *exc) -> None:
         self.close()
 
-    def milking(self) -> dict:
+    def milk(self) -> dict:
         """The farm's milking robots, read now."""
-        return self._read("milking")
+        return self._read("milk")
 
-    def herd(self) -> dict:
-        """The farm's animals as the server knows them, read now (core/herd_c.h)."""
-        return self._read("herd")
+    def cow(self) -> dict:
+        """The farm's animals as the server knows them, read now (core/cow_c.h)."""
+        return self._read("cow")
 
     def _read(self, kind: str) -> dict:
         L = _lib()

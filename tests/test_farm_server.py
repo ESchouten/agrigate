@@ -53,7 +53,7 @@ class FakeFarm:
     def __exit__(self, *a):
         pass
 
-    def herd(self):
+    def cow(self):
         if FakeFarm.fail:
             raise FarmError(1, "")
         return {"animals": HERD}

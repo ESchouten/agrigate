@@ -1,4 +1,4 @@
-// A farm's milking robots as a driver fills them in: the data behind core/milking_c.h, where
+// A farm's milking robots as a driver fills them in: the data behind core/milk_c.h, where
 // every field is described.
 #pragma once
 
@@ -6,7 +6,7 @@
 #include <vector>
 
 namespace robot {
-namespace milking {
+namespace milk {
 
 namespace state {
 constexpr const char* Idle = "idle";
@@ -36,5 +36,5 @@ struct Farm {
   std::string json() const;
 };
 
-}  // namespace milking
+}  // namespace milk
 }  // namespace robot

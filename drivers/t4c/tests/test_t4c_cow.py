@@ -1,6 +1,6 @@
 """Offline tests: the T4C driver with the farm's licence key, as a real T4C server answers
 (checked on T4C 4.22: field names in PascalCase, "ServerEror", ICAR lists in integrationglobal).
-The animals here are made up. Run: python3 drivers/t4c/tests/test_t4c_herd.py"""
+The animals here are made up. Run: python3 drivers/t4c/tests/test_t4c_cow.py"""
 import os, sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -57,11 +57,11 @@ def server() -> FakeFarm:
 
 def herd(farm, key=KEY):
     with Farm("t4c", farm.address, "", key) as f:
-        return {a["number"]: a for a in f.herd()["animals"]}, f.notes
+        return {a["number"]: a for a in f.cow()["animals"]}, f.notes
 
 
 def test_the_driver_knows_a_herd():
-    assert next(d for d in drivers() if d["id"] == "t4c")["kinds"] == ["milking", "herd"]
+    assert next(d for d in drivers() if d["id"] == "t4c")["kinds"] == ["milk", "cow"]
 
 
 def test_the_herd():
@@ -99,7 +99,7 @@ def test_licence_key_instead_of_a_login():
 
 def test_robots_as_a_real_server_answers():
     with Farm("t4c", server().address, "", KEY) as f:
-        robot = f.milking()["robots"][0]
+        robot = f.milk()["robots"][0]
     assert (robot["id"], robot["name"], robot["group"], robot["raw"], robot["lastVisit"]) == ("101", "Melkrobot 1", "Melkveestal", "0", "2026-11-23T13:24:59")
     assert (robot["milkKg"], robot["milkings"], robot["failedMilkings"]) == (790, 103, 1)
 

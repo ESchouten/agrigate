@@ -57,7 +57,7 @@ T4C keeps no work number.
 ## Checked on a real server
 
 T4C 4.22, two Astronaut A4s, 92 animals (2026-11-23), with the licence key: the robots (0.6 s) and
-the herd (1.8 s) read as the tests expect (`tests/test_t4c_herd.py` answers in the same shape).
+the herd (1.8 s) read as the tests expect (`tests/test_t4c_cow.py` answers in the same shape).
 
 Still open:
 
@@ -73,6 +73,6 @@ To see what a server says:
 
 ```bash
 cd python
-python farm.py t4c 10.4.1.1:6969 --herd                              # asks the licence key
+python farm.py t4c 10.4.1.1:6969 --cow                              # asks the licence key
 python farm.py t4c <address> --user <name> --record answers.json     # logins and keys left out
 ```

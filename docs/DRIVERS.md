@@ -18,7 +18,7 @@ the same C++ runs on a phone, a computer and a microcontroller.
 | | Reached directly | Read through the farm's server | Listened to (live) |
 |---|---|---|---|
 | For | A robot with its own radio | What the farm's management software knows | What a robot says on the farm network as it happens |
-| API in `core/` | `scraper_c.h` | `robot_c.h`, and per kind a header on top: `milking_c.h`, `herd_c.h` | `live_c.h` |
+| API in `core/` | `scraper_c.h` | `robot_c.h`, and per kind a header on top: `milk_c.h`, `cow_c.h` | `live_c.h` |
 | Links | `ble-serial`, `bt-serial`: bytes both ways | `http`: a request and its answer | `udp`: datagrams to and from the robot |
 | Drivers | `lely` | `t4c`, `fullsense` | `lfw` |
 | In one build | One driver | Every driver (`core/robot/Drivers.cpp`) | Every driver (`core/robot/Drivers.cpp`, `live::kDrivers`) |
@@ -44,8 +44,8 @@ real server goes in `drivers/<name>/API.md`.
 
 For example a feeding robot that the farm's server knows:
 
-1. `core/feeding_c.h`: what every feeding robot has in common, as `feeding_read` and
-   `feeding_json` on a session of `robot_c.h`, like `milking_c.h`.
+1. `core/feed_c.h`: what every feeding robot has in common, as `feed_read` and
+   `feed_json` on a session of `robot_c.h`, like `milk_c.h`.
 2. `core/robot/Feeding.h` and `.cpp`: that data and its JSON.
 3. One line each in `core/robot/Robot.h` (the driver's read for this kind, the session's data)
    and in the list of kinds in `core/robot/Robot.cpp`.

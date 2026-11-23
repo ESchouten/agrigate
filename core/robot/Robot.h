@@ -1,6 +1,6 @@
 // What a driver for a farm's management server is built from (core/robot_c.h is the same thing
 // seen from a host). A driver is one file in drivers/<name>/src: how to log in, and per kind of
-// robot it knows what to ask and how the answers become that kind's data (Milking.h). It asks
+// robot it knows what to ask and how the answers become that kind's data (Milk.h). It asks
 // with get() and post(); the session sends one request at a time through the host and hands
 // each answer to the request's own function, which may ask for more.
 #pragma once
@@ -11,8 +11,8 @@
 #include <string>
 
 #include "Json.h"
-#include "Herd.h"
-#include "Milking.h"
+#include "Cow.h"
+#include "Milk.h"
 #include "robot_c.h"
 
 namespace robot {
@@ -27,9 +27,9 @@ struct Driver {
   /** Ask for a login and set Session::headers from the answer (or fail(ROBOT_LOGIN_REJECTED)). */
   void (*login)(Session&);
   /** Per kind of robot: fill that kind's data in the session. Null: the driver has no such robots. */
-  void (*milking)(Session&);
-  /** The herd the server knows (core/herd_c.h). Null: the server knows no herd. */
-  void (*herd)(Session&) = nullptr;
+  void (*milk)(Session&);
+  /** The herd the server knows (core/cow_c.h). Null: the server knows no herd. */
+  void (*cow)(Session&) = nullptr;
 };
 
 /** Every driver in this build (Drivers.cpp). */
@@ -47,8 +47,8 @@ class Session {
   /** Sent with every request: the login, set by the driver. */
   std::map<std::string, std::string> headers;
 
-  milking::Farm milking;
-  herd::Herd herd;
+  milk::Farm milk;
+  cow::Herd cow;
 
   /** [optional]: an answer that is not there (an error status, no JSON) is left out and noted
    *  in the error text instead of failing the read. */

@@ -1,7 +1,7 @@
 /* The herd as the farm's management server knows it, in C, the same for every driver that knows
  * a herd, on a session of robot_c.h. It only reads: nothing here changes anything on the farm.
  *
- * herd_read asks the server for its animals; when the requests are done (robot_c.h), herd_json
+ * cow_read asks the server for its animals; when the requests are done (robot_c.h), cow_json
  * gives what it read. Dates are "YYYY-MM-DD" (the farm's own day), "" when not known; numbers
  * are null when not known:
  *   {"animals": [{
@@ -20,8 +20,8 @@
  *     "pregnancyChecks": [{"date", "result": "pregnant" | "notPregnant" | "unknown"}]   oldest first
  *   }]}
  * How far back inseminations and pregnancy checks go is up to the server (see the driver's API.md). */
-#ifndef HERD_C_H
-#define HERD_C_H
+#ifndef COW_C_H
+#define COW_C_H
 
 #include "robot_c.h"
 
@@ -31,8 +31,8 @@ extern "C" {
 
 /* Start a read. Returns ROBOT_OK (started: now the requests), ROBOT_UNSUPPORTED or
  * ROBOT_IN_PROGRESS. */
-ROBOT_API int32_t herd_read(robot_session* s);
-ROBOT_API int32_t herd_json(robot_session* s, char* buf, int32_t size);
+ROBOT_API int32_t cow_read(robot_session* s);
+ROBOT_API int32_t cow_json(robot_session* s, char* buf, int32_t size);
 
 #ifdef __cplusplus
 }

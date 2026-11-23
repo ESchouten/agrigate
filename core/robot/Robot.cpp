@@ -90,7 +90,7 @@ namespace robot {
 
 // Every kind of robot a driver can know: a new kind adds its line here, its read to Driver and
 // its header to core/.
-const struct { const char* name; void (*Driver::*read)(Session&); } kKinds[] = {{"milking", &Driver::milking}, {"herd", &Driver::herd}};
+const struct { const char* name; void (*Driver::*read)(Session&); } kKinds[] = {{"milk", &Driver::milk}, {"cow", &Driver::cow}};
 
 int32_t copyOut(const std::string& s, char* buf, int32_t size) {
   if (buf && size > 0) {
