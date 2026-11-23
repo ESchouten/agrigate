@@ -18,11 +18,11 @@ the same C++ runs on a phone, a computer and a microcontroller.
 | | Reached directly | Read through the farm's server | Listened to (live) |
 |---|---|---|---|
 | For | A robot with its own radio | What the farm's management software knows | What a robot says on the farm network as it happens |
-| API in `core/` | `scraper_c.h` | `robot_c.h`, and per kind a header on top: `milk_c.h`, `cow_c.h` | `live_c.h` |
+| API in `core/` | `clean_c.h` | `robot_c.h`, and per kind a header on top: `milk_c.h`, `cow_c.h` | `live_c.h` |
 | Links | `ble-serial`, `bt-serial`: bytes both ways | `http`: a request and its answer | `udp`: datagrams to and from the robot |
 | Drivers | `lely` | `t4c`, `fullsense` | `lfw` |
 | In one build | One driver | Every driver (`core/robot/Drivers.cpp`) | Every driver (`core/robot/Drivers.cpp`, `live::kDrivers`) |
-| Used by | Buttons, apps, Python | Python (`scraper_control.farm`, `farm.py`, `farm_server.py`) | Python (`scraper_control.live`, `farm_server.py`) |
+| Used by | Buttons, apps, Python | Python (`agrigate.farm`, `farm.py`, `farm_server.py`) | Python (`agrigate.live`, `farm_server.py`) |
 
 The farm service (`python/farm_server.py`, [FARM_API.md](FARM_API.md)) puts the last two together:
 one live session per robot and the herd of the farm's server, over HTTP.
@@ -46,7 +46,7 @@ For example a feeding robot that the farm's server knows:
 
 1. `core/feed_c.h`: what every feeding robot has in common, as `feed_read` and
    `feed_json` on a session of `robot_c.h`, like `milk_c.h`.
-2. `core/robot/Feeding.h` and `.cpp`: that data and its JSON.
+2. `core/robot/Feed.h` and `.cpp`: that data and its JSON.
 3. One line each in `core/robot/Robot.h` (the driver's read for this kind, the session's data)
    and in the list of kinds in `core/robot/Robot.cpp`.
 4. In each driver whose server knows such robots: the function that reads them.
@@ -56,7 +56,7 @@ that also takes commands adds them to its own header; whether a command is safe 
 distance is decided per kind and per command, in the driver.
 
 A robot of a new kind that is reached directly gets its own API in `core/` in the way of
-`scraper_c.h`, on the links that are there.
+`clean_c.h`, on the links that are there.
 
 ## A new live driver
 

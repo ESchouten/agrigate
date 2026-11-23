@@ -129,7 +129,7 @@ the last good read stay. `/api/animals/<key>` gives one animal, or 404.
 ### `GET /api/status`
 
 ```json
-{"service": "scraper-control farm", "version": 1, "time": 1795437727482, "robots": 2,
+{"service": "agrigate farm", "version": 1, "time": 1795437727482, "robots": 2,
  "robotsConnected": 2, "herd": {"animals": 92, "updated": 1795437721591, "error": ""}, "lastEvent": 0}
 ```
 

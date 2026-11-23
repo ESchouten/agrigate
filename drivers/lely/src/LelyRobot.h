@@ -10,7 +10,7 @@
 namespace lely {
 
 // The link to the robot. Buttons: BtLink (firmware/lib). Apps and Python: HostTransport
-// (scraper_c.cpp). Tests: a pipe to the simulated robot.
+// (clean_c.cpp). Tests: a pipe to the simulated robot.
 class Transport {
  public:
   virtual ~Transport() {}
@@ -42,7 +42,7 @@ enum class Lang { Nl, En };
 Lang langFromCode(const char* code);              // "en", "en_US", ... -> En; else Nl
 const char* resultText(Result r, Lang l = Lang::Nl);
 
-// Progress while a command runs, for a UI (same numbers as SCRAPER_STEP_* in scraper_c.h).
+// Progress while a command runs, for a UI (same numbers as CLEAN_STEP_* in clean_c.h).
 enum class Step {
   Linked = 1,       // Bluetooth link open
   Granted = 2,      // PIN accepted

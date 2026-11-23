@@ -8,7 +8,7 @@ sys.path.insert(0, os.path.join(ROOT, "firmware", "test_host"))
 from driver import host_flags  # noqa: E402
 import lvgl_host  # noqa: E402
 
-BIN = os.path.join(tempfile.gettempdir(), "scraper_fw_test")
+BIN = os.path.join(tempfile.gettempdir(), "clean_fw_test")
 
 
 def check(name, cond, err):

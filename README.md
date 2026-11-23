@@ -98,11 +98,11 @@ hold left = done.
 
 | Folder | What |
 |---|---|
-| `core/` | The robot APIs, one per kind of robot and the same for every make: `scraper_c.h` (manure scrapers), `robot_c.h` with `milk_c.h` and `cow_c.h` (read through the farm's server), `live_c.h` (what a robot says on the farm network) |
+| `core/` | The robot APIs, one per kind of robot and the same for every make: `clean_c.h` (manure scrapers), `robot_c.h` with `milk_c.h` and `cow_c.h` (read through the farm's server), `live_c.h` (what a robot says on the farm network) |
 | `drivers/` | One folder per robot type or server software: everything specific to it |
 | `firmware/` | The M5Stack buttons (PlatformIO) |
 | `native/` | The apps: shared Kotlin, Compose for Android and desktop, SwiftUI for iOS ([README](native/README.md)) |
-| `python/` | The Python library `scraper_control` and the command lines `scraper.py`, `farm.py` and `farm_server.py` |
+| `python/` | The Python library `agrigate` and the command lines `clean.py`, `farm.py` and `farm_server.py` |
 | `tools/` | Build secrets |
 
 Every client only provides the link to the robot (bytes in, bytes out, or a request and its
@@ -115,7 +115,7 @@ answer); the driver says which kind of link it needs. A new robot type is a new 
 python3 tools/secrets.py                          # once: build secrets from ~/.scraper-control/secrets
 cd firmware && pio run -e m5stack-core -t upload  # the buttons (USB the first time)
 cd native && ./gradlew :composeApp:run            # the desktop app (see native/README.md)
-cd python && pip install -e . && python scraper.py --scan
+cd python && pip install -e . && python clean.py --scan
 ```
 
 Without build secrets everything builds and the tests pass, but a real robot may refuse to

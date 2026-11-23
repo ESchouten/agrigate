@@ -1,6 +1,6 @@
 """The robot API in Python. This is the only layer scripts need.
 
-    from scraper_control import Robot
+    from agrigate import Robot
 
     async with Robot(pin="1234") as robot:          # finds the robot, ~2-3 s
         print(robot.status())                       # Status(planning=True, next_ride='21:00:00', ...)

@@ -9,7 +9,7 @@ internal fun loadCoreLibrary() = loaded
 
 private val loaded: Unit by lazy {
   System.getProperty("scraper.core.lib")?.let { return@lazy System.load(it) }
-  val name = System.mapLibraryName("scraper_jni")
+  val name = System.mapLibraryName("clean_jni")
   val res = CoreJni::class.java.getResourceAsStream("/native/$name")
     ?: error("core library /native/$name missing from the app")
   val dir = Files.createTempDirectory("scraper-core").toFile().apply { deleteOnExit() }

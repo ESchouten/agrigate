@@ -14,7 +14,7 @@ import getpass
 import json
 import os
 
-from scraper_control.farm import Farm, FarmError, drivers
+from agrigate.farm import Farm, FarmError, drivers
 
 
 def main() -> int:

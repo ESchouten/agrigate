@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Command line for the robot, on top of the robot driver.
 
-    python scraper.py --scan                        # which robots are there?
-    python scraper.py --pin 1234                    # connect, show status and screen (presses nothing)
-    python scraper.py --pin 1234 --route A --dry-run    # everything but Start
-    python scraper.py --pin 1234 --route A          # the robot really drives
-    python scraper.py --pin 1234 --planning on
-    python scraper.py --pin 1234 -i                 # interactive: press panel keys
+    python clean.py --scan                        # which robots are there?
+    python clean.py --pin 1234                    # connect, show status and screen (presses nothing)
+    python clean.py --pin 1234 --route A --dry-run    # everything but Start
+    python clean.py --pin 1234 --route A          # the robot really drives
+    python clean.py --pin 1234 --planning on
+    python clean.py --pin 1234 -i                 # interactive: press panel keys
 
 The robot is found automatically (by the driver's address or service, or by name) and remembered;
 --address / --name override that. macOS: run from Terminal.app.
@@ -17,7 +17,7 @@ import argparse
 import asyncio
 import sys
 
-from scraper_control import KEYS, Robot, RobotError, find_robots
+from agrigate import KEYS, Robot, RobotError, find_robots
 
 SHORT = {"u": "up", "d": "down", "e": "enter", "s": "start_stop", "b": "back", "p": "prog",
          "1": "soft1", "2": "soft2", "3": "soft3"}

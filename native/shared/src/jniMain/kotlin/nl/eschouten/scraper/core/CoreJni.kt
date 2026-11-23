@@ -1,4 +1,4 @@
-// JNI side of core/jni/scraper_jni.cpp, shared by Android and the desktop JVM.
+// JNI side of core/jni/clean_jni.cpp, shared by Android and the desktop JVM.
 package nl.eschouten.scraper.core
 
 internal object CoreJni {

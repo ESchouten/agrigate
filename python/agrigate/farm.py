@@ -1,6 +1,6 @@
 """What is read through the farm's management server (core/robot_c.h): milking robots and the herd.
 
-    from scraper_control.farm import Farm
+    from agrigate.farm import Farm
     with Farm("t4c", "192.168.1.10", "user", "password") as farm:
         for robot in farm.milk()["robots"]:      # core/milk_c.h describes every field
             print(robot["name"], robot["state"])

@@ -6,8 +6,8 @@ plugins {
 }
 
 val hasAndroid = findProject(":androidApp") != null   // settings.gradle.kts: an Android SDK is there
-// The robot driver (gradle.properties scraper.driver): drivers/<name>/src, built with the C API in core/
-val driver = providers.gradleProperty("scraper.driver").get()
+// The robot driver (gradle.properties clean.driver): drivers/<name>/src, built with the C API in core/
+val driver = providers.gradleProperty("clean.driver").get()
 val driverDir = rootDir.resolve("../drivers/$driver")
 val driverSrc = driverDir.resolve("src")
 val apiDir = rootDir.resolve("../core")
@@ -96,7 +96,7 @@ val configureCoreJni by tasks.registering(Exec::class) {
   outputs.dir(coreJniWork)
   doFirst { coreJniWork.get().asFile.run { deleteRecursively(); mkdirs() } } // a fresh CMake cache: the sources may have moved
   commandLine(
-    "cmake", "-S", apiDir.path, "-B", coreJniWork.get().asFile.path, "-DSCRAPER_DRIVER=$driver", "-DCMAKE_BUILD_TYPE=Release",
+    "cmake", "-S", apiDir.path, "-B", coreJniWork.get().asFile.path, "-DCLEAN_DRIVER=$driver", "-DCMAKE_BUILD_TYPE=Release",
     "-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=$out", "-DCMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE=$out",   // the second: a .dll on Windows
   )
 }

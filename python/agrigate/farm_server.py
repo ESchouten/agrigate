@@ -139,7 +139,7 @@ class FarmService:
     def status_json(self) -> dict:
         robots = [lst.state() for _, _, lst in self.robots]
         with self._lock:
-            return {"service": "scraper-control farm", "version": VERSION, "time": now_ms(),
+            return {"service": "agrigate farm", "version": VERSION, "time": now_ms(),
                     "robots": len(robots), "robotsConnected": sum(1 for r in robots if r["connected"]),
                     "herd": None if not self.config.get("server") else
                     {"animals": len(self._herd), "updated": self._herd_at or None, "error": self._herd_error},

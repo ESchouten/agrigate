@@ -4,7 +4,7 @@
  * the robot needs to hand its messages on (a registration), never a command.
  *
  * Link "udp": the host has one UDP socket per session and moves datagrams; the driver says what
- * to send and is handed what came back from the robot's address. Like robot_c.h and scraper_c.h
+ * to send and is handed what came back from the robot's address. Like robot_c.h and clean_c.h
  * there are no threads and no callbacks, so the same driver runs in the apps, in Python and on a
  * microcontroller:
  *   s = live_open("lfw", "10.4.1.101")

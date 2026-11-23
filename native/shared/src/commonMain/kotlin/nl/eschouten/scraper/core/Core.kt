@@ -1,4 +1,4 @@
-// The robot driver's C API (core/scraper_c.h), seen from Kotlin. All robot logic lives in the
+// The robot driver's C API (core/clean_c.h), seen from Kotlin. All robot logic lives in the
 // driver; this file only turns its callbacks into suspend functions.
 package nl.eschouten.scraper.core
 
@@ -15,7 +15,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.concurrent.Volatile
 
-/** Result codes of the core (scraper_c.h). */
+/** Result codes of the core (clean_c.h). */
 enum class CoreResult { Ok, ConnectFailed, PinRejected, NoScreen, Busy, Unexpected, StartedNoAnswer, Cancelled, InProgress;
 
   val code: Int get() = if (this == InProgress) 100 else ordinal
@@ -25,7 +25,7 @@ enum class CoreResult { Ok, ConnectFailed, PinRejected, NoScreen, Busy, Unexpect
   }
 }
 
-/** Progress while a command runs (scraper_c.h SCRAPER_STEP_*). */
+/** Progress while a command runs (clean_c.h CLEAN_STEP_*). */
 enum class CoreStep {
   Linked, // Bluetooth link open
   Granted, // PIN accepted
@@ -51,7 +51,7 @@ data class ManualState(val left: Boolean?, val right: Boolean?, val forward: Boo
 /** The charger approach screen (HANDM. LADER): the charger's side and the battery as shown. */
 data class ChargerState(val left: Boolean, val right: Boolean, val volt: String, val amp: String)
 
-/** What the core read from the robot's screen (scraper_status_json). */
+/** What the core read from the robot's screen (clean_status_json). */
 data class CoreStatus(
   /** Time planning on/off; null = not on the home screen. */
   val planning: Boolean? = null,
@@ -112,7 +112,7 @@ internal interface CoreCallbacks {
   fun onProgress(step: Int)
 }
 
-/** One scraper_session, per platform: JNI (Android, desktop) or cinterop (iOS). */
+/** One clean_session, per platform: JNI (Android, desktop) or cinterop (iOS). */
 internal interface CoreNative {
   fun feed(data: ByteArray)
   fun linkDown()
@@ -144,7 +144,7 @@ internal expect fun nativeResultText(code: Int, language: String): String
 /** The PIN as the core sends it (for the fake robots in tests). */
 internal expect fun nativeEncryptPin(pin: String): ByteArray
 
-/** How the driver's robots are reached (scraper_links_json): a JSON array, preferred first. */
+/** How the driver's robots are reached (clean_links_json): a JSON array, preferred first. */
 internal expect fun nativeLinksJson(): String
 
 /** The result in words, "nl" or "en". */
@@ -213,7 +213,7 @@ class CoreSession(
    *  [CoreResult.Cancelled], the robot back as it was. Any thread; does not wait. */
   fun cancel() { native?.cancel() }
 
-  /** Planning owed after a dropped link: 1 / 0, -1 = none (see scraper_c.h). Hand a remembered
+  /** Planning owed after a dropped link: 1 / 0, -1 = none (see clean_c.h). Hand a remembered
    *  value to the next session before [connect]; read it after each command and keep it. */
   var owedPlanning: Int
     get() = native?.owedPlanning() ?: -1

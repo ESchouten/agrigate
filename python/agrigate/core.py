@@ -1,11 +1,11 @@
-"""ctypes binding to the robot API in C (core/scraper_c.h), built from the robot driver.
+"""ctypes binding to the robot API in C (core/clean_c.h), built from the robot driver.
 
 The core holds all robot logic (screens, route steps, safety rules); this module only
 moves bytes between it and a Bluetooth link. The same core runs on the M5Stack and in
 the apps.
 
 The library is $SCRAPER_CORE_LIB, or the one next to this file, which is built on first
-use and after a change (needs a C++17 compiler). Or build it yourself:  python -m scraper_control.build_core
+use and after a change (needs a C++17 compiler). Or build it yourself:  python -m agrigate.build_core
 """
 from __future__ import annotations
 
@@ -36,7 +36,7 @@ def library_path() -> Path:
         return build()
     except Exception as e:
         raise FileNotFoundError(f"{LIBNAME} not found and building it failed ({e}); "
-                                "build it with: python -m scraper_control.build_core") from e
+                                "build it with: python -m agrigate.build_core") from e
 
 
 _lib = None
@@ -47,29 +47,29 @@ def lib():
     if _lib is None:
         L = ctypes.CDLL(str(library_path()))
         S = ctypes.c_void_p
-        L.scraper_new.restype = S
-        L.scraper_new.argtypes = [ctypes.c_char_p, ctypes.c_char_p, WRITE_FN, DONE_FN, ctypes.c_void_p]
-        L.scraper_free.argtypes = [S]
-        L.scraper_feed.argtypes = [S, ctypes.c_char_p, ctypes.c_int32]
-        L.scraper_release.argtypes = [ctypes.POINTER(ctypes.c_uint8)]
-        L.scraper_link_down.argtypes = [S]
-        L.scraper_cancel.argtypes = [S]
-        for name, extra in (("scraper_connect", []), ("scraper_start_route", [ctypes.c_char, ctypes.c_int32]),
-                            ("scraper_set_planning", [ctypes.c_int32]), ("scraper_press", [ctypes.c_int32]),
-                            ("scraper_finish", []), ("scraper_stop_route", []), ("scraper_wait", []),
-                            ("scraper_answer_stop", [ctypes.c_int32])):
+        L.clean_new.restype = S
+        L.clean_new.argtypes = [ctypes.c_char_p, ctypes.c_char_p, WRITE_FN, DONE_FN, ctypes.c_void_p]
+        L.clean_free.argtypes = [S]
+        L.clean_feed.argtypes = [S, ctypes.c_char_p, ctypes.c_int32]
+        L.clean_release.argtypes = [ctypes.POINTER(ctypes.c_uint8)]
+        L.clean_link_down.argtypes = [S]
+        L.clean_cancel.argtypes = [S]
+        for name, extra in (("clean_connect", []), ("clean_start_route", [ctypes.c_char, ctypes.c_int32]),
+                            ("clean_set_planning", [ctypes.c_int32]), ("clean_press", [ctypes.c_int32]),
+                            ("clean_finish", []), ("clean_stop_route", []), ("clean_wait", []),
+                            ("clean_answer_stop", [ctypes.c_int32])):
             getattr(L, name).argtypes = [S] + extra
             getattr(L, name).restype = ctypes.c_int32
-        for name in ("scraper_status_json", "scraper_last_error"):
+        for name in ("clean_status_json", "clean_last_error"):
             getattr(L, name).argtypes = [S, ctypes.c_char_p, ctypes.c_int32]
             getattr(L, name).restype = ctypes.c_int32
-        L.scraper_image_version.argtypes = [S, ctypes.c_char_p]
-        L.scraper_image_version.restype = ctypes.c_int32
-        L.scraper_result_text_lang.argtypes = [ctypes.c_int32, ctypes.c_char_p]
-        L.scraper_result_text_lang.restype = ctypes.c_char_p
-        L.scraper_set_language.argtypes = [S, ctypes.c_char_p]
-        L.scraper_links_json.argtypes = [ctypes.c_char_p, ctypes.c_int32]
-        L.scraper_links_json.restype = ctypes.c_int32
+        L.clean_image_version.argtypes = [S, ctypes.c_char_p]
+        L.clean_image_version.restype = ctypes.c_int32
+        L.clean_result_text_lang.argtypes = [ctypes.c_int32, ctypes.c_char_p]
+        L.clean_result_text_lang.restype = ctypes.c_char_p
+        L.clean_set_language.argtypes = [S, ctypes.c_char_p]
+        L.clean_links_json.argtypes = [ctypes.c_char_p, ctypes.c_int32]
+        L.clean_links_json.restype = ctypes.c_int32
         _lib = L
     return _lib
 
@@ -84,14 +84,14 @@ def text(fn, *args) -> str:
 
 def links_info() -> list[dict]:
     """How the driver's robots are reached, preferred first: [{"kind": "ble-serial", ...}, ...]
-    (see core/scraper_c.h)."""
+    (see core/clean_c.h)."""
     buf = ctypes.create_string_buffer(1024)
-    lib().scraper_links_json(buf, len(buf))
+    lib().clean_links_json(buf, len(buf))
     return json.loads(buf.value.decode())
 
 
 def result_text(r: int, language: str = "en") -> str:
-    return lib().scraper_result_text_lang(r, language.encode()).decode()
+    return lib().clean_result_text_lang(r, language.encode()).decode()
 
 
 class CoreSession:
@@ -106,17 +106,17 @@ class CoreSession:
         self._wcb = WRITE_FN(self._on_write)
         self._dcb = DONE_FN(lambda _u, _cmd, _res: None)
         ver = image_version if image_version and len(image_version) == 9 else None
-        self._s = lib().scraper_new((pin or "").encode(), ver, self._wcb, self._dcb, None)
-        lib().scraper_set_language(self._s, language.encode())   # of last_error(): "nl" or "en"
+        self._s = lib().clean_new((pin or "").encode(), ver, self._wcb, self._dcb, None)
+        lib().clean_set_language(self._s, language.encode())   # of last_error(): "nl" or "en"
 
     def _on_write(self, _user, data, n) -> None:
         frame = ctypes.string_at(data, n)
-        lib().scraper_release(data)
+        lib().clean_release(data)
         self._write(frame)
 
     def close(self) -> None:
         if self._s:
-            lib().scraper_free(self._s)
+            lib().clean_free(self._s)
             self._s = None
 
     def __del__(self):
@@ -124,52 +124,52 @@ class CoreSession:
 
     # bytes in / link state
     def feed(self, data: bytes) -> None:
-        lib().scraper_feed(self._s, data, len(data))
+        lib().clean_feed(self._s, data, len(data))
 
     def link_down(self) -> None:
-        lib().scraper_link_down(self._s)
+        lib().clean_link_down(self._s)
 
     def cancel(self) -> None:
         """Cancel the running command from another thread (e.g. on Ctrl+C): it ends with
         CANCELLED and the robot back as it was, until Start is pressed for a route."""
-        lib().scraper_cancel(self._s)
+        lib().clean_cancel(self._s)
 
     # commands (blocking)
     def _run(self, started: int) -> int:
         if started == IN_PROGRESS:
             return IN_PROGRESS
-        return lib().scraper_wait(self._s)
+        return lib().clean_wait(self._s)
 
     def connect(self) -> int:
-        return self._run(lib().scraper_connect(self._s))
+        return self._run(lib().clean_connect(self._s))
 
     def start_route(self, letter: str, dry_run: bool = False) -> int:
-        return self._run(lib().scraper_start_route(self._s, letter.upper().encode(), int(dry_run)))
+        return self._run(lib().clean_start_route(self._s, letter.upper().encode(), int(dry_run)))
 
     def stop_route(self) -> int:
-        return self._run(lib().scraper_stop_route(self._s))
+        return self._run(lib().clean_stop_route(self._s))
 
     def answer_stop(self, finish: bool) -> int:
-        return self._run(lib().scraper_answer_stop(self._s, int(finish)))
+        return self._run(lib().clean_answer_stop(self._s, int(finish)))
 
     def set_planning(self, on: bool) -> int:
-        return self._run(lib().scraper_set_planning(self._s, int(on)))
+        return self._run(lib().clean_set_planning(self._s, int(on)))
 
     def press(self, key: int) -> int:
-        return self._run(lib().scraper_press(self._s, key))
+        return self._run(lib().clean_press(self._s, key))
 
     def finish(self) -> int:
         """Back home from a safe menu, planning as at connect (before close)."""
-        return self._run(lib().scraper_finish(self._s))
+        return self._run(lib().clean_finish(self._s))
 
     # state
     def status(self) -> dict:
-        return json.loads(text(lib().scraper_status_json, self._s))
+        return json.loads(text(lib().clean_status_json, self._s))
 
     def last_error(self) -> str:
-        return text(lib().scraper_last_error, self._s)
+        return text(lib().clean_last_error, self._s)
 
     def image_version(self) -> tuple[bytes, bool]:
         buf = ctypes.create_string_buffer(9)
-        changed = lib().scraper_image_version(self._s, buf)
+        changed = lib().clean_image_version(self._s, buf)
         return buf.raw, bool(changed)

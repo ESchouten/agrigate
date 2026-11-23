@@ -10,7 +10,7 @@ a native UI per platform that only draws what the shared module says:
 | iOS | SwiftUI (`iosApp`) | Kable (CoreBluetooth) | cinterop (`libcore.a`) |
 | Web page | Compose for Web, wasm (`composeApp`) | none: the web API of the desktop app that serves it | none |
 
-The driver is chosen in `gradle.properties` (`scraper.driver`), its Kotlin side is listed in
+The driver is chosen in `gradle.properties` (`clean.driver`), its Kotlin side is listed in
 `shared/.../model/Registry.kt`.
 
 ```

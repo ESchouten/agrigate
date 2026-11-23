@@ -2,13 +2,13 @@
  * over HTTP on the farm network. This is what every kind of robot shares there: the drivers
  * (drivers/<name>/, one per server software), a session with one server and the HTTP exchange.
  * What a kind of robot can do is in its own header on top of this one (milk_c.h); a next
- * kind adds its header the same way. Manure scrapers are reached directly: scraper_c.h.
+ * kind adds its header the same way. Manure scrapers are reached directly: clean_c.h.
  *
  * The driver decides what to ask and understands the answers; the HTTP itself is the host's
- * job, as Bluetooth is in scraper_c.h. So the same driver runs in the apps, in Python and on a
+ * job, as Bluetooth is in clean_c.h. So the same driver runs in the apps, in Python and on a
  * microcontroller:
  *   s = robot_open("<driver>", "192.168.1.10", user, password)
- *   milk_read(s)                                   (or another kind's call)
+ *   milk_read(s)                                      (or another kind's call)
  *   while (robot_request_json(s, buf, size) > 0) {    {"method","url","headers":{..},"body"}
  *     ...send that request...
  *     robot_response(s, status, body, len)            status 0: no answer

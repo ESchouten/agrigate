@@ -1,4 +1,4 @@
-// How a robot is reached, as its driver describes it (scraper_links_json, core/scraper_c.h): a
+// How a robot is reached, as its driver describes it (clean_links_json, core/clean_c.h): a
 // list of kinds, preferred first. Each kind is implemented once per platform, or not at all
 // there (a scan skips it); a driver that talks another way adds a kind here and its link.
 package nl.eschouten.scraper.link

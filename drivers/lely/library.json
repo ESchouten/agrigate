@@ -3,5 +3,5 @@
   "description": "Lely Discovery driver: protocol, screens and the safety rules behind the robot API",
   "frameworks": "*",
   "platforms": "*",
-  "build": { "srcDir": "src", "includeDir": "src", "srcFilter": ["+<*>", "-<scraper_c.cpp>"] }
+  "build": { "srcDir": "src", "includeDir": "src", "srcFilter": ["+<*>", "-<clean_c.cpp>"] }
 }

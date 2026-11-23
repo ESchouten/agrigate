@@ -22,8 +22,8 @@ firmware/sdkconfig.*
 
 # Build secrets (tools/secrets.py) and core libraries built on first use
 drivers/secrets.h
-python/scraper_control/libscraper_core.*
-python/scraper_control/scraper_core.dll
+python/agrigate/libagrigate_core.*
+python/agrigate/agrigate_core.dll
 
 # local build output (Android NDK, XcodeGen)
 native/androidApp/.cxx/

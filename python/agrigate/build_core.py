@@ -1,8 +1,8 @@
 """Build the robot drivers with their C APIs (core/) into a library next to this package.
 
-    python -m scraper_control.build_core          # needs a C++17 compiler (g++/clang++)
+    python -m agrigate.build_core          # needs a C++17 compiler (g++/clang++)
 
-In it: one scraper driver (a folder in drivers/ with a scraper_c.cpp: $SCRAPER_DRIVER, or the
+In it: one scraper driver (a folder in drivers/ with a clean_c.cpp: $CLEAN_DRIVER, or the
 only one there) and every driver for a farm's server (core/robot/Drivers.cpp).
 """
 import os
@@ -12,20 +12,20 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent.parent
-LIBNAME = {"darwin": "libscraper_core.dylib", "win32": "scraper_core.dll"}.get(sys.platform, "libscraper_core.so")
+LIBNAME = {"darwin": "libagrigate_core.dylib", "win32": "agrigate_core.dll"}.get(sys.platform, "libagrigate_core.so")
 
 
 def driver_src() -> Path:
-    name = os.environ.get("SCRAPER_DRIVER")
-    found = [f.parent for f in sorted((ROOT / "drivers").glob("*/src/scraper_c.cpp")) if not name or f.parent.parent.name == name]
+    name = os.environ.get("CLEAN_DRIVER")
+    found = [f.parent for f in sorted((ROOT / "drivers").glob("*/src/clean_c.cpp")) if not name or f.parent.parent.name == name]
     if len(found) != 1:
-        raise FileNotFoundError("set SCRAPER_DRIVER to one of: " + ", ".join(d.parent.name for d in found))
+        raise FileNotFoundError("set CLEAN_DRIVER to one of: " + ", ".join(d.parent.name for d in found))
     return found[0]
 
 
 def folders() -> list:
     """The scraper driver, what the farm server drivers share, and each of those drivers."""
-    servers = [d for d in sorted((ROOT / "drivers").glob("*/src")) if not (d / "scraper_c.cpp").exists()]
+    servers = [d for d in sorted((ROOT / "drivers").glob("*/src")) if not (d / "clean_c.cpp").exists()]
     return [driver_src(), ROOT / "core", ROOT / "core" / "robot", *servers]
 
 

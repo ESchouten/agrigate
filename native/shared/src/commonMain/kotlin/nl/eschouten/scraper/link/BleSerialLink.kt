@@ -1,4 +1,4 @@
-// The "ble-serial" link (see core/scraper_c.h) via Kable (Apache 2.0): Android, iOS and desktop
+// The "ble-serial" link (see core/clean_c.h) via Kable (Apache 2.0): Android, iOS and desktop
 // (btleplug). A serial BLE service from the driver's LinkSpec: write to RX, notifications from
 // TX. Finds the robot by the driver's address prefix, by name (Apple shows a UUID instead of a
 // MAC) or by the service, like the Python and M5 code.

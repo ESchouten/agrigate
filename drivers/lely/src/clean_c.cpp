@@ -1,7 +1,7 @@
-// The Lely Discovery's implementation of the generic C API (core/scraper_c.h).
+// The Lely Discovery's implementation of the generic C API (core/clean_c.h).
 // One worker thread per session runs the blocking C++ Robot API; bytes from the
-// host are queued by scraper_feed() and handed to the robot inside Transport::pump().
-#include "scraper_c.h"
+// host are queued by clean_feed() and handed to the robot inside Transport::pump().
+#include "clean_c.h"
 
 #include <atomic>
 #include <chrono>
@@ -21,10 +21,10 @@ namespace {
 
 class HostTransport : public Transport {
  public:
-  HostTransport(scraper_write_fn w, void* user) : write_(w), user_(user) {}
+  HostTransport(clean_write_fn w, void* user) : write_(w), user_(user) {}
 
   bool connect() override { return up_; }            // the host already opened BLE
-  void disconnect() override {}                       // the host closes BLE after scraper_free
+  void disconnect() override {}                       // the host closes BLE after clean_free
   bool linkUp() override { return up_ && !stop_; }
   bool write(const Bytes& f) override {
     if (!linkUp()) return false;
@@ -57,7 +57,7 @@ class HostTransport : public Transport {
   void stop() { std::lock_guard<std::mutex> g(mu_); stop_ = true; cv_.notify_all(); }
 
  private:
-  scraper_write_fn write_;
+  clean_write_fn write_;
   void* user_;
   std::mutex mu_;
   std::condition_variable cv_;
@@ -133,8 +133,8 @@ int32_t copyOut(const std::string& s, char* buf, int32_t size) {
 
 }  // namespace
 
-struct scraper_session {
-  scraper_session(const char* pin, const uint8_t* ver, scraper_write_fn w, scraper_done_fn d, void* u)
+struct clean_session {
+  clean_session(const char* pin, const uint8_t* ver, clean_write_fn w, clean_done_fn d, void* u)
       : link(w, u), done(d), user(u), robot(link, encryptPin(pin), version) {
     if (ver) memcpy(version, ver, 9);
     auto robotHandler = link.onData;                 // set by Robot; add a snapshot after it
@@ -146,7 +146,7 @@ struct scraper_session {
     worker = std::thread([this] { run(); });
   }
 
-  ~scraper_session() {
+  ~clean_session() {
     {
       std::lock_guard<std::mutex> g(mu);
       quit = true;
@@ -158,13 +158,13 @@ struct scraper_session {
 
   int32_t submit(int32_t cmd, std::function<Result()> job) {
     std::lock_guard<std::mutex> g(mu);
-    if (busy) return SCRAPER_IN_PROGRESS;
+    if (busy) return CLEAN_IN_PROGRESS;
     busy = true;
     pendingCmd = cmd;
     pendingGen = ++cmdGen;
     pending = std::move(job);
     cv.notify_all();
-    return SCRAPER_OK;
+    return CLEAN_OK;
   }
 
   int32_t wait() {
@@ -192,7 +192,7 @@ struct scraper_session {
         std::lock_guard<std::mutex> g(mu);
         if (quit) break;
         if (pending) { job.swap(pending); cmd = pendingCmd; runningGen = pendingGen; }
-        runningCancellable = cmd == SCRAPER_CMD_CONNECT || cmd == SCRAPER_CMD_ROUTE || cmd == SCRAPER_CMD_PLANNING || cmd == SCRAPER_CMD_ROUTES;
+        runningCancellable = cmd == CLEAN_CMD_CONNECT || cmd == CLEAN_CMD_ROUTE || cmd == CLEAN_CMD_PLANNING || cmd == CLEAN_CMD_ROUTES;
       }
       if (!job) {
         robot.idle(50);   // keep-alive while connected and idle
@@ -201,7 +201,7 @@ struct scraper_session {
       robot.clearCancel();
       Result r = job();
       runningCancellable = false;
-      if (cmd == SCRAPER_CMD_CONNECT && r == Result::Ok) connected = true;
+      if (cmd == CLEAN_CMD_CONNECT && r == Result::Ok) connected = true;
       snapshot();
       {
         std::lock_guard<std::mutex> g(mu);
@@ -215,7 +215,7 @@ struct scraper_session {
   }
 
   HostTransport link;
-  scraper_done_fn done;
+  clean_done_fn done;
   void* user;
   uint8_t version[9] = {0};
   Robot robot;
@@ -223,14 +223,14 @@ struct scraper_session {
   std::mutex mu;
   std::condition_variable cv;
   std::function<Result()> pending;
-  int32_t pendingCmd = 0, lastResult = SCRAPER_OK;
+  int32_t pendingCmd = 0, lastResult = CLEAN_OK;
   bool busy = false, quit = false, connected = false, versionChanged = false;
   int32_t owed = -1, owedIn = -1;
   std::atomic<int> holdGen{0}, releasedGen{0};   // a hold runs until its number is released
-  // scraper_cancel marks the command with this number (0 = none yet): only that one stops
+  // clean_cancel marks the command with this number (0 = none yet): only that one stops
   int pendingGen = 0, cmdGen = 0;
   std::atomic<int> runningGen{-1}, cancelGen{0};
-  bool runningCancellable = false;   // worker thread: the running command takes scraper_cancel
+  bool runningCancellable = false;   // worker thread: the running command takes clean_cancel
   std::string status = "{}", error, routes = "{}";
   uint8_t versionCopy[9] = {0};
   std::thread worker;
@@ -238,36 +238,36 @@ struct scraper_session {
 
 extern "C" {
 
-scraper_session* scraper_new(const char* pin, const uint8_t* ver, scraper_write_fn w, scraper_done_fn d, void* user) {
+clean_session* clean_new(const char* pin, const uint8_t* ver, clean_write_fn w, clean_done_fn d, void* user) {
   if (!w) return nullptr;
-  return new scraper_session(pin, ver, w, d, user);
+  return new clean_session(pin, ver, w, d, user);
 }
 
-void scraper_free(scraper_session* s) { delete s; }
+void clean_free(clean_session* s) { delete s; }
 
-void scraper_on_progress(scraper_session* s, scraper_progress_fn fn) {
+void clean_on_progress(clean_session* s, clean_progress_fn fn) {
   if (!s) return;
   void* user = s->user;
   if (fn) s->robot.onStep = [s, fn, user](Step st) { s->snapshot(); fn(user, (int32_t)st); };
   else s->robot.onStep = nullptr;
 }
 
-void scraper_set_language(scraper_session* s, const char* code) {
+void clean_set_language(clean_session* s, const char* code) {
   if (!s) return;
   std::lock_guard<std::mutex> g(s->mu);
   s->robot.lang = langFromCode(code);
 }
 
-void scraper_release(const uint8_t* data) { free((void*)data); }
+void clean_release(const uint8_t* data) { free((void*)data); }
 
-void scraper_feed(scraper_session* s, const uint8_t* data, int32_t len) {
+void clean_feed(clean_session* s, const uint8_t* data, int32_t len) {
   if (s && data && len > 0) s->link.feed(data, (size_t)len);
 }
 
-void scraper_link_down(scraper_session* s) { if (s) s->link.down(); }
+void clean_link_down(clean_session* s) { if (s) s->link.down(); }
 
-int32_t scraper_connect(scraper_session* s) {
-  return s->submit(SCRAPER_CMD_CONNECT, [s] {
+int32_t clean_connect(clean_session* s) {
+  return s->submit(CLEAN_CMD_CONNECT, [s] {
     int32_t owed;
     {
       std::lock_guard<std::mutex> g(s->mu);
@@ -278,24 +278,24 @@ int32_t scraper_connect(scraper_session* s) {
   });
 }
 
-void scraper_set_owed_planning(scraper_session* s, int32_t owed) {
+void clean_set_owed_planning(clean_session* s, int32_t owed) {
   if (!s) return;
   std::lock_guard<std::mutex> g(s->mu);
   s->owedIn = owed;
 }
 
-int32_t scraper_owed_planning(scraper_session* s) {
+int32_t clean_owed_planning(clean_session* s) {
   if (!s) return -1;
   std::lock_guard<std::mutex> g(s->mu);
   return s->owed;
 }
 
-int32_t scraper_start_route(scraper_session* s, char letter, int32_t dry_run) {
-  return s->submit(SCRAPER_CMD_ROUTE, [s, letter, dry_run] { return s->robot.startRoute(letter, dry_run != 0); });
+int32_t clean_start_route(clean_session* s, char letter, int32_t dry_run) {
+  return s->submit(CLEAN_CMD_ROUTE, [s, letter, dry_run] { return s->robot.startRoute(letter, dry_run != 0); });
 }
 
-int32_t scraper_read_routes(scraper_session* s) {
-  return s->submit(SCRAPER_CMD_ROUTES, [s] {
+int32_t clean_read_routes(clean_session* s) {
+  return s->submit(CLEAN_CMD_ROUTES, [s] {
     std::vector<std::string> out;
     Result r = s->robot.readRoutes(out);
     if (r == Result::Ok) {
@@ -313,30 +313,30 @@ int32_t scraper_read_routes(scraper_session* s) {
   });
 }
 
-int32_t scraper_routes_json(scraper_session* s, char* buf, int32_t size) {
+int32_t clean_routes_json(clean_session* s, char* buf, int32_t size) {
   std::lock_guard<std::mutex> g(s->mu);
   return copyOut(s->routes, buf, size);
 }
 
-int32_t scraper_stop_route(scraper_session* s) {
-  return s->submit(SCRAPER_CMD_STOP, [s] { return s->robot.stopRoute(); });
+int32_t clean_stop_route(clean_session* s) {
+  return s->submit(CLEAN_CMD_STOP, [s] { return s->robot.stopRoute(); });
 }
 
-int32_t scraper_answer_stop(scraper_session* s, int32_t finish) {
-  return s->submit(SCRAPER_CMD_ANSWER_STOP, [s, finish] { return s->robot.answerStop(finish != 0); });
+int32_t clean_answer_stop(clean_session* s, int32_t finish) {
+  return s->submit(CLEAN_CMD_ANSWER_STOP, [s, finish] { return s->robot.answerStop(finish != 0); });
 }
 
-int32_t scraper_set_planning(scraper_session* s, int32_t on) {
-  return s->submit(SCRAPER_CMD_PLANNING, [s, on] { return s->robot.setPlanning(on != 0); });
+int32_t clean_set_planning(clean_session* s, int32_t on) {
+  return s->submit(CLEAN_CMD_PLANNING, [s, on] { return s->robot.setPlanning(on != 0); });
 }
 
-int32_t scraper_press(scraper_session* s, int32_t key) {
-  return s->submit(SCRAPER_CMD_PRESS, [s, key] { return s->robot.press((Key)key); });
+int32_t clean_press(clean_session* s, int32_t key) {
+  return s->submit(CLEAN_CMD_PRESS, [s, key] { return s->robot.press((Key)key); });
 }
 
-int32_t scraper_hold(scraper_session* s, int32_t key) {
+int32_t clean_hold(clean_session* s, int32_t key) {
   int gen = ++s->holdGen;
-  return s->submit(SCRAPER_CMD_HOLD, [s, key, gen] {
+  return s->submit(CLEAN_CMD_HOLD, [s, key, gen] {
     uint32_t start = s->link.now();
     s->robot.holdBegin((Key)key);
     // the robot needs a press of some length, also for a quick tap on a touch screen
@@ -347,53 +347,53 @@ int32_t scraper_hold(scraper_session* s, int32_t key) {
   });
 }
 
-void scraper_unhold(scraper_session* s) {
+void clean_unhold(clean_session* s) {
   if (s) s->releasedGen = s->holdGen.load();
 }
 
-void scraper_cancel(scraper_session* s) {
+void clean_cancel(clean_session* s) {
   if (!s) return;
   std::lock_guard<std::mutex> g(s->mu);
   if (s->busy) s->cancelGen = s->cmdGen;
 }
 
-int32_t scraper_finish(scraper_session* s) {
-  return s->submit(SCRAPER_CMD_FINISH, [s] { return s->robot.finish(); });
+int32_t clean_finish(clean_session* s) {
+  return s->submit(CLEAN_CMD_FINISH, [s] { return s->robot.finish(); });
 }
 
-int32_t scraper_wait(scraper_session* s) { return s->wait(); }
+int32_t clean_wait(clean_session* s) { return s->wait(); }
 
-int32_t scraper_status_json(scraper_session* s, char* buf, int32_t size) {
+int32_t clean_status_json(clean_session* s, char* buf, int32_t size) {
   std::lock_guard<std::mutex> g(s->mu);
   return copyOut(s->status, buf, size);
 }
 
-int32_t scraper_last_error(scraper_session* s, char* buf, int32_t size) {
+int32_t clean_last_error(clean_session* s, char* buf, int32_t size) {
   std::lock_guard<std::mutex> g(s->mu);
   return copyOut(s->error, buf, size);
 }
 
-int32_t scraper_image_version(scraper_session* s, uint8_t* out9) {
+int32_t clean_image_version(clean_session* s, uint8_t* out9) {
   std::lock_guard<std::mutex> g(s->mu);
   if (out9) memcpy(out9, s->versionCopy, 9);
   return s->versionChanged ? 1 : 0;
 }
 
-int32_t scraper_encrypt_pin(const char* pin, uint8_t* out, int32_t size) {
+int32_t clean_encrypt_pin(const char* pin, uint8_t* out, int32_t size) {
   Bytes b = encryptPin(pin ? pin : "");
   if (out) memcpy(out, b.data(), b.size() < (size_t)size ? b.size() : (size_t)size);
   return (int32_t)b.size();
 }
 
-const char* scraper_result_text_lang(int32_t r, const char* code) {
+const char* clean_result_text_lang(int32_t r, const char* code) {
   Lang l = langFromCode(code);
-  if (r == SCRAPER_IN_PROGRESS) return l == Lang::En ? "already busy" : "al bezig";
+  if (r == CLEAN_IN_PROGRESS) return l == Lang::En ? "already busy" : "al bezig";
   return resultText((Result)r, l);
 }
 
 }  // extern "C"
 
-int32_t scraper_links_json(char* buf, int32_t size) {
+int32_t clean_links_json(char* buf, int32_t size) {
   std::string j = std::string("[{\"kind\":\"ble-serial\",\"service\":\"") + kBle.service + "\",\"rx\":\"" + kBle.rx + "\",\"tx\":\"" + kBle.tx +
                   "\",\"addressPrefix\":\"" + kBle.addressPrefix + "\"}," +
                   "{\"kind\":\"bt-serial\",\"service\":\"" + kSppService + "\",\"addressPrefix\":\"" + kBle.addressPrefix + "\"}]";

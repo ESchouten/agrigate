@@ -54,7 +54,7 @@ class Robot(
   /** The owed planning changed (1 / 0 / -1): keep it with the robot for the next session. */
   val onOwed: ((Int) -> Unit)? = null,
 ) {
-  /** See scraper_c.h: what the robot must be put back to if this link drops now. */
+  /** See clean_c.h: what the robot must be put back to if this link drops now. */
   var owedPlanning: Int = owedPlanning
     private set
 

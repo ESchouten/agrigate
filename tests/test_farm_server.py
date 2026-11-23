@@ -1,4 +1,4 @@
-"""Offline tests of the farm service (python/scraper_control/farm_server.py): its HTTP API with
+"""Offline tests of the farm service (python/agrigate/farm_server.py): its HTTP API with
 robots and a herd made up here, no robots or server needed. Run: python3 tests/test_farm_server.py"""
 import json, sys, threading, time, types, urllib.request
 from pathlib import Path
@@ -9,8 +9,8 @@ try:
 except ImportError:
     m = types.ModuleType("bleak"); m.BleakClient = m.BleakScanner = object; sys.modules["bleak"] = m
 
-from scraper_control.farm import FarmError
-from scraper_control.farm_server import allowed, serve
+from agrigate.farm import FarmError
+from agrigate.farm_server import allowed, serve
 
 HERD = [
     {"id": "4", "number": "15", "name": "DINA 1", "lifeNumber": "NL 100000001", "workNumber": "", "responder": "1000015",
