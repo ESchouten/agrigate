@@ -1,7 +1,7 @@
 """Live: which animal is at each robot right now, from the robots themselves (core/live_c.h).
 
     from scraper_control.live import Listener
-    with Listener("lely-lfw", "10.4.1.101") as robot:      # one per robot
+    with Listener("lfw", "10.4.1.101") as robot:      # one per robot
         ...
         robot.state()            # {"connected", "lastMessage", "animal": {"number", "name", "responder", "since"}}
         robot.events(after=0)    # {"events": [{"seq", "time", "kind": "arrival", ...}], "last": n}
@@ -17,10 +17,10 @@ import socket
 import threading
 import time
 
-from .core import lib
+from .core import lib, text
 
 
-def _now_ms() -> int:
+def now_ms() -> int:
     return int(time.time() * 1000)
 
 
@@ -41,16 +41,9 @@ def _lib():
     return L
 
 
-def _text(fn, *args) -> str:
-    n = fn(*args, None, 0)
-    buf = ctypes.create_string_buffer(n + 1)
-    fn(*args, buf, n + 1)
-    return buf.value.decode(errors="replace")
-
-
 def drivers() -> list[dict]:
     """The live drivers in this build: [{"id", "name", "link": {"kind": "udp", "port"}}]."""
-    return json.loads(_text(_lib().live_drivers_json))
+    return json.loads(text(_lib().live_drivers_json))
 
 
 class Listener:
@@ -90,7 +83,7 @@ class Listener:
         L = _lib()
         while not self._stop.is_set():
             with self._lock:
-                L.live_tick(self._s, _now_ms())
+                L.live_tick(self._s, now_ms())
             self._flush()
             try:
                 data, (host, _) = self._sock.recvfrom(65535)
@@ -102,7 +95,7 @@ class Listener:
             if host != self.address:
                 continue
             with self._lock:
-                L.live_incoming(self._s, data, len(data), _now_ms())
+                L.live_incoming(self._s, data, len(data), now_ms())
             if self.on_event:
                 new = self.events(self._seen)
                 for e in new["events"]:
@@ -114,11 +107,11 @@ class Listener:
 
     def state(self) -> dict:
         with self._lock:
-            return json.loads(_text(_lib().live_json, self._s, _now_ms()))
+            return json.loads(text(_lib().live_json, self._s, now_ms()))
 
     def events(self, after: int = 0) -> dict:
         with self._lock:
-            return json.loads(_text(_lib().live_events_json, self._s, int(after)))
+            return json.loads(text(_lib().live_events_json, self._s, int(after)))
 
     def close(self) -> None:
         if not self._s:

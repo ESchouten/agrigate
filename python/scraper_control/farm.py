@@ -19,7 +19,7 @@ import http.client
 import json
 import urllib.parse
 
-from .core import lib
+from .core import lib, text
 
 OK, UNREACHABLE, LOGIN_REJECTED, UNEXPECTED, UNSUPPORTED = range(5)
 SECRET = ("token", "password", "license")   # answer fields left out of a recording
@@ -30,13 +30,6 @@ class FarmError(Exception):
         super().__init__(message or ["", "no answer from the server", "user name or password rejected",
                                      "unexpected answer", "the driver does not know this kind of robot"][result])
         self.result = result
-
-
-def _text(fn, *args) -> str:
-    n = fn(*args, None, 0)
-    buf = ctypes.create_string_buffer(n + 1)
-    fn(*args, buf, n + 1)
-    return buf.value.decode(errors="replace")
 
 
 def _lib():
@@ -57,7 +50,7 @@ def _lib():
 
 def drivers() -> list[dict]:
     """The server software this build knows: [{"id", "name", "kinds", "link"}, ...]."""
-    return json.loads(_text(_lib().robot_drivers_json))
+    return json.loads(text(_lib().robot_drivers_json))
 
 
 def _hide(value):
@@ -101,13 +94,13 @@ class Farm:
         started = getattr(L, kind + "_read")(self._s)
         if started != OK:
             raise FarmError(started, "")
-        while request := _text(L.robot_request_json, self._s):
+        while request := text(L.robot_request_json, self._s):
             status, body = self._send(json.loads(request))
             L.robot_response(self._s, status, body, len(body))
-        self.notes = _text(L.robot_last_error, self._s)
+        self.notes = text(L.robot_last_error, self._s)
         if L.robot_result(self._s) != OK:
             raise FarmError(L.robot_result(self._s), self.notes)
-        return json.loads(_text(getattr(L, kind + "_json"), self._s))
+        return json.loads(text(getattr(L, kind + "_json"), self._s))
 
     def _send(self, r: dict) -> tuple[int, bytes]:
         # http.client, not urllib: urllib changes a header's case ("licensekey" -> "Licensekey") and

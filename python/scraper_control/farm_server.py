@@ -1,20 +1,25 @@
-"""A small HTTP service on the farm (on the robot PC): which animal is at which robot, live, and what
-the farm's management server knows about each animal. For other programs on the farm network,
-such as a camera system that wants to know which cow it sees (docs/FARM_API.md).
+"""A small HTTP service on a computer on the farm network: which animal is at which robot, live,
+and what the farm's management server knows about each animal. For other programs on the farm
+network, such as a camera system that wants to know which cow it sees (docs/FARM_API.md).
 
     python farm_server.py farm_server.json
 
 The configuration (JSON):
     {"listen": "0.0.0.0:8099",
-     "robots": [{"name": "Robot 1", "driver": "lely-lfw", "address": "10.4.1.101"}, ...],
+     "token": "",
+     "robots": [{"name": "Robot 1", "driver": "lfw", "address": "10.4.1.101"}, ...],
      "server": {"driver": "t4c", "address": "10.4.1.1:6969", "user": "", "password": ""},
      "herdRefreshSeconds": 300}
-"server" is optional (without it only the live part). For T4C an empty user and the licence key
-as password; the password can also come from the environment (FARM_SERVER_PASSWORD), so that
-it does not have to be in the file. It only reads: nothing here changes anything on the farm.
+"token": what every request carries (Authorization: Bearer <token>); without one only this
+computer itself is answered. "server" is optional (without it only the live part); its password
+is the user's, or the farm's licence key with an empty user where the server takes one. Token and
+password can also come from the environment (FARM_SERVER_TOKEN, FARM_SERVER_PASSWORD), so that
+they do not have to be in the file. It only reads: nothing here changes anything on the farm.
 """
 from __future__ import annotations
 
+import hmac
+import ipaddress
 import json
 import os
 import threading
@@ -23,7 +28,7 @@ import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from .farm import Farm, FarmError
-from .live import Listener
+from .live import Listener, now_ms
 
 VERSION = 1
 EVENTS_KEPT = 1000
@@ -32,16 +37,13 @@ WAIT_MAX = 60
 HERD_FIELDS = ("lifeNumber", "workNumber", "production", "reproduction", "lactation", "daysInMilk", "pregnantDays", "expectedCalving")
 
 
-def _now_ms() -> int:
-    return int(time.time() * 1000)
-
-
 class FarmService:
     """The robots' listeners, the herd (read again every herdRefreshSeconds) and the events of all
     robots in one row with its own numbering. Thread-safe; the HTTP handler only reads from it."""
 
     def __init__(self, config: dict, listener=Listener, farm=Farm):
         self.config = config
+        self.token = config.get("token") or os.environ.get("FARM_SERVER_TOKEN", "")
         self._lock = threading.Condition()
         self._events: list[dict] = []
         self._seq = 0
@@ -55,7 +57,7 @@ class FarmService:
         self.robots = []
         for r in config.get("robots", []):
             name = r.get("name") or r["address"]
-            self.robots.append((name, r.get("driver", "lely-lfw"), listener(r.get("driver", "lely-lfw"), r["address"], on_event=self._on_event(name))))
+            self.robots.append((name, r["driver"], listener(r["driver"], r["address"], on_event=self._on_event(name))))
         self._herd_thread = None
         if config.get("server"):
             self._herd_thread = threading.Thread(target=self._herd_loop, name="herd", daemon=True)
@@ -75,7 +77,7 @@ class FarmService:
             with self._farm_cls(s["driver"], s["address"], s.get("user", ""), password) as farm:
                 animals = farm.herd()["animals"]
             with self._lock:
-                self._herd, self._herd_at, self._herd_error = animals, _now_ms(), ""
+                self._herd, self._herd_at, self._herd_error = animals, now_ms(), ""
                 self._by_responder = {a["responder"]: a for a in animals if a.get("responder")}
                 self._by_number = {a["number"]: a for a in animals if a.get("number")}
         except (FarmError, OSError, ValueError) as e:
@@ -137,7 +139,7 @@ class FarmService:
     def status_json(self) -> dict:
         robots = [lst.state() for _, _, lst in self.robots]
         with self._lock:
-            return {"service": "scraper-control farm", "version": VERSION, "time": _now_ms(),
+            return {"service": "scraper-control farm", "version": VERSION, "time": now_ms(),
                     "robots": len(robots), "robotsConnected": sum(1 for r in robots if r["connected"]),
                     "herd": None if not self.config.get("server") else
                     {"animals": len(self._herd), "updated": self._herd_at or None, "error": self._herd_error},
@@ -147,6 +149,13 @@ class FarmService:
         self._stop.set()
         for _, _, lst in self.robots:
             lst.close()
+
+
+def allowed(token: str, authorization: str, client: str) -> bool:
+    """With a token: a request that carries it. Without one: only this computer itself."""
+    if token:
+        return hmac.compare_digest(authorization.encode(), b"Bearer " + token.encode())
+    return ipaddress.ip_address(client).is_loopback
 
 
 def handler(service: FarmService):
@@ -161,12 +170,13 @@ def handler(service: FarmService):
             self.send_response(status)
             self.send_header("Content-Type", "application/json; charset=utf-8")
             self.send_header("Content-Length", str(len(data)))
-            self.send_header("Access-Control-Allow-Origin", "*")
             self.send_header("Cache-Control", "no-store")
             self.end_headers()
             self.wfile.write(data)
 
         def do_GET(self):
+            if not allowed(service.token, self.headers.get("Authorization", ""), self.client_address[0]):
+                return self._json(401, {"error": "Authorization: Bearer <token> needed" if service.token else "no token set: only this computer is answered"})
             u = urllib.parse.urlsplit(self.path)
             q = {k: v[-1] for k, v in urllib.parse.parse_qs(u.query).items()}
             path = u.path.rstrip("/")

@@ -45,7 +45,7 @@ def read(farm, password="geheim"):
 
 def test_driver_is_listed():
     d = next(d for d in drivers() if d["id"] == "t4c")
-    assert d["kinds"] == ["milking", "herd"] and d["link"] == {"kind": "http", "scheme": "http", "port": 80}
+    assert d["kinds"] == ["milking", "herd"] and d["link"] == {"kind": "http", "scheme": "http", "port": 6969}
 
 
 def test_robots_alarms_and_figures():
@@ -105,7 +105,7 @@ def test_a_login_the_server_does_not_take_ends_the_read():
     try:
         read(farm)
     except FarmError as e:
-        assert e.result == 3 and farm.count(LOGIN) == 2   # one new login, then it gives up
+        assert e.result == 2 and farm.count(LOGIN) == 2   # one new login, then it gives up: rejected
     else:
         assert False
 

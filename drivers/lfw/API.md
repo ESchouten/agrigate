@@ -1,11 +1,11 @@
-# Lely LFW live driver
+# LFW live driver
 
-Which cow is in an Astronaut's box, from the robot's own messages (`core/live_c.h`). Link: `udp`,
-port 6000 on the robot. The driver is `src/LelyLfw.cpp`.
+Which cow is in a milking robot's box, from the robot's own messages (`core/live_c.h`). Link: `udp`,
+port 6000 on the robot. The driver is `src/Lfw.cpp`.
 
 ## How
 
-The robot PC (an Astronaut A4: ARM, Linux) runs a program `Proxy` on UDP port 6000 that hands
+The robot's own computer (on an A4: ARM, Linux) runs a program `Proxy` on UDP port 6000 that hands
 every internal LFW message to the clients registered with it. The farm software T4C registers
 the same way ("LogService").
 
@@ -21,6 +21,9 @@ NUL. Any other message only counts as "the robot is there" (`connected`).
 
 The driver never sends an LFW message (`0xD156`) itself: what it sends is its registration and
 nothing else, so it cannot change anything on the robot.
+
+The robot's own computer is not a server meant for other programs, as a farm's management server
+is: this driver is **experimental** until it has run for longer than the check below.
 
 ## Checked on real robots
 

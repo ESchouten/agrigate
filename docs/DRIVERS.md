@@ -20,7 +20,7 @@ the same C++ runs on a phone, a computer and a microcontroller.
 | For | A robot with its own radio | What the farm's management software knows | What a robot says on the farm network as it happens |
 | API in `core/` | `scraper_c.h` | `robot_c.h`, and per kind a header on top: `milking_c.h`, `herd_c.h` | `live_c.h` |
 | Links | `ble-serial`, `bt-serial`: bytes both ways | `http`: a request and its answer | `udp`: datagrams to and from the robot |
-| Drivers | `lely` | `t4c`, `fullsense` | `lely_lfw` |
+| Drivers | `lely` | `t4c`, `fullsense` | `lfw` |
 | In one build | One driver | Every driver (`core/robot/Drivers.cpp`) | Every driver (`core/robot/Drivers.cpp`, `live::kDrivers`) |
 | Used by | Buttons, apps, Python | Python (`scraper_control.farm`, `farm.py`, `farm_server.py`) | Python (`scraper_control.live`, `farm_server.py`) |
 
@@ -71,4 +71,4 @@ For a make whose robots say on the farm network which animal they identified: on
 4. Add it to `live::kDrivers` in `core/robot/Drivers.cpp`, and its make to the table in the README.
 
 A live driver only listens: it sends no more than the robot needs to hand its messages on, never
-a command. Its tests feed it datagrams through the C API (`drivers/lely_lfw/tests`).
+a command. Its tests feed it datagrams through the C API (`drivers/lfw/tests`).

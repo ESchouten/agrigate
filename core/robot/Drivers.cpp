@@ -11,9 +11,9 @@ const int kDriverCount = sizeof kDrivers / sizeof *kDrivers;
 
 // Every live driver (core/live_c.h): which animal is at a robot, from the robot itself.
 namespace live {
-extern const Driver lelyLfw;
+extern const Driver lfw;
 
-const Driver* const kDrivers[] = {&lelyLfw};
+const Driver* const kDrivers[] = {&lfw};
 const int kDriverCount = sizeof kDrivers / sizeof *kDrivers;
 }  // namespace live
 

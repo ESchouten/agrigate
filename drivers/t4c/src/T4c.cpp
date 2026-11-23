@@ -1,4 +1,4 @@
-// The T4C farm management server (Lely Horizon): its milking robots and its herd, read only.
+// The T4C farm management server: its milking robots and its herd, read only.
 // Checked against a real server (T4C 4.22, two Astronauts, 92 animals, 2026-11-23); see ../API.md.
 #include "Robot.h"
 
@@ -75,8 +75,8 @@ void readMilking(Session& s) {
   });
 }
 
-// ---- the herd: seven requests whatever its size (Animals/active, the status per 150 animals,
-// the farm's number, the sires and four lists of events in the ICAR format the server also offers)
+// ---- the herd: seven requests and one more per 150 animals (Animals/active, their status, the
+// farm's number, the sires and four lists of events in the ICAR format the server also offers)
 
 // T4C's ReproductionStatusId (GET /t4capi/reproductionstatustypes on a real server)
 const char* reproduction(double id) {
@@ -121,6 +121,11 @@ struct HerdRead {
   std::map<std::string, std::string> sireByCode, sireByLife;  // -> the sire's name
   std::string ucn;
 };
+
+std::string found(const std::map<std::string, std::string>& in, const std::string& key) {
+  auto it = in.find(key);
+  return it == in.end() ? "" : it->second;
+}
 
 herd::Animal* animal(Session& s, HerdRead& h, const Json& icarAnimal) {
   auto it = h.byLife.find(icarAnimal["id"].str());
@@ -187,7 +192,8 @@ void readHerd(Session& s) {
             n.date = herd::day(e["eventDateTime"].str());
             n.sireCode = idOf(e["sireIdentifiers"], "nl.aicode");
             n.sireLifeNumber = idOf(e["sireIdentifiers"], "eu.bovine");
-            n.sireName = h->sireByCode.count(n.sireCode) ? h->sireByCode[n.sireCode] : h->sireByLife[n.sireLifeNumber];
+            n.sireName = found(h->sireByCode, n.sireCode);
+            if (n.sireName.empty()) n.sireName = found(h->sireByLife, n.sireLifeNumber);
             n.type = inseminationType(e["inseminationType"].str());
             x->inseminations.push_back(n);
           }
@@ -207,6 +213,6 @@ void readHerd(Session& s) {
 
 }  // namespace
 
-extern const Driver t4c = {"t4c", "T4C", "http", 80, login, readMilking, readHerd};
+extern const Driver t4c = {"t4c", "T4C", "http", 6969, login, readMilking, readHerd};
 
 }  // namespace robot

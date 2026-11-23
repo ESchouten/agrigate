@@ -74,7 +74,8 @@ void Session::response(int status, const std::string& body) {
     r.then(answer);
   } else {
     const std::string why = what + (good ? ": not JSON" : ": HTTP " + std::to_string(status));
-    if (!r.optional) return fail(ROBOT_UNEXPECTED, why);
+    // a 401 here is the second one: the server does not take the login it was just given
+    if (!r.optional) return fail(status == 401 ? ROBOT_LOGIN_REJECTED : ROBOT_UNEXPECTED, why);
     error_ += (error_.empty() ? "" : "; ") + why;
   }
   if (loggingIn_ && queue_.empty() && result_ == ROBOT_OK) {   // logged in: now the read

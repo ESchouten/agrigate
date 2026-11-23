@@ -74,6 +74,14 @@ def lib():
     return _lib
 
 
+def text(fn, *args) -> str:
+    """What a C call that copies text into (buf, size) gives: asked for its length, then read."""
+    n = fn(*args, None, 0)
+    buf = ctypes.create_string_buffer(n + 1)
+    fn(*args, buf, n + 1)
+    return buf.value.decode(errors="replace")
+
+
 def links_info() -> list[dict]:
     """How the driver's robots are reached, preferred first: [{"kind": "ble-serial", ...}, ...]
     (see core/scraper_c.h)."""
@@ -155,17 +163,11 @@ class CoreSession:
         return self._run(lib().scraper_finish(self._s))
 
     # state
-    def _text(self, fn) -> str:
-        n = fn(self._s, None, 0)
-        buf = ctypes.create_string_buffer(n + 1)
-        fn(self._s, buf, n + 1)
-        return buf.value.decode(errors="replace")
-
     def status(self) -> dict:
-        return json.loads(self._text(lib().scraper_status_json))
+        return json.loads(text(lib().scraper_status_json, self._s))
 
     def last_error(self) -> str:
-        return self._text(lib().scraper_last_error)
+        return text(lib().scraper_last_error, self._s)
 
     def image_version(self) -> tuple[bytes, bool]:
         buf = ctypes.create_string_buffer(9)

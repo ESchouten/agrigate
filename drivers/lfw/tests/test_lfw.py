@@ -1,11 +1,12 @@
-"""Offline tests: the Lely LFW live driver through its C API (core/live_c.h), fed with datagrams as
+"""Offline tests: the LFW live driver through its C API (core/live_c.h), fed with datagrams as
 a robot's proxy sends them (the format was read on two Astronaut A4s). Run:
-python3 drivers/lely_lfw/tests/test_lely_lfw.py"""
+python3 drivers/lfw/tests/test_lfw.py"""
 import ctypes, json, os, struct, sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 from farm_test import run  # noqa: builds the library and points the Python API at it
-from scraper_control.live import _lib, _text, drivers
+from scraper_control.core import text
+from scraper_control.live import _lib, drivers
 
 T0 = 1_795_430_000_000   # ms
 
@@ -21,7 +22,7 @@ def cow(responder, number, name):
 class Robot:
     def __init__(self):
         self.L = _lib()
-        self.s = self.L.live_open(b"lely-lfw", b"10.4.1.101")
+        self.s = self.L.live_open(b"lfw", b"10.4.1.101")
 
     def tick(self, t):
         self.L.live_tick(self.s, t)
@@ -37,10 +38,10 @@ class Robot:
         self.L.live_incoming(self.s, datagram, len(datagram), t)
 
     def state(self, t):
-        return json.loads(_text(self.L.live_json, self.s, t))
+        return json.loads(text(self.L.live_json, self.s, t))
 
     def events(self, after=0):
-        return json.loads(_text(self.L.live_events_json, self.s, after))
+        return json.loads(text(self.L.live_events_json, self.s, after))
 
 
 def registration(on):
@@ -48,7 +49,7 @@ def registration(on):
 
 
 def test_listed():
-    assert {"id": "lely-lfw", "name": "Lely Astronaut (LFW)", "link": {"kind": "udp", "port": 6000}} in drivers()
+    assert {"id": "lfw", "name": "LFW", "link": {"kind": "udp", "port": 6000}} in drivers()
 
 
 def test_registers_and_renews_every_two_seconds():

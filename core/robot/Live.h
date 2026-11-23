@@ -1,6 +1,6 @@
 // What a live driver is built from (core/live_c.h is the same seen from a host): per make of
 // robot, how to keep the robot handing on its messages and how a message says which animal is
-// there. A driver is one file in drivers/<name>/src; it adds itself to kLiveDrivers in Drivers.cpp.
+// there. A driver is one file in drivers/<name>/src; it is added to live::kDrivers in Drivers.cpp.
 #pragma once
 
 #include <cstdint>
@@ -14,7 +14,7 @@ class Session;
 
 struct Driver {
   const char* id;     // stored with a robot: never change it
-  const char* name;   // the make / protocol
+  const char* name;   // what the robots speak
   int port;           // the robot's UDP port
   /** Called every ~100 ms: queue what has to be sent now (Session::send). */
   void (*tick)(Session&, int64_t now);

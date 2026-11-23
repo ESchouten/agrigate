@@ -1,7 +1,7 @@
 # T4C driver
 
-Reads the milking robots and the herd a T4C farm management server (Lely Horizon) knows. Link:
-`http`, on a real server port 6969 (`10.4.1.1:6969` on the robot network). The driver is
+Reads the milking robots and the herd a T4C farm management server knows. Link:
+`http`, port 6969 (a real server: `10.4.1.1:6969` on the robot network). The driver is
 `src/T4c.cpp`; it only asks, with `GET` (and the login's `POST` when a user name is given).
 
 ## Login
@@ -31,7 +31,7 @@ as written). An error comes as HTTP 200 with `ServerEror.Code` other than 200: t
 
 ## The herd
 
-Thirteen requests or fewer, whatever the herd's size:
+Seven requests and one more per 150 animals:
 
 | Call | For |
 |---|---|
@@ -66,6 +66,7 @@ Still open:
 - what an alarm's `type` says about its severity (now `unknown`);
 - over which time the figures run (they looked like the last 24 hours);
 - the login with a user name and password;
+- what a real server answers to a licence key it does not know (a `401` ends as "login rejected");
 - an insemination by the farmer himself (`InseminationType` gave only `Insemination` here).
 
 To see what a server says:

@@ -24,15 +24,15 @@ Python script.
 | Robot | Kind | Connection | Driver |
 |---|---|---|---|
 | Lely Discovery | Manure scraper | Bluetooth LE, or classic Bluetooth on older robots (not on iOS) | [`drivers/lely`](drivers/lely) |
-| Lely Astronaut | Milking robot and herd, read only | The farm's T4C server (Horizon) on the local network | [`drivers/t4c`](drivers/t4c/API.md) |
-| Lely Astronaut A4 | Which cow is in the box, live | The robot itself on the robot network (UDP) | [`drivers/lely_lfw`](drivers/lely_lfw/API.md) |
+| Lely Astronaut | Milking robot and herd, read only | The farm's T4C server on the local network | [`drivers/t4c`](drivers/t4c/API.md) |
+| Lely Astronaut A4 | Which cow is in the box, live (experimental) | The robot itself on the robot network (UDP) | [`drivers/lfw`](drivers/lfw/API.md) |
 | Fullwood M²erlin | Milking robot, read only | The farm's FULLSENSE server on the local network | [`drivers/fullsense`](drivers/fullsense/API.md) |
 
 Milking robots are new: their state, alarms and figures, the herd (numbers, lactation,
 reproduction, inseminations) and which cow is at which robot right now can be read with Python
 (`farm.py`), not yet in the apps or on the buttons. The **farm service** (`python/farm_server.py`)
 offers it over HTTP to other programs on the farm, such as a camera system that wants to know which
-cow it sees: [docs/FARM_API.md](docs/FARM_API.md). The T4C and Lely LFW drivers were checked on a real
+cow it sees: [docs/FARM_API.md](docs/FARM_API.md). The `t4c` and `lfw` drivers were checked on a real
 farm; the FULLSENSE driver has not met a real server yet (see each driver's page).
 
 ## Install
@@ -87,11 +87,11 @@ hold left = done.
 
 | Folder | What |
 |---|---|
-| `core/` | The robot APIs, one per kind of robot and the same for every make: `scraper_c.h` (manure scrapers), `robot_c.h` with `milking_c.h` (robots read through the farm's server) |
+| `core/` | The robot APIs, one per kind of robot and the same for every make: `scraper_c.h` (manure scrapers), `robot_c.h` with `milking_c.h` and `herd_c.h` (read through the farm's server), `live_c.h` (what a robot says on the farm network) |
 | `drivers/` | One folder per robot type or server software: everything specific to it |
 | `firmware/` | The M5Stack buttons (PlatformIO) |
 | `native/` | The apps: shared Kotlin, Compose for Android and desktop, SwiftUI for iOS ([README](native/README.md)) |
-| `python/` | The Python library `scraper_control` and the command lines `scraper.py` and `farm.py` |
+| `python/` | The Python library `scraper_control` and the command lines `scraper.py`, `farm.py` and `farm_server.py` |
 | `tools/` | Build secrets |
 
 Every client only provides the link to the robot (bytes in, bytes out, or a request and its
@@ -115,6 +115,7 @@ connect.
 ```bash
 python3 tests/test_firmware.py                    # the buttons' firmware on a computer
 for t in drivers/*/tests/test_*.py; do python3 $t; done  # each driver against its simulated robot or server
+python3 tests/test_farm_server.py                 # the farm service with made-up robots and herd
 cd native && ./gradlew :shared:jvmTest :composeApp:jvmTest
 ```
 

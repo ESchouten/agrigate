@@ -1,12 +1,13 @@
-// Lely Astronaut (A4): which cow is in the box, from the robot's own messages (live_c.h).
+// LFW: which cow is in a milking robot's box, from the robot's own messages (live_c.h).
 //
-// The robot PC runs a proxy on UDP port 6000 that hands every internal LFW message to the clients
+// The robot's own computer runs a proxy on UDP port 6000 that hands every internal LFW message to the clients
 // registered with it (the farm software T4C registers the same way). This driver registers, renews
 // that every 2 s and reads one message: "cow number and name", which the robot sends when it has
 // read a cow's responder at the start of a visit. It never sends an LFW message itself.
 // See ../API.md for the format and what was checked on real robots.
 #include <cstring>
 
+#include "Json.h"
 #include "Live.h"
 
 namespace robot {
@@ -33,7 +34,7 @@ std::string registration(bool on) {
 }
 
 // UTF-16LE up to the first NUL, as UTF-8
-std::string utf8(const std::string& d, size_t from) {
+std::string text(const std::string& d, size_t from) {
   std::string o;
   for (size_t i = from; i + 1 < d.size(); i += 2) {
     unsigned c = u16(d, i);
@@ -42,10 +43,7 @@ std::string utf8(const std::string& d, size_t from) {
       unsigned low = u16(d, i + 2);
       if (low >= 0xDC00 && low < 0xE000) { c = 0x10000 + ((c - 0xD800) << 10) + (low - 0xDC00); i += 2; }
     }
-    if (c < 0x80) o += (char)c;
-    else if (c < 0x800) { o += (char)(0xC0 | c >> 6); o += (char)(0x80 | (c & 0x3F)); }
-    else if (c < 0x10000) { o += (char)(0xE0 | c >> 12); o += (char)(0x80 | (c >> 6 & 0x3F)); o += (char)(0x80 | (c & 0x3F)); }
-    else { o += (char)(0xF0 | c >> 18); o += (char)(0x80 | (c >> 12 & 0x3F)); o += (char)(0x80 | (c >> 6 & 0x3F)); o += (char)(0x80 | (c & 0x3F)); }
+    utf8(o, c);
   }
   while (!o.empty() && o.back() == ' ') o.pop_back();
   return o;
@@ -66,7 +64,7 @@ void incoming(Session& s, const std::string& d, int64_t now) {
   const std::string data = d.substr(12, length);
   const uint32_t responder = u32(data, 0), number = u32(data, 4);
   Animal a;
-  a.name = utf8(data, 8);
+  a.name = text(data, 8);
   if (a.name.empty() || responder == 0 || responder >= 100000000) return;   // not a cow
   a.responder = std::to_string(responder);
   a.number = std::to_string(number);
@@ -77,7 +75,7 @@ void stop(Session& s) { s.send(registration(false)); }
 
 }  // namespace
 
-extern const Driver lelyLfw = {"lely-lfw", "Lely Astronaut (LFW)", 6000, tick, incoming, stop};
+extern const Driver lfw = {"lfw", "LFW", 6000, tick, incoming, stop};
 
 }  // namespace live
 }  // namespace robot

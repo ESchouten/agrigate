@@ -10,7 +10,7 @@ except ImportError:
     m = types.ModuleType("bleak"); m.BleakClient = m.BleakScanner = object; sys.modules["bleak"] = m
 
 from scraper_control.farm import FarmError
-from scraper_control.farm_server import serve
+from scraper_control.farm_server import allowed, serve
 
 HERD = [
     {"id": "4", "number": "15", "name": "DINA 1", "lifeNumber": "NL 100000001", "workNumber": "", "responder": "1000015",
@@ -59,9 +59,10 @@ class FakeFarm:
         return {"animals": HERD}
 
 
-def start(server=True):
+def start(server=True, token=""):
     FakeListener.made = []
-    config = {"listen": "127.0.0.1:0", "robots": [{"name": "Robot 1", "address": "10.4.1.101"}, {"name": "Robot 2", "address": "10.4.1.102"}]}
+    config = {"listen": "127.0.0.1:0", "token": token,
+              "robots": [{"name": "Robot 1", "driver": "lfw", "address": "10.4.1.101"}, {"name": "Robot 2", "driver": "lfw", "address": "10.4.1.102"}]}
     if server:
         config["server"] = {"driver": "t4c", "address": "10.4.1.1:6969", "user": "", "password": "key"}
     httpd, service = serve(config, listener=FakeListener, farm=FakeFarm)
@@ -72,10 +73,11 @@ def start(server=True):
     return base, service, httpd
 
 
-def get(base, path, status=200):
+def get(base, path, status=200, token=None):
+    request = urllib.request.Request(base + path, headers={"Authorization": "Bearer " + token} if token else {})
     try:
-        with urllib.request.urlopen(base + path, timeout=10) as r:
-            assert r.status == status and r.headers["Access-Control-Allow-Origin"] == "*"
+        with urllib.request.urlopen(request, timeout=10) as r:
+            assert r.status == status
             return json.loads(r.read())
     except urllib.error.HTTPError as e:
         assert e.code == status, (e.code, path)
@@ -94,7 +96,7 @@ def test_robots_with_the_herd_added():
     assert [r["animal"] for r in get(base, "/api/robots")["robots"]] == [None, None]
     FakeListener.made[1].arrive("15", "DINA 1", "1000015")
     robot = get(base, "/api/robots")["robots"][1]
-    assert (robot["name"], robot["address"], robot["driver"]) == ("Robot 2", "10.4.1.102", "lely-lfw")
+    assert (robot["name"], robot["address"], robot["driver"]) == ("Robot 2", "10.4.1.102", "lfw")
     a = robot["animal"]
     assert (a["number"], a["name"], a["responder"], a["lifeNumber"], a["reproduction"], a["daysInMilk"], a["expectedCalving"]) == (
         "15", "DINA 1", "1000015", "NL 100000001", "pregnant", 162, "2027-06-24")
@@ -160,6 +162,21 @@ def test_the_server_not_answering_keeps_the_live_part():
         httpd.shutdown()
     finally:
         FakeFarm.fail = False
+
+
+def test_with_a_token_every_request_carries_it():
+    base, service, httpd = start(token="geheim")
+    assert get(base, "/api/status", token="geheim")["robots"] == 2
+    for wrong in (None, "fout", "geheim2"):
+        assert get(base, "/api/animals", 401, token=wrong) == {"error": "Authorization: Bearer <token> needed"}
+    httpd.shutdown()
+
+
+def test_without_a_token_only_this_computer_is_answered():
+    base, service, httpd = start()
+    assert get(base, "/api/status")["robots"] == 2   # the test is this computer
+    assert not allowed("", "", "192.168.1.20") and not allowed("", "Bearer x", "10.4.1.50")
+    httpd.shutdown()
 
 
 def test_unknown_path():

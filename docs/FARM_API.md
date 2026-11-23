@@ -1,13 +1,13 @@
 # Farm service: which cow is where, over HTTP
 
-A small service for the robot PC (or any computer on the farm network) that tells other programs,
+A small service for a computer on the farm network that tells other programs,
 such as a camera system that wants to know which cow it sees, **which animal is at which robot
 right now** and **what the farm's management server knows about every animal**. It only reads:
 nothing in it changes anything on the farm.
 
 - **Live**, from the robots themselves (`core/live_c.h`): the robot says which cow it identified
   the moment it reads her responder. One listener per robot, so a farm with ten robots works the
-  same as one with one. Driver: `lely-lfw` (Lely Astronaut A4).
+  same as one with one. Driver: `lfw`.
 - **The herd**, from the farm's server (`core/herd_c.h`): name, numbers, lactation, days in milk,
   reproduction, inseminations, pregnancy checks. Read again every 5 minutes. Driver: `t4c`.
 
@@ -17,9 +17,8 @@ a client usually needs only `/api/events`.
 ## Start
 
 ```bash
-cd python
-pip install bleak            # the package's own dependency (the scraper robots); not used here
-FARM_SERVER_PASSWORD=<licence key> python farm_server.py farm_server.json
+cd python && pip install -e .
+FARM_SERVER_TOKEN=<token> FARM_SERVER_PASSWORD=<licence key> python farm_server.py farm_server.json
 ```
 
 `farm_server.json`:
@@ -28,8 +27,8 @@ FARM_SERVER_PASSWORD=<licence key> python farm_server.py farm_server.json
 {
   "listen": "0.0.0.0:8099",
   "robots": [
-    {"name": "Robot 1", "driver": "lely-lfw", "address": "10.4.1.101"},
-    {"name": "Robot 2", "driver": "lely-lfw", "address": "10.4.1.102"}
+    {"name": "Robot 1", "driver": "lfw", "address": "10.4.1.101"},
+    {"name": "Robot 2", "driver": "lfw", "address": "10.4.1.102"}
   ],
   "server": {"driver": "t4c", "address": "10.4.1.1:6969", "user": ""},
   "herdRefreshSeconds": 300
@@ -38,17 +37,24 @@ FARM_SERVER_PASSWORD=<licence key> python farm_server.py farm_server.json
 
 - `robots[].address`: the robot's own address on the robot network (where its proxy listens on
   UDP 6000), not the farm server's.
-- `server` is optional: without it only the live part. For T4C (Lely Horizon) leave `user` empty
-  and give the farm's licence key as password, in the file (`"password"`) or, better, in the
-  environment as `FARM_SERVER_PASSWORD`. A user name and password of the T4C web pages work too.
-- Or without a file: `python farm_server.py --robot "Robot 1=10.4.1.101" --robot "Robot 2=10.4.1.102" --t4c 10.4.1.1:6969`.
+- `server` is optional: without it only the live part. For `t4c` leave `user` empty and give the
+  farm's licence key as password, in the file (`"password"`) or, better, in the environment as
+  `FARM_SERVER_PASSWORD`. A user name and password of the server's web pages work too.
+- The token is a word of your own choosing that every request has to carry, in the file
+  (`"token"`) or in the environment as `FARM_SERVER_TOKEN`. Without a token the service answers
+  only the computer it runs on.
 
-The service has no login of its own: run it on the farm network only, behind the farm's router.
+Plain HTTP: use it on the farm network only, never forward the port to the internet.
 
 ## The API
 
-Everything is `GET`, answers JSON (UTF-8) and allows any origin (CORS), so a web page can ask too.
-Times are milliseconds since 1970-01-01 UTC; dates are `YYYY-MM-DD` on the farm's own day; a value
+Every call carries the token:
+
+```
+Authorization: Bearer <token>
+```
+
+No token or a wrong one: `401`. Everything is `GET` and answers JSON (UTF-8). Times are milliseconds since 1970-01-01 UTC; dates are `YYYY-MM-DD` on the farm's own day; a value
 that is not known is `null` (numbers) or `""` (text).
 
 ### `GET /api/events?after=<seq>&wait=<seconds>`
@@ -83,7 +89,7 @@ Every robot with the animal it identified last:
 
 ```json
 {"robots": [
-  {"name": "Robot 2", "driver": "lely-lfw", "address": "10.4.1.102", "connected": true,
+  {"name": "Robot 2", "driver": "lfw", "address": "10.4.1.102", "connected": true,
    "lastMessage": 1795437955121,
    "animal": {"number": "73", "name": "JANNA 4", "responder": "1000073", "since": 1795437955042,
               "lifeNumber": "NL 100000073", "workNumber": "", "production": "milking",
@@ -92,7 +98,7 @@ Every robot with the animal it identified last:
 ]}
 ```
 
-- `connected`: the robot said something in the last 10 seconds (an Astronaut talks all the time).
+- `connected`: the robot said something in the last 10 seconds (a milking robot talks all the time).
 - `animal` stays until the next one is identified: the robot does not always say when a cow
   leaves (a cow it refuses walks on without a word). `since` tells how old it is.
 - With a TCS passage (robot 1 leads to robot 2) robot 1 also identifies the cows that walk
@@ -129,11 +135,11 @@ the last good read stay. `/api/animals/<key>` gives one animal, or 404.
 
 `herd` is `null` without a server.
 
-## What each make gives
+## What each driver gives
 
-| | Live (robot) | Herd (server) |
+| Drivers | Live (robot) | Herd (server) |
 |---|---|---|
-| Lely Astronaut A4 + Horizon/T4C | number, name, responder | everything above; `workNumber` is empty (T4C has none: in the Netherlands it is usually the last four digits before the check digit of the life number) |
+| `lfw` + `t4c` | number, name, responder | everything above; `workNumber` is empty (T4C has none: in the Netherlands it is usually the last four digits before the check digit of the life number) |
 
-A new make adds a live driver (`drivers/<name>/src`, [DRIVERS.md](DRIVERS.md)) and/or a herd read
+The makes behind the drivers are in the README's table. A new make adds a live driver (`drivers/<name>/src`, [DRIVERS.md](DRIVERS.md)) and/or a herd read
 in its server driver; this API stays the same.

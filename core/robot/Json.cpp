@@ -20,12 +20,6 @@ struct Parser {
   bool take(char c) { space(); if (p < end && *p == c) { p++; return true; } return false; }
   bool word(const char* w) { size_t n = strlen(w); if ((size_t)(end - p) >= n && !memcmp(p, w, n)) { p += n; return true; } return false; }
 
-  static void utf8(std::string& o, unsigned c) {
-    if (c < 0x80) o += (char)c;
-    else if (c < 0x800) { o += (char)(0xC0 | c >> 6); o += (char)(0x80 | (c & 0x3F)); }
-    else if (c < 0x10000) { o += (char)(0xE0 | c >> 12); o += (char)(0x80 | ((c >> 6) & 0x3F)); o += (char)(0x80 | (c & 0x3F)); }
-    else { o += (char)(0xF0 | c >> 18); o += (char)(0x80 | ((c >> 12) & 0x3F)); o += (char)(0x80 | ((c >> 6) & 0x3F)); o += (char)(0x80 | (c & 0x3F)); }
-  }
   bool hex4(unsigned& c) {
     if (end - p < 4) return false;
     char b[5] = {p[0], p[1], p[2], p[3], 0};
@@ -132,6 +126,13 @@ const Json& Json::at(size_t index) const { return index < items.size() ? items[i
 const std::string& Json::str() const { return type == String || type == Number || type == Bool ? text : kEmpty; }
 
 double Json::num(double fallback) const { return type == Number ? strtod(text.c_str(), nullptr) : fallback; }
+
+void utf8(std::string& o, unsigned c) {
+  if (c < 0x80) o += (char)c;
+  else if (c < 0x800) { o += (char)(0xC0 | c >> 6); o += (char)(0x80 | (c & 0x3F)); }
+  else if (c < 0x10000) { o += (char)(0xE0 | c >> 12); o += (char)(0x80 | ((c >> 6) & 0x3F)); o += (char)(0x80 | (c & 0x3F)); }
+  else { o += (char)(0xF0 | c >> 18); o += (char)(0x80 | ((c >> 12) & 0x3F)); o += (char)(0x80 | ((c >> 6) & 0x3F)); o += (char)(0x80 | (c & 0x3F)); }
+}
 
 std::string quote(const std::string& s) {
   std::string o = "\"";

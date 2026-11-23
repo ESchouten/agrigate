@@ -27,6 +27,9 @@ struct Json {
   double num(double fallback = -1) const;
 };
 
+/** Adds the character [codepoint] to [out] as UTF-8. */
+void utf8(std::string& out, unsigned codepoint);
+
 /** [s] as a JSON string, quotes included. */
 std::string quote(const std::string& s);
 
