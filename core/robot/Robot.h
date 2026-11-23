@@ -11,6 +11,7 @@
 #include <string>
 
 #include "Json.h"
+#include "Herd.h"
 #include "Milking.h"
 #include "robot_c.h"
 
@@ -27,6 +28,8 @@ struct Driver {
   void (*login)(Session&);
   /** Per kind of robot: fill that kind's data in the session. Null: the driver has no such robots. */
   void (*milking)(Session&);
+  /** The herd the server knows (core/herd_c.h). Null: the server knows no herd. */
+  void (*herd)(Session&) = nullptr;
 };
 
 /** Every driver in this build (Drivers.cpp). */
@@ -45,6 +48,7 @@ class Session {
   std::map<std::string, std::string> headers;
 
   milking::Farm milking;
+  herd::Herd herd;
 
   /** [optional]: an answer that is not there (an error status, no JSON) is left out and noted
    *  in the error text instead of failing the read. */

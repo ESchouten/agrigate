@@ -1,9 +1,13 @@
-"""Robots that are read through the farm's management server (core/robot_c.h): milking robots.
+"""What is read through the farm's management server (core/robot_c.h): milking robots and the herd.
 
     from scraper_control.farm import Farm
     with Farm("t4c", "192.168.1.10", "user", "password") as farm:
         for robot in farm.milking()["robots"]:      # core/milking_c.h describes every field
             print(robot["name"], robot["state"])
+        for cow in farm.herd()["animals"]:          # core/herd_c.h
+            print(cow["number"], cow["name"], cow["reproduction"])
+
+A T4C server also takes the farm's licence key instead of a login: Farm("t4c", address, "", key).
 
 What to ask and what the answers mean is in the drivers (drivers/, C++), the same code as in
 the apps; this module only sends their HTTP requests. It reads only.
@@ -11,9 +15,9 @@ the apps; this module only sends their HTTP requests. It reads only.
 from __future__ import annotations
 
 import ctypes
+import http.client
 import json
-import urllib.error
-import urllib.request
+import urllib.parse
 
 from .core import lib
 
@@ -44,9 +48,9 @@ def _lib():
         L.robot_close.argtypes = [S]
         L.robot_response.argtypes = [S, ctypes.c_int32, ctypes.c_char_p, ctypes.c_int32]
         L.robot_drivers_json.argtypes = text
-        for name in ("robot_request_json", "robot_last_error", "milking_json"):
+        for name in ("robot_request_json", "robot_last_error", "milking_json", "herd_json"):
             getattr(L, name).argtypes = [S] + text
-        for name in ("robot_result", "milking_read"):
+        for name in ("robot_result", "milking_read", "herd_read"):
             getattr(L, name).argtypes = [S]
     return L
 
@@ -88,6 +92,10 @@ class Farm:
         """The farm's milking robots, read now."""
         return self._read("milking")
 
+    def herd(self) -> dict:
+        """The farm's animals as the server knows them, read now (core/herd_c.h)."""
+        return self._read("herd")
+
     def _read(self, kind: str) -> dict:
         L = _lib()
         started = getattr(L, kind + "_read")(self._s)
@@ -102,12 +110,24 @@ class Farm:
         return json.loads(_text(getattr(L, kind + "_json"), self._s))
 
     def _send(self, r: dict) -> tuple[int, bytes]:
-        request = urllib.request.Request(r["url"], r["body"].encode() or None, r["headers"], method=r["method"])
+        # http.client, not urllib: urllib changes a header's case ("licensekey" -> "Licensekey") and
+        # a T4C server then fails; the driver's headers go out exactly as it wrote them
+        u = urllib.parse.urlsplit(r["url"])
+        conn_type = http.client.HTTPSConnection if u.scheme == "https" else http.client.HTTPConnection
+        body = r["body"].encode()
         try:
-            with urllib.request.urlopen(request, timeout=self.timeout) as answer:
+            conn = conn_type(u.hostname, u.port, timeout=self.timeout)
+            try:
+                conn.putrequest(r["method"], (u.path or "/") + ("?" + u.query if u.query else ""), skip_accept_encoding=True)
+                for k, v in r["headers"].items():
+                    conn.putheader(k, v)
+                if body:
+                    conn.putheader("Content-Length", str(len(body)))
+                conn.endheaders(body or None)
+                answer = conn.getresponse()
                 status, body = answer.status, answer.read()
-        except urllib.error.HTTPError as e:
-            status, body = e.code, e.read()
+            finally:
+                conn.close()
         except OSError:   # no route, refused, timeout
             status, body = 0, b""
         if self.recording is not None:

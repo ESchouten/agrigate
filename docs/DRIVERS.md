@@ -15,14 +15,17 @@ the same C++ runs on a phone, a computer and a microcontroller.
 
 ## Two ways to reach a robot
 
-| | Reached directly | Read through the farm's server |
-|---|---|---|
-| For | A robot with its own radio | Robots the farm's management software knows |
-| API in `core/` | `scraper_c.h` | `robot_c.h`, and per kind a header on top: `milking_c.h` |
-| Links | `ble-serial`, `bt-serial`: bytes both ways | `http`: a request and its answer |
-| Drivers | `lely` | `t4c`, `fullsense` |
-| In one build | One driver | Every driver (`core/robot/Drivers.cpp`) |
-| Used by | Buttons, apps, Python | Python (`scraper_control.farm`, `farm.py`); the apps and buttons not yet |
+| | Reached directly | Read through the farm's server | Listened to (live) |
+|---|---|---|---|
+| For | A robot with its own radio | What the farm's management software knows | What a robot says on the farm network as it happens |
+| API in `core/` | `scraper_c.h` | `robot_c.h`, and per kind a header on top: `milking_c.h`, `herd_c.h` | `live_c.h` |
+| Links | `ble-serial`, `bt-serial`: bytes both ways | `http`: a request and its answer | `udp`: datagrams to and from the robot |
+| Drivers | `lely` | `t4c`, `fullsense` | `lely_lfw` |
+| In one build | One driver | Every driver (`core/robot/Drivers.cpp`) | Every driver (`core/robot/Drivers.cpp`, `live::kDrivers`) |
+| Used by | Buttons, apps, Python | Python (`scraper_control.farm`, `farm.py`, `farm_server.py`) | Python (`scraper_control.live`, `farm_server.py`) |
+
+The farm service (`python/farm_server.py`, [FARM_API.md](FARM_API.md)) puts the last two together:
+one live session per robot and the herd of the farm's server, over HTTP.
 
 ## A new driver for a farm's server
 
@@ -54,3 +57,18 @@ distance is decided per kind and per command, in the driver.
 
 A robot of a new kind that is reached directly gets its own API in `core/` in the way of
 `scraper_c.h`, on the links that are there.
+
+## A new live driver
+
+For a make whose robots say on the farm network which animal they identified: one file,
+`drivers/<name>/src/<Name>.cpp`, with a `robot::live::Driver` (`core/robot/Live.h`):
+
+1. `tick`: queue what has to go to the robot now (`Session::send`), for example a registration it
+   has to renew. Called about every 100 ms.
+2. `incoming`: a datagram from the robot; `Session::heard` when it is one of the robot's own,
+   `Session::arrival` when it says which animal is there.
+3. `stop`: the goodbye, if the robot wants one.
+4. Add it to `live::kDrivers` in `core/robot/Drivers.cpp`, and its make to the table in the README.
+
+A live driver only listens: it sends no more than the robot needs to hand its messages on, never
+a command. Its tests feed it datagrams through the C API (`drivers/lely_lfw/tests`).

@@ -19,10 +19,12 @@ from scraper_control.farm import Farm, FarmError, drivers  # noqa: for the tests
 class FakeFarm:
     """routes: {"GET /path?query": answer}. An answer is given as JSON; (status, text) is given
     as it is; a function gets the request's JSON and returns one of those. Every path but
-    `login` wants the login the server last handed out (`token`), else 401."""
+    `login` wants the login the server last handed out (`token`), else 401. With `key` (a server
+    that takes a licence key instead, as T4C does) every path wants the header "licensekey" with
+    that key, written exactly so: a real T4C fails on "Licensekey"."""
 
-    def __init__(self, login: str, routes: dict = None):
-        self.login, self.routes, self.token, self.asked = login, routes or {}, "login-1", []
+    def __init__(self, login: str, routes: dict = None, key: str = None):
+        self.login, self.routes, self.token, self.asked, self.key = login, routes or {}, "login-1", [], key
         farm = self
 
         class Handler(BaseHTTPRequestHandler):
@@ -30,7 +32,10 @@ class FakeFarm:
                 key = f"{self.command} {self.path}"
                 body = self.rfile.read(int(self.headers.get("Content-Length") or 0))
                 farm.asked.append((key, dict(self.headers)))
-                if key != farm.login and self.headers.get("Authorization") != "Bearer " + farm.token:
+                if farm.key is not None:
+                    taken = any(k == "licensekey" and v == farm.key for k, v in self.headers.items())
+                    answer = farm.routes.get(key, (404, "")) if taken else (500, '{"Data":null,"ServerEror":{"Code":500,"Message":"Object reference not set to an instance of an object."}}')
+                elif key != farm.login and self.headers.get("Authorization") != "Bearer " + farm.token:
                     answer = (401, "")
                 else:
                     answer = farm.routes.get(key, (404, ""))

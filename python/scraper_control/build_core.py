@@ -39,6 +39,8 @@ def build(out: Path = HERE / LIBNAME) -> Path:
     cxx = "clang++" if sys.platform == "darwin" else "g++"
     flags = ["-std=c++17", "-O2", "-fPIC", "-fvisibility=hidden", "-pthread"]
     flags += ["-dynamiclib"] if sys.platform == "darwin" else ["-shared"]
+    if sys.platform == "win32":   # MinGW: its runtime inside the DLL, so Python finds no missing libstdc++/libgcc
+        flags += ["-static"]
     includes = [arg for d in folders() for arg in ("-I", str(d))]
     subprocess.check_call([cxx, *flags, *includes, *(str(f) for f in sources() if f.suffix == ".cpp"), "-o", str(out)])
     return out
