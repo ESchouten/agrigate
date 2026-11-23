@@ -6,7 +6,7 @@ import nl.eschouten.scraper.app.LinkState
 import nl.eschouten.scraper.model.Capability
 import nl.eschouten.scraper.texts.tr
 
-const val APP_NAME = "Scraper Control"
+const val APP_NAME = "Agrigate Clean"
 
 data class StatePill(val text: String, val dot: Tone?, val spinning: Boolean, val tappable: Boolean)
 

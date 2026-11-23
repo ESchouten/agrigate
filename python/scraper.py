@@ -75,7 +75,7 @@ async def main(a) -> int:
 
 
 if __name__ == "__main__":
-    ap = argparse.ArgumentParser(description="Scraper Control: the robot via Bluetooth")
+    ap = argparse.ArgumentParser(description="Agrigate Clean: the robot via Bluetooth")
     ap.add_argument("--pin", help="the robot's PIN")
     ap.add_argument("--address", help="address (macOS: UUID); default: search")
     ap.add_argument("--name", help="robot name, when there are several")

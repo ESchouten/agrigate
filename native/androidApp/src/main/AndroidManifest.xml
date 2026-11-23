@@ -15,7 +15,7 @@
 
   <application
       android:name=".ScraperApp"
-      android:label="Scraper Control"
+      android:label="Agrigate Clean"
       android:icon="@mipmap/ic_launcher"
       android:theme="@style/Theme.Scraper"
       android:enableOnBackInvokedCallback="true"

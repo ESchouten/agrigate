@@ -104,7 +104,7 @@ fun main(args: Array<String>) {
         controller.dispose()
         exitApplication()
       },
-      title = "Scraper Control",
+      title = "Agrigate Clean",
       icon = icon,
       state = rememberWindowState(width = 420.dp, height = 820.dp),
       onPreviewKeyEvent = { e -> e.type == KeyEventType.KeyDown && e.key == Key.Escape && nav.back() },

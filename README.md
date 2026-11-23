@@ -1,7 +1,18 @@
-# Scraper Control
+# Agrigate
 
-Control your manure scraper robot with three physical buttons, a phone or computer app, or a
-Python script.
+Open software for the robots in the barn: one gate to all of them, whatever their make.
+
+| | For | State |
+|---|---|---|
+| **Agrigate Clean** | Manure robots: routes, schedule, manual driving | Apps, buttons, Python |
+| **Agrigate Milk** | Milking robots: state, alarms, figures (read only) | Python |
+| **Agrigate Cow** | The herd from the farm's server, and which cow is at which robot (read only) | Python, farm service |
+| **Agrigate Feed** | Feeding robots | Not yet |
+
+## Agrigate Clean
+
+Control your manure robot with three physical buttons, a phone or computer app, or a Python
+script.
 
 - **Buttons** (M5Stack): one route per button; hold for the schedule, manual driving and
   settings. Wifi is set up on the device itself, and it updates itself from the signed releases.

@@ -96,7 +96,7 @@ jobs:
           grep -q "$VERSION" firmware/.pio/build/m5stack-core/firmware.bin || { echo "the firmware does not carry version $VERSION"; exit 1; }
           cp firmware/.pio/build/m5stack-core/firmware.bin "$BIN"
           cp firmware/.pio/build/m5stack-core/firmware.elf "${BIN%.bin}.elf"   # reads a crash (docs/API.md)
-          echo "# Scraper Control $VERSION: one block per board" > out/update.ini
+          echo "# Agrigate Clean $VERSION: one block per board" > out/update.ini
           python3 firmware/sign_release.py "$BIN" --board m5stack-core --key "$FIRMWARE_SIGNING_KEY" --version "$VERSION" --build "$BUILD" >> out/update.ini
           cat out/update.ini
       - name: First-install image (bootloader, partitions and app in one file, from address 0)
@@ -238,7 +238,7 @@ jobs:
           cp docs/install/index.html site/
           cp "fw/scraper-control-m5stack-core-$VERSION-full.bin" site/scraper-control-m5stack-core-full.bin
           cat > site/manifest.json <<JSON
-          {"name": "Scraper Control buttons", "version": "$VERSION", "new_install_prompt_erase": true,
+          {"name": "Agrigate Clean buttons", "version": "$VERSION", "new_install_prompt_erase": true,
            "builds": [{"chipFamily": "ESP32", "parts": [{"path": "scraper-control-m5stack-core-full.bin", "offset": 0}]}]}
           JSON
       - name: Apt repository with this release's .deb (sudo apt upgrade; README > Install), signed
@@ -252,6 +252,7 @@ jobs:
           cd site/apt
           dpkg-scanpackages --arch amd64 pool /dev/null > dists/stable/main/binary-amd64/Packages
           gzip -9k dists/stable/main/binary-amd64/Packages
+          # Origin and Label stay: apt refuses a repository whose Origin changed until a person allows it
           apt-ftparchive -o APT::FTPArchive::Release::Origin="Scraper Control" -o APT::FTPArchive::Release::Label="Scraper Control" \
             -o APT::FTPArchive::Release::Suite=stable -o APT::FTPArchive::Release::Codename=stable \
             -o APT::FTPArchive::Release::Architectures=amd64 -o APT::FTPArchive::Release::Components=main \
@@ -292,8 +293,8 @@ jobs:
         run: |
           ls -laR dist
           gh release create "v$VERSION" dist/* \
-            --title "Scraper Control $VERSION" \
-            --notes "Scraper Control $VERSION.
+            --title "Agrigate Clean $VERSION" \
+            --notes "Agrigate Clean $VERSION.
 
           - M5 buttons: they install this version themselves (settings, or automatically once a day / on a new wifi connection).
           - Android: install the .apk, or follow this repository with Obtainium for automatic updates.

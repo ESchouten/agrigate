@@ -88,7 +88,7 @@ func notifyFailure(_ n: WidgetNotice) async {
   try? await center.add(UNNotificationRequest(identifier: "widget-failure", content: content, trigger: nil))
 }
 
-/// "Start route A with Scraper Control" in Siri and Shortcuts.
+/// "Start route A with Agrigate Clean" in Siri and Shortcuts.
 struct RouteShortcuts: AppShortcutsProvider {
   static var appShortcuts: [AppShortcut] {
     AppShortcut(

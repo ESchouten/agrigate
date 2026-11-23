@@ -149,8 +149,8 @@ class Tr(val code: String) {
       if (on) t("Planning aanzetten", "Switch the schedule on") else t("Planning uitzetten", "Switch the schedule off")
   val setupFirst: String get() = t("Stel eerst de app in", "Set up the app first")
   val setupFirstBody: String get() = t(
-    "Open Scraper Control en kies je robot. Daarna kun je de widget plaatsen.",
-    "Open Scraper Control and choose your robot. Then you can place the widget.",
+    "Open Agrigate Clean en kies je robot. Daarna kun je de widget plaatsen.",
+    "Open Agrigate Clean and choose your robot. Then you can place the widget.",
   )
   val whichRoute: String get() = t("Welke route?", "Which route?")
   val whichRobot: String get() = t("Welke robot?", "Which robot?")

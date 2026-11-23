@@ -15,7 +15,7 @@ int main(int argc, char** argv) {
     return 0;
   }
   std::string text =
-      "# Scraper Control updates\n"
+      "# Agrigate Clean updates\n"
       "[other-board]\nfile=other.bin\nversion=9.9.9\nbuild=999\nsize=10\n"
       "sha256=0000000000000000000000000000000000000000000000000000000000000000\nsig=30\n"
       "[m5stack-core]\r\nfile=scraper-control-m5stack-core-0.7.0.bin\r\nversion=0.7.0\nbuild=412\nsize=2145195\n"

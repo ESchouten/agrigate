@@ -1,4 +1,4 @@
-# Scraper Control: native apps
+# Agrigate Clean: native apps
 
 The apps. One shared Kotlin module with all behaviour, and
 a native UI per platform that only draws what the shared module says:

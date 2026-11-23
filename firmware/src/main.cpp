@@ -1,8 +1,8 @@
-// Scraper Control buttons for M5Stack Basic: left / middle / right button start route A / B / C.
+// Agrigate Clean buttons for M5Stack Basic: left / middle / right button start route A / B / C.
 // Each press: connect (~2 s), start the route with all checks, disconnect.
 // Hold the middle button 1.5 s for manual drive (HANDBEDIENING), see manualSession(); there
 // hold the right button for the charger approach (HANDM. LADER).
-// The screens follow the Scraper Control app's look (red header, light cards), drawn with LVGL (Ui.h).
+// The screens follow the Agrigate Clean app's look (red header, light cards), drawn with LVGL (Ui.h).
 // Hold the left button 1.5 s to switch the planning (tijdpad) on or off.
 // Hold the right button 1.5 s for the settings: PIN, which robot, wifi (set up on the M5
 // itself, or WPS) and updates (signed releases from GitHub).
@@ -262,7 +262,7 @@ static void idle() {
   static uint32_t heapAt = 0;
   if (!heapAt || millis() - heapAt > 60000) { heapAt = millis() | 1; logHeap("home"); }
   homeDrawnAt = millis();
-  ui::Screen scr("Scraper Control");
+  ui::Screen scr("Agrigate Clean");
   card(10, 56, 300, 54, kCard);
   if (haveSeen) {
     bool on = seen.planning == 1;
@@ -1076,9 +1076,9 @@ static void wpsSetup() {
   esp_wps_config_t cfg;
   std::memset(&cfg, 0, sizeof cfg);
   cfg.wps_type = WPS_TYPE_PBC;
-  std::strncpy(cfg.factory_info.manufacturer, "Scraper Control", sizeof cfg.factory_info.manufacturer - 1);
+  std::strncpy(cfg.factory_info.manufacturer, "Agrigate", sizeof cfg.factory_info.manufacturer - 1);
   std::strncpy(cfg.factory_info.model_number, "1", sizeof cfg.factory_info.model_number - 1);
-  std::strncpy(cfg.factory_info.model_name, "Scraper-knop", sizeof cfg.factory_info.model_name - 1);
+  std::strncpy(cfg.factory_info.model_name, "Agrigate Clean", sizeof cfg.factory_info.model_name - 1);
   std::strncpy(cfg.factory_info.device_name, "scraper-control", sizeof cfg.factory_info.device_name - 1);
   bool started = esp_wifi_wps_enable(&cfg) == ESP_OK && esp_wifi_wps_start(0) == ESP_OK;
   bool cancelled = false;

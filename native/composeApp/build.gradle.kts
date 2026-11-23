@@ -46,6 +46,7 @@ compose.desktop {
   application {
     mainClass = "nl.eschouten.scraper.app.MainKt"
     nativeDistributions {
+      // the installed name stays (Velopack finds the app by it), the window and app names say Agrigate Clean
       packageName = "Scraper Control"
       // beyond what is found by itself: the web API (api/ApiServer), updates (app/DesktopUpdates)
       modules("jdk.httpserver", "java.net.http", "jdk.crypto.ec")
