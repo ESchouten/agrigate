@@ -13,7 +13,7 @@ import javax.crypto.spec.GCMParameterSpec
 /** Android: SharedPreferences, also read by the home-screen widgets. Secrets (the PINs) are
  *  encrypted with an AES key that never leaves the Android Keystore. */
 class PrefsStore(context: Context) : Store {
-  private val prefs = context.applicationContext.getSharedPreferences("scraper", Context.MODE_PRIVATE)
+  private val prefs = context.applicationContext.getSharedPreferences("clean", Context.MODE_PRIVATE)
   override fun getString(key: String): String? = prefs.getString(key, null)
   override fun putString(key: String, value: String?) {
     prefs.edit().apply { if (value == null) remove(key) else putString(key, value) }.commit()
@@ -53,7 +53,7 @@ class PrefsStore(context: Context) : Store {
 
   private companion object {
     const val KEYSTORE = "AndroidKeyStore"
-    const val ALIAS = "scraper-secrets"
+    const val ALIAS = "clean-secrets"
     const val TRANSFORM = "AES/GCM/NoPadding"
     const val IV = 12 // bytes, what the Keystore uses for GCM
   }

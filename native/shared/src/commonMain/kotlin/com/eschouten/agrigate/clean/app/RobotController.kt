@@ -1,5 +1,5 @@
 // Everything an app does with a robot goes through one RobotController, so route buttons,
-// a type's own screens and the home-screen widget never open two connections. It only knows the generic model (model/Scraper.kt); the
+// a type's own screens and the home-screen widget never open two connections. It only knows the generic model (model/Clean.kt); the
 // robot logic itself is in the type's implementation.
 //
 // Screens read [state] (a StateFlow; Swift: watch {}) and call the suspend functions.
@@ -21,11 +21,11 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.sync.withLock
 import com.eschouten.agrigate.clean.model.Capability
 import com.eschouten.agrigate.clean.model.RunStep
-import com.eschouten.agrigate.clean.model.ScraperException
-import com.eschouten.agrigate.clean.model.ScraperFault
-import com.eschouten.agrigate.clean.model.ScraperModel
-import com.eschouten.agrigate.clean.model.ScraperSession
-import com.eschouten.agrigate.clean.model.ScraperStatus
+import com.eschouten.agrigate.clean.model.CleanException
+import com.eschouten.agrigate.clean.model.CleanFault
+import com.eschouten.agrigate.clean.model.CleanModel
+import com.eschouten.agrigate.clean.model.CleanSession
+import com.eschouten.agrigate.clean.model.CleanStatus
 import com.eschouten.agrigate.clean.api.ApiSession
 import com.eschouten.agrigate.clean.texts.tr
 import kotlin.concurrent.Volatile
@@ -56,7 +56,7 @@ data class ControllerState(
   val robots: List<RobotProfile> = emptyList(),
   val robot: RobotProfile = RobotProfile(),
   /** Live status while connected, else null. */
-  val live: ScraperStatus? = null,
+  val live: CleanStatus? = null,
   val connected: Boolean = false,
   val onboarded: Boolean = false,
   val widgetTipSeen: Boolean = false,
@@ -77,7 +77,7 @@ data class ControllerState(
   /** [RobotController.cancel] can still stop the running action: until the robot starts
    *  the route (Erik 2026-11-18); a type's own screens and the panel are not actions. */
   val canCancel get() = isBusy && !cancelling && (link != LinkState.Working || live?.cancellable == true)
-  val model: ScraperModel get() = robot.type
+  val model: CleanModel get() = robot.type
   val snapshot: RobotSnapshot? get() = robot.snapshot
 
   /** Last successful start of [route] (not a dry run), for "Laatst gestart ...". */
@@ -103,7 +103,7 @@ class RobotController(
   private val now: () -> Long = { Clock.System.now().toEpochMilliseconds() },
 ) {
   private val mutex = Mutex()
-  private var robot: ScraperSession? = null
+  private var robot: CleanSession? = null
   private var holds = 0
   private var poll: Job? = null
   private var seen: Any? = null
@@ -117,7 +117,7 @@ class RobotController(
   @Volatile private var cancelling = false
 
   /** The robot in use as last read, also on a driving or menu screen, with when (the web API). */
-  @Volatile var lastSeen: Pair<ScraperStatus, Long>? = null
+  @Volatile var lastSeen: Pair<CleanStatus, Long>? = null
     private set
 
   private val _state = MutableStateFlow(build())
@@ -129,7 +129,7 @@ class RobotController(
   val isConnected get() = robot?.isConnected ?: false
 
   /** The open connection, for a type's own screens (null when not connected). */
-  val session: ScraperSession? get() = if (isConnected) robot else null
+  val session: CleanSession? get() = if (isConnected) robot else null
 
   // ---- robots ----
 
@@ -216,7 +216,7 @@ class RobotController(
         val r = robot!!
         if (!dryRun && r.status().driving) {
           // A type that cannot stop a route: press nothing, say it is busy.
-          if (!settings.robot.type.can(Capability.Stop)) throw ScraperException(ScraperFault.Busy, tr.robotBusyNothingPressed)
+          if (!settings.robot.type.can(Capability.Stop)) throw CleanException(CleanFault.Busy, tr.robotBusyNothingPressed)
           r.stopRoute()
           stopped = true
           planningResumes = false
@@ -262,7 +262,7 @@ class RobotController(
   /** The robot asks whether to finish the stopped route: the user decides (Erik 2026-11-11),
    *  the answer goes to the robot 1:1. No answer within 2 minutes (or from the widget, which
    *  cannot ask): the question stays on the robot and nothing is pressed. */
-  private suspend fun askFinish(r: ScraperSession, ask: Boolean): Outcome {
+  private suspend fun askFinish(r: CleanSession, ask: Boolean): Outcome {
     if (!r.status().finishQuestion) return Outcome(true, tr.routeStoppedMsg, stopped = true)
     if (viaWidget || !ask) return Outcome(true, tr.finishLeftOpenMsg, stopped = true)
     val answer = CompletableDeferred<Boolean?>()
@@ -284,7 +284,7 @@ class RobotController(
   suspend fun stopRoute(): Outcome = job(
     work = {
       val r = robot!!
-      if (!settings.robot.type.can(Capability.Stop) || !r.status().driving) throw ScraperException(ScraperFault.Busy, tr.robotBusyNothingPressed)
+      if (!settings.robot.type.can(Capability.Stop) || !r.status().driving) throw CleanException(CleanFault.Busy, tr.robotBusyNothingPressed)
       r.stopRoute()
       planningResumes = false
       askFinish(r, ask = false)
@@ -297,7 +297,7 @@ class RobotController(
   suspend fun answerStop(finish: Boolean): Outcome = job(
     work = {
       val r = robot!!
-      if (!r.status().finishQuestion) throw ScraperException(ScraperFault.Busy, tr.robotBusyNothingPressed)
+      if (!r.status().finishQuestion) throw CleanException(CleanFault.Busy, tr.robotBusyNothingPressed)
       r.answerStop(finish)
       Outcome(true, if (finish) tr.routeContinuesMsg else tr.routeCancelledMsg, stopped = true)
     },
@@ -332,7 +332,7 @@ class RobotController(
   }
 
   private fun checkCancel() {
-    if (cancelling) throw ScraperException(ScraperFault.Cancelled, tr.cancelledBody)
+    if (cancelling) throw CleanException(CleanFault.Cancelled, tr.cancelledBody)
   }
 
   suspend fun setPlanning(on: Boolean): Outcome = job(
@@ -388,14 +388,14 @@ class RobotController(
   }
 
   /** A type-specific action on the open connection (its own screens, while held). */
-  suspend fun custom(action: suspend (ScraperSession) -> Unit): Outcome = mutex.withLock {
+  suspend fun custom(action: suspend (CleanSession) -> Unit): Outcome = mutex.withLock {
     val r = robot
     if (r == null || !r.isConnected) return@withLock Outcome(false, tr.notConnected)
     try {
       action(r)
       readStatus()
       Outcome(true, "")
-    } catch (e: ScraperException) {
+    } catch (e: CleanException) {
       Outcome(false, e.message ?: "")
     }
   }
@@ -419,17 +419,17 @@ class RobotController(
       if (!isConnected) open()
       set(LinkState.Working)
       work().also { readStatus() }
-    } catch (e: ScraperException) {
+    } catch (e: CleanException) {
       Outcome(
         false, e.message ?: "",
         problem = when (e.fault) {
-          ScraperFault.BluetoothOff -> Problem.BluetoothOff
-          ScraperFault.NotFound -> Problem.NotFound
-          ScraperFault.AuthRejected -> Problem.PinRejected
-          ScraperFault.Busy -> Problem.Busy
-          ScraperFault.NoConfirmation -> Problem.NoAnswer
-          ScraperFault.Cancelled -> Problem.Cancelled
-          ScraperFault.Failed -> Problem.Failed
+          CleanFault.BluetoothOff -> Problem.BluetoothOff
+          CleanFault.NotFound -> Problem.NotFound
+          CleanFault.AuthRejected -> Problem.PinRejected
+          CleanFault.Busy -> Problem.Busy
+          CleanFault.NoConfirmation -> Problem.NoAnswer
+          CleanFault.Cancelled -> Problem.Cancelled
+          CleanFault.Failed -> Problem.Failed
         },
       )
     } catch (e: NoRobot) {
@@ -469,7 +469,7 @@ class RobotController(
     // Bluetooth sometimes fails once and works the next time: three tries, a second apart.
     // What went wrong in each goes into the message (and the logbook): where it fails tells
     // how to make it better (Erik 2026-11-18).
-    var r: ScraperSession
+    var r: CleanSession
     var tries = 0
     val whys = mutableListOf<String>()
     while (true) {
@@ -489,10 +489,10 @@ class RobotController(
       try {
         r.connect()
         break
-      } catch (e: ScraperException) {
-        if (e.fault != ScraperFault.NotFound) throw e
+      } catch (e: CleanException) {
+        if (e.fault != CleanFault.NotFound) throw e
         whys += e.message ?: ""
-        if (++tries == 3) throw ScraperException(e.fault, tr.triesFailed(whys))
+        if (++tries == 3) throw CleanException(e.fault, tr.triesFailed(whys))
         runCatching { r.disconnect() }
         steps = emptyList()
         delay(1_000)

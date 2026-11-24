@@ -34,7 +34,7 @@ script.
 
 | Robot | Kind | Connection | Driver |
 |---|---|---|---|
-| Lely Discovery | Manure scraper | Bluetooth LE, or classic Bluetooth on older robots (not on iOS) | [`drivers/discovery`](drivers/discovery) |
+| Lely Discovery | Manure robot | Bluetooth LE, or classic Bluetooth on older robots (not on iOS) | [`drivers/discovery`](drivers/discovery) |
 | Lely Astronaut | Milking robot and herd, read only | The farm's T4C server on the local network | [`drivers/t4c`](drivers/t4c/API.md) |
 | Lely Astronaut A4 | Which cow is in the box, live (experimental) | The robot itself on the robot network (UDP) | [`drivers/astronaut`](drivers/astronaut/API.md) |
 | Fullwood M²erlin | Milking robot, read only | The farm's FULLSENSE server on the local network | [`drivers/fullsense`](drivers/fullsense/API.md) |
@@ -100,7 +100,7 @@ hold left = done.
 
 | Folder | What |
 |---|---|
-| `core/` | The robot APIs, one per kind of robot and the same for every make: `clean_c.h` (manure scrapers), `robot_c.h` with `milk_c.h` and `cow_c.h` (read through the farm's server), `live_c.h` (what a robot says on the farm network) |
+| `core/` | The robot APIs, one per kind of robot and the same for every make: `clean_c.h` (manure robots), `robot_c.h` with `milk_c.h` and `cow_c.h` (read through the farm's server), `live_c.h` (what a robot says on the farm network) |
 | `drivers/` | One folder per robot type or server software: everything specific to it |
 | `firmware/` | The M5Stack buttons (PlatformIO) |
 | `native/` | The apps: shared Kotlin, Compose for Android and desktop, SwiftUI for iOS ([README](native/README.md)) |

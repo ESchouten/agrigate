@@ -24,7 +24,7 @@ was checked on a real Discovery (November 2026), unless stated otherwise.
 | (in `disconnect()`) | `finish()` | leave the robot as it was found: back to the home screen from a safe menu, schedule as at connect (unless `set_planning` changed it on purpose) |
 | (after every command) | `owedPlanning()` / `setOwedPlanning(v)` | if the link drops before `finish()` could run, the host keeps what the robot is still "owed" (schedule 1/0, -1 = nothing) and hands it to the next session; `connect()` then first puts the robot back. While the robot drives or shows another screen the value stays owed. Apps: per robot, at most 6 hours old; M5: in RTC memory (survives a restart, not a power cut), 6 hours |
 | `await disconnect()` | `disconnect()` | |
-| `LelyBusy` / `LelyError` | `Result::Busy` / `Result::Unexpected` / … | errors |
+| `DiscoveryBusy` / `DiscoveryError` | `Result::Busy` / `Result::Unexpected` / … | errors |
 
 Safety rules (the same in every implementation):
 
@@ -119,7 +119,7 @@ bytes. No checksum.
 | ↔ | 1536 | 245 | 244 | n × 16-byte CAN records | panel (keys, screen) |
 
 PIN: AES-128-CBC, IV = 16 zero bytes, PKCS7, with a fixed key: the build secret `LELY_APP_KEY`
-(`src/LelyPin.cpp`).
+(`src/DiscoveryPin.cpp`).
 
 ### CAN record (16 bytes)
 `id u32` (app: 1022 = 0x3FE; robot: 0x3E1), `data[8]`, `length u8`, 3 × 0. Robot records have

@@ -25,7 +25,7 @@ val generateVersion by tasks.registering {
     val f = versionDir.get().asFile.resolve("com/eschouten/agrigate/clean/AppVersion.kt")
     f.parentFile.mkdirs()
     f.writeText(
-      "// Generated from gradle.properties (scraper.version) + the build number. Do not edit.\n" +
+      "// Generated from gradle.properties (agrigate.version) + the build number. Do not edit.\n" +
         "package com.eschouten.agrigate.clean\n\n" +
         "object AppVersion {\n  const val NAME = \"$appVersion\"\n  const val BUILD = $appBuild\n}\n",
     )

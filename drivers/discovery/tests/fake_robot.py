@@ -16,13 +16,13 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
 def core_key() -> bytes:
     """The PIN key the core here is built with: the build secret (../../secrets.h), else the
-    test key, as in core/src/LelyPin.cpp."""
+    test key, as in core/src/DiscoveryPin.cpp."""
     p = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "secrets.h")
     if os.path.exists(p):
         for line in open(p):
             if line.startswith("#define LELY_APP_KEY "):
                 return bytes.fromhex(line.split('"')[1].replace("\\x", ""))
-    return b"ScraperTestKey!!"
+    return b"AgrigateTestKey!"
 
 
 APP_KEY = core_key()

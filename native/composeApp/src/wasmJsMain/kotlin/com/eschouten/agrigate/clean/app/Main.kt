@@ -15,9 +15,9 @@ import org.w3c.dom.events.Event
 
 /** The settings and the logbook stay in this browser. */
 private object BrowserStore : Store {
-  override fun getString(key: String): String? = localStorage.getItem("scraper.$key")
+  override fun getString(key: String): String? = localStorage.getItem("clean.$key")
   override fun putString(key: String, value: String?) {
-    if (value == null) localStorage.removeItem("scraper.$key") else localStorage.setItem("scraper.$key", value)
+    if (value == null) localStorage.removeItem("clean.$key") else localStorage.setItem("clean.$key", value)
   }
 }
 

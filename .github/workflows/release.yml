@@ -31,7 +31,7 @@ permissions:
   actions: read # the ci run of this commit
 
 jobs:
-  version: # 1.6.120: scraper.version + the build number (commit count + scraper.buildBase)
+  version: # 1.6.120: agrigate.version + the build number (commit count + agrigate.buildBase)
     runs-on: ubuntu-latest
     outputs:
       build: ${{ steps.v.outputs.build }}
@@ -42,9 +42,9 @@ jobs:
           fetch-depth: 0
       - id: v
         run: |
-          BUILD=$(( $(git rev-list --count HEAD) + $(sed -n 's/^scraper.buildBase=//p' native/gradle.properties) ))
+          BUILD=$(( $(git rev-list --count HEAD) + $(sed -n 's/^agrigate.buildBase=//p' native/gradle.properties) ))
           echo "build=$BUILD" >> "$GITHUB_OUTPUT"
-          echo "version=$(sed -n 's/^scraper.version=//p' native/gradle.properties).$BUILD" >> "$GITHUB_OUTPUT"
+          echo "version=$(sed -n 's/^agrigate.version=//p' native/gradle.properties).$BUILD" >> "$GITHUB_OUTPUT"
       - name: Tested? (a release only builds; workflow ci has tested this commit)
         env:
           GH_TOKEN: ${{ github.token }}
@@ -219,6 +219,7 @@ jobs:
       contents: read
       pages: write
       id-token: write
+      actions: write # removes an earlier try's page artifact
     environment:
       name: github-pages
     env:
@@ -253,7 +254,6 @@ jobs:
           cd site/apt
           dpkg-scanpackages --arch amd64 pool /dev/null > dists/stable/main/binary-amd64/Packages
           gzip -9k dists/stable/main/binary-amd64/Packages
-          # Origin and Label stay: apt refuses a repository whose Origin changed until a person allows it
           apt-ftparchive -o APT::FTPArchive::Release::Origin="Agrigate" -o APT::FTPArchive::Release::Label="Agrigate" \
             -o APT::FTPArchive::Release::Suite=stable -o APT::FTPArchive::Release::Codename=stable \
             -o APT::FTPArchive::Release::Architectures=amd64 -o APT::FTPArchive::Release::Components=main \
@@ -263,6 +263,12 @@ jobs:
           echo "$APT_SIGNING_KEY" | gpg --batch --import
           gpg --batch --yes --clearsign -o dists/stable/InRelease dists/stable/Release
           gpg --export > agrigate.gpg   # the key apt checks (signed-by)
+      - name: A second try of this job starts clean (two page artifacts stop the deploy)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts" -q '.artifacts[] | select(.name == "github-pages") | .id' |
+            xargs -r -I{} gh api -X DELETE "repos/$GITHUB_REPOSITORY/actions/artifacts/{}"
       - uses: actions/upload-pages-artifact@v5
         with:
           path: site

@@ -7,13 +7,13 @@ set -u
 cd ${0:A:h}
 DEVICE=${IOS_DEVICE:-"iPhone 15 Pro"}
 SHOTS=${SHOTS:-/tmp/shots}
-WORK=${WORK:-/tmp/scraper-ios}
+WORK=${WORK:-/tmp/agrigate-ios}
 ONLY=() APPEARANCE=light TEXT=large
 while [ $# -gt 0 ]; do
   case $1 in
     --appearance) APPEARANCE=$2; shift ;;
     --text) TEXT=$2; shift ;;
-    test_*) ONLY=(-only-testing:ScraperControlUITests/ScenarioTests/$1) ;;
+    test_*) ONLY=(-only-testing:AgrigateCleanUITests/ScenarioTests/$1) ;;
   esac
   shift
 done
@@ -25,12 +25,12 @@ xcrun simctl ui $UDID appearance $APPEARANCE
 xcrun simctl ui $UDID content_size $TEXT
 xcodegen >/dev/null
 mkdir -p $WORK; rm -rf $WORK/result.xcresult $WORK/att
-xcodebuild test -project ScraperControl.xcodeproj -scheme ScraperControl -destination "id=$UDID" \
+xcodebuild test -project AgrigateClean.xcodeproj -scheme AgrigateClean -destination "id=$UDID" \
   -derivedDataPath $WORK/dd -resultBundlePath $WORK/result.xcresult $ONLY > $WORK/test.log 2>&1
 rc=$?
 grep -E "^/.*error:" $WORK/test.log | sed 's#.*/iosApp/##' | sort -u | head -20
 grep -E "Test Case .*(passed|failed)" $WORK/test.log | sed -E "s/.*ScenarioTests (test_[a-z_]+)\]' (passed|failed).*/\2 \1/" | sort -u
-grep -E "error: -\[ScraperControlUITests" $WORK/test.log | sed -E 's#.*ScenarioTests.swift:([0-9]+): error: -\[ScraperControlUITests.ScenarioTests (test_[a-z_]+)\] : (.*)#\2 (line \1): \3#' | sort -u
+grep -E "error: -\[AgrigateCleanUITests" $WORK/test.log | sed -E 's#.*ScenarioTests.swift:([0-9]+): error: -\[AgrigateCleanUITests.ScenarioTests (test_[a-z_]+)\] : (.*)#\2 (line \1): \3#' | sort -u
 mkdir -p $WORK/att $SHOTS/nl $SHOTS/en
 xcrun xcresulttool export attachments --path $WORK/result.xcresult --output-path $WORK/att >/dev/null 2>&1
 python3 - $WORK/att $SHOTS <<'EOF'

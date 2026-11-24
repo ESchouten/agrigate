@@ -29,18 +29,18 @@ private fun device(i: Intent): BluetoothDevice? =
   else @Suppress("DEPRECATION") i.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
 
 @SuppressLint("MissingPermission") // bluetoothProblem() checks the permissions first
-internal actual suspend fun findClassicRobots(spec: LinkSpec.BtSerial): List<FoundRobot> {
+internal actual suspend fun findClassicRobots(spec: LinkSpec.BtSerial): List<FoundDevice> {
   if (!AndroidPlatform.isReady || bluetoothProblem() != null) return emptyList()
   val c = AndroidPlatform.context
   val adapter = adapter(c) ?: return emptyList()
-  val found = ConcurrentHashMap<String, FoundRobot>()
+  val found = ConcurrentHashMap<String, FoundDevice>()
   val receiver = object : BroadcastReceiver() {
     override fun onReceive(context: Context, i: Intent) {
       val d = device(i) ?: return
       // not LE only: this search runs only when BLE found nothing; an older board may say dual or unknown
       if (d.type == BluetoothDevice.DEVICE_TYPE_LE || !d.address.lowercase().startsWith(spec.addressPrefix)) return
       val rssi = i.getShortExtra(BluetoothDevice.EXTRA_RSSI, (-127).toShort()).toInt()
-      found[d.address] = FoundRobot(d.address, d.name.orEmpty(), rssi, spec.kind)
+      found[d.address] = FoundDevice(d.address, d.name.orEmpty(), rssi, spec.kind)
     }
   }
   val filter = IntentFilter(BluetoothDevice.ACTION_FOUND)

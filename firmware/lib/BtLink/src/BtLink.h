@@ -14,7 +14,7 @@
 #include <string>
 #include <vector>
 
-#include "ScraperDriver.h"
+#include "CleanDriver.h"
 
 // A robot seen in a search; classic: found over classic Bluetooth (else BLE).
 struct FoundRobot {

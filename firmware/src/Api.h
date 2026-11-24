@@ -73,7 +73,7 @@ class PinGate {
   uint32_t lockedUntil_ = 0;
 };
 
-// The robot's status in the apps' generic terms (ScraperStatus in native/.../model/Scraper.kt).
+// The robot's status in the apps' generic terms (CleanStatus in native/.../model/Clean.kt).
 struct ApiStatus {
   int planning = -1;   // 1 on, 0 off, -1 unknown
   std::string nextRun, activity, route;
@@ -100,7 +100,7 @@ inline std::string toJson(const ApiStatus& s) {
          ",\"finishQuestion\":" + flag(s.finishQuestion) + "}";
 }
 
-// The answer's body. fault: "" when it worked, else a ScraperFault name ("Busy", ...);
+// The answer's body. fault: "" when it worked, else a CleanFault name ("Busy", ...);
 // status: toJson() or "" (not read yet); age: seconds since it was read.
 inline std::string apiAnswer(const std::string& fault, const std::string& message, const std::string& status, long age) {
   return std::string("{\"ok\":") + (fault.empty() ? "true" : "false") +

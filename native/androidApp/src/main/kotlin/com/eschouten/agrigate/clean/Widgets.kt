@@ -148,7 +148,7 @@ class WidgetTapReceiver : BroadcastReceiver() {
         }
         val n = if (on != null) WidgetBridge.planningNotice(out) else WidgetBridge.notice(store, robot, route!!, out)
         n?.let { WidgetNotify.show(app, it) }
-        (app as? ScraperApp)?.widgetRan()
+        (app as? CleanApp)?.widgetRan()
       } finally {
         pending.finish()
       }

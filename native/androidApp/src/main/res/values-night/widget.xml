@@ -5,5 +5,5 @@
   <color name="widget_text">#F2EDEC</color>
   <color name="widget_muted">#B9B0AE</color>
   <color name="widget_play_bg">#3A2326</color>
-  <style name="Theme.Scraper.Dialog" parent="@android:style/Theme.DeviceDefault.Dialog.NoActionBar" />
+  <style name="Theme.Clean.Dialog" parent="@android:style/Theme.DeviceDefault.Dialog.NoActionBar" />
 </resources>

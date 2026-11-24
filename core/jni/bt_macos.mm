@@ -61,10 +61,10 @@ struct Done {
 };
 }  // namespace
 
-@interface ScraperBt : NSObject <IOBluetoothDeviceInquiryDelegate, IOBluetoothRFCOMMChannelDelegate>
+@interface AgrigateBt : NSObject <IOBluetoothDeviceInquiryDelegate, IOBluetoothRFCOMMChannelDelegate>
 @end
 
-@implementation ScraperBt {
+@implementation AgrigateBt {
 @public
   std::mutex foundMu;
   std::map<std::string, std::pair<std::string, int>> found;   // address -> name, rssi
@@ -128,14 +128,14 @@ NSThread* btThread() {   // started once; runs its run loop for good
           [rl runMode:NSDefaultRunLoopMode beforeDate:[NSDate distantFuture]];
         }
     }];
-    th.name = @"scraper-bt";
+    th.name = @"agrigate-bt";
     [th start];
     return th;
   }();
   return t;
 }
 
-void onBt(ScraperBt* target, void (^block)(void)) {   // runs block on the Bluetooth thread, waits
+void onBt(AgrigateBt* target, void (^block)(void)) {   // runs block on the Bluetooth thread, waits
   [target performSelector:@selector(run:) onThread:btThread() withObject:[block copy] waitUntilDone:YES];
 }
 }  // namespace
@@ -145,7 +145,7 @@ namespace btserial {
 bool supported() { return IOBluetoothHostController.defaultController != nil; }
 
 std::string find(const std::string& prefix, int ms) {
-  ScraperBt* f = [ScraperBt new];
+  AgrigateBt* f = [AgrigateBt new];
   f->prefix = prefix;
   __block IOBluetoothDeviceInquiry* inquiry = nil;
   onBt(f, ^{
@@ -177,7 +177,7 @@ int64_t open(const std::string& address, const std::string& service, std::string
     return -1;
   }
   auto l = std::make_shared<Link>();
-  ScraperBt* c = [ScraperBt new];
+  AgrigateBt* c = [AgrigateBt new];
   c->link = l;
   Done sdp, opened;
   c->sdpDone = &sdp;
@@ -258,7 +258,7 @@ bool write(int64_t h, const uint8_t* data, int n) {
   auto l = get(h);
   if (!l || l->closed) return false;
   __block bool ok = true;
-  ScraperBt* runner = [ScraperBt new];
+  AgrigateBt* runner = [AgrigateBt new];
   onBt(runner, ^{
     int mtu = l->channel.getMTU > 0 ? l->channel.getMTU : 127;
     for (int at = 0; ok && at < n; at += mtu) {
@@ -278,7 +278,7 @@ void close(int64_t h) {
     l = it->second;
     links.erase(it);
   }
-  ScraperBt* runner = [ScraperBt new];
+  AgrigateBt* runner = [AgrigateBt new];
   onBt(runner, ^{
     [l->channel closeChannel];
     [l->device closeConnection];

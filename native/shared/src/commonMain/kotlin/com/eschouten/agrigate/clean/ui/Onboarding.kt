@@ -11,7 +11,7 @@ import com.eschouten.agrigate.clean.app.Problem
 import com.eschouten.agrigate.clean.app.RobotController
 import com.eschouten.agrigate.clean.app.RobotProfile
 import com.eschouten.agrigate.clean.model.RunIntent
-import com.eschouten.agrigate.clean.model.scraperModels
+import com.eschouten.agrigate.clean.model.cleanModels
 import com.eschouten.agrigate.clean.texts.tr
 
 enum class OnboardingPage { Welcome, FindRobot, Pin }
@@ -114,7 +114,7 @@ class OnboardingFlow(private val controller: RobotController, val platform: Plat
 
   fun welcome() = WelcomePage(
     tr.welcomeTitle,
-    tr.welcomeLead(APP_NAME, scraperModels.joinToString(", ") { it.fullName }),
+    tr.welcomeLead(APP_NAME, cleanModels.joinToString(", ") { it.fullName }),
     listOf(
       Feature(Glyph.Touch, tr.featureTapTitle, tr.featureTapBody),
       Feature(Glyph.Schedule, tr.featurePlanningTitle, tr.featurePlanningBody),
@@ -168,7 +168,7 @@ data class AddRobotPage(
   val add: Action,
 )
 
-data class AddRobotState(val modelId: String = scraperModels.first().id, val label: String = "", val pin: String = "", val saving: Boolean = false)
+data class AddRobotState(val modelId: String = cleanModels.first().id, val label: String = "", val pin: String = "", val saving: Boolean = false)
 
 class AddRobotFlow(private val controller: RobotController, platform: Platform) {
   private val scope = newScope()
@@ -179,7 +179,7 @@ class AddRobotFlow(private val controller: RobotController, platform: Platform) 
   fun watch(onChange: (AddRobotState) -> Unit): Cancellable = _state.watchIn(scope, onChange)
 
   val scan = ScanFlow(
-    scraperModels.first(), exclude = controller.state.value.robots.map { it.robotId }.toSet(),
+    cleanModels.first(), exclude = controller.state.value.robots.map { it.robotId }.toSet(),
     platform = platform, scope = scope,
   )
 
@@ -197,11 +197,11 @@ class AddRobotFlow(private val controller: RobotController, platform: Platform) 
 
   /** [scan] is the scan's state, so the button follows the choice. */
   fun page(st: AddRobotState = _state.value, scan: ScanState = this.scan.state.value): AddRobotPage {
-    val m = scraperModels.first { it.id == st.modelId }
+    val m = cleanModels.first { it.id == st.modelId }
     val chosen = scan.found.any { it.id == scan.selectedId }
     return AddRobotPage(
       tr.addRobot, tr.addRobotHelp, tr.robotType,
-      scraperModels.map { Choice(it.id, it.fullName, it.id == st.modelId) },
+      cleanModels.map { Choice(it.id, it.fullName, it.id == st.modelId) },
       tr.details2, tr.nameInApp, tr.exampleBarn, tr.pin, m.pinHelp,
       Action(if (st.saving) tr.busyDots else tr.add, ActionKind.Confirm, "add-robot-save", enabled = !st.saving && chosen),
     )

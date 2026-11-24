@@ -14,7 +14,7 @@ import com.eschouten.agrigate.clean.app.RobotController
 import com.eschouten.agrigate.clean.app.Widgets
 import com.eschouten.agrigate.clean.model.RunIntent
 import com.eschouten.agrigate.clean.model.RunStep
-import com.eschouten.agrigate.clean.model.ScraperModel
+import com.eschouten.agrigate.clean.model.CleanModel
 import com.eschouten.agrigate.clean.texts.tr
 
 enum class RunPhase { Confirm, Running, Done }
@@ -28,12 +28,12 @@ data class RunFlowState(
 )
 
 /** What is happening now, as a short headline. */
-fun currentStep(model: ScraperModel, steps: List<RunStep>, link: LinkState, intent: RunIntent): String =
+fun currentStep(model: CleanModel, steps: List<RunStep>, link: LinkState, intent: RunIntent): String =
   if (link == LinkState.Searching) tr.searchRobot else model.nextStep(steps, intent)
 
 data class Progress(val headline: String, val value: Float, val done: List<String>)
 
-fun progress(model: ScraperModel, steps: List<RunStep>, link: LinkState, intent: RunIntent, routeTitle: String): Progress {
+fun progress(model: CleanModel, steps: List<RunStep>, link: LinkState, intent: RunIntent, routeTitle: String): Progress {
   val total = model.expectedSteps(intent)
   val done = steps.filter { it.percent == null }
   val part = (steps.lastOrNull()?.percent ?: 0) / 100f // a step under way (a sync) moves the bar on to the next

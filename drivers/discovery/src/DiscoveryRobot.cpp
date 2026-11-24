@@ -1,0 +1,597 @@
+#include "DiscoveryRobot.h"
+
+#include <cstring>
+
+namespace discovery {
+namespace {
+// Screens are recognised by their layout (Screen::isHome() etc.), not by words, so this
+// works in every robot language. Dutch names, for reading: beginscherm ("Vlg rit"),
+// routemenu "HANDM. ROUTE", the questions "Tijdpad na rijden route aanzetten?" and
+// "VEILIGHEIDWAARSCHUW. ... Bevestig?" (Ja = soft1, Nee = soft3), "HANDBEDIENING", and the
+// main menu "Werken, Routes, Testen, Instellingen, Alarmen, Service" (Esc from home).
+const char* kRoutes = "ABCD";
+
+int routeIndex(char c) { const char* p = strchr(kRoutes, c); return (p && c) ? int(p - kRoutes) : -1; }
+
+std::string compact(const std::string& s) {
+  std::string o;
+  for (char c : s) if (c != ' ') o += c;
+  return o;
+}
+
+// A screen with text that the core does not know and that asks nothing: a notice, a submenu
+// someone left open. Esc leads back from it. Never a driving screen or one with answers on
+// the bottom row (a question, "route afmaken?", the charger's L / R control).
+bool escapable(const Screen& s) {
+  return !s.lines().empty() && !s.isHome() && !s.isRouteMenu() && !s.isMainMenu() && !s.isManual() &&
+         !s.isDriving() && !s.isQuestion() && !s.isStopQuestion();
+}
+}  // namespace
+
+Lang langFromCode(const char* code) {
+  return code && (code[0] == 'e' || code[0] == 'E') && (code[1] == 'n' || code[1] == 'N') ? Lang::En : Lang::Nl;
+}
+
+const char* resultText(Result r, Lang l) {
+  bool en = l == Lang::En;
+  switch (r) {
+    case Result::Ok: return "ok";
+    case Result::ConnectFailed: return en ? "connection failed" : "verbinden mislukt";
+    case Result::PinRejected: return en ? "PIN rejected" : "pincode geweigerd";
+    case Result::NoScreen: return en ? "no screen received" : "geen scherm ontvangen";
+    case Result::Busy: return en ? "robot is busy" : "robot is bezig";
+    case Result::Unexpected: return en ? "unexpected screen" : "onverwacht scherm";
+    case Result::StartedNoAnswer: return en ? "started, question not seen" : "gestart, vraag niet gezien";
+    case Result::Cancelled: return en ? "cancelled" : "geannuleerd";
+  }
+  return "?";
+}
+
+Robot::Robot(Transport& t, Bytes encPin, uint8_t imageVersion[9])
+    : t_(t), pin_(std::move(encPin)), ver_(imageVersion) {
+  t_.onData = [this](const uint8_t* d, size_t n) { onBytes(d, n); };
+}
+
+Result Robot::fail(Result r, const std::string& why) {
+  err_ = why + "\n" + screen.text();
+  say(std::string(tr("FOUT: ", "ERROR: ")) + why);
+  return r;
+}
+
+// ---- incoming ------------------------------------------------------------------
+void Robot::onBytes(const uint8_t* d, size_t n) {
+  lastRx_ = t_.now();
+  for (auto& m : parser_.feed(d, n)) {
+    if (m.msgId == 2001) {
+      named_ = true;
+    } else if (m.msgId == 2020) {
+      granted_ = (!m.payload.empty() && m.payload[0] == 1) ? 1 : 0;
+    } else if (m.msgId == 1536 && m.payload.size() % 16 == 0) {
+      for (size_t o = 0; o < m.payload.size(); o += 16) {
+        uint32_t id = m.payload[o] | m.payload[o + 1] << 8;
+        if ((id & 0xF00) == 0x300) onCan(&m.payload[o + 4]);
+      }
+    }
+  }
+}
+
+void Robot::onCan(const uint8_t d[8]) {
+  uint8_t k = d[0], s = d[1];
+  if (k == 2 && s == 0) {
+    t_.write(reconnect());
+  } else if (k == 5 && s == 0) {             // robot asks which image set we have
+    t_.write(imageVersion(ver_));
+  } else if (k == 5 && s == 4) {             // robot tells its image set version
+    if (d[2] == 0) memcpy(ver_, d + 3, 5);
+    if (d[2] == 1) { memcpy(ver_ + 5, d + 3, 4); versionChanged_ = true; }
+  } else if (k == 5 && s == 2) {             // the image count (d[2] == 1), or images done / skipped
+    if (d[2] == 1) images_ = d[3];
+    t_.write(canReady());
+  } else if (k == 5 && s == 6) {             // the next image of the set starts: d[2] = its number
+    imageNr_ = d[2];
+    step(Step::Syncing);
+  } else if (k == 3 && s == 20 && d[2] == 0 && d[3] == 0) {
+    t_.write(contrast());
+  } else if (k == 3) {
+    screen.feed(d);
+  }
+}
+
+void Robot::keepAlive() {
+  if (!connected_) return;
+  uint32_t now = t_.now();
+  if (now - lastAlive_ >= 1000) {
+    lastAlive_ = now;
+    t_.write(alive());
+    t_.write(aliveWithLevel(1));
+  }
+}
+
+bool Robot::waitUntil(const Pred& p, uint32_t ms) {
+  uint32_t end = t_.now() + ms;
+  while (!p(screen)) {
+    if ((int32_t)(t_.now() - end) >= 0 || !t_.linkUp() || (connecting_ && cancelNow())) return false;
+    keepAlive();
+    t_.pump(20);
+  }
+  return true;
+}
+
+// The user cancelled (Transport::cancelled): asked between steps, so a key is never cut off.
+bool Robot::cancelNow() {
+  if (!cancel_ && t_.cancelled && t_.cancelled()) {
+    cancel_ = true;
+    say(tr("geannuleerd", "cancelled"));
+  }
+  return cancel_;
+}
+
+// A cancelled command: the robot back as it was before it (home screen, planning as before).
+Result Robot::putBack(bool wasOn) {
+  Result r = restore(wasOn);
+  if (r != Result::Ok) return r;
+  step(Step::Restored);
+  return fail(Result::Cancelled, tr("geannuleerd, robot terug zoals hij was", "cancelled, robot put back as it was"));
+}
+
+// The real robot redraws its screen in pieces over BLE and ignores keys until it is
+// done (seen 2026-11-05 with the M5Stack). So after every key we wait for the expected
+// screen and then until the robot is done drawing it (settle).
+// Sometimes the robot does not react to a key at all (no frames back, seen 2026-11-05);
+// then the same key is sent once more. Only when nothing at all changed on the screen.
+void Robot::owe(int v) {
+  if (v == owed_) return;
+  owed_ = v;
+  if (onOwed) onOwed(v);
+}
+
+void Robot::track() {
+  if (planningAtConnect_ >= 0 && screen.isHome() && screen.planning() == planningAtConnect_) owe(-1);
+}
+
+bool Robot::tap(Key k, const Pred& until, uint32_t ms) {
+  // Any key may take the robot away from how it was found; say so before it is sent, so a
+  // link that drops right after it still leaves the debt with the host.
+  if (planningAtConnect_ >= 0 && !screen.isDriving()) owe(planningAtConnect_);
+  struct Track { Robot* r; ~Track() { r->track(); } } after{this};
+  for (int attempt = 0; attempt < 2; attempt++) {
+    uint32_t v = screen.version();
+    t_.write(key(0, k));
+    t_.pump(80);
+    t_.write(key(7, k));
+    bool ok = waitUntil(until, ms);
+    settle(until);
+    if (ok || until(screen)) return true;
+    if (screen.version() != v) return false;   // the robot did react, just not as expected
+    patient_ = true;
+    say(tr("geen reactie op toets, nog een keer", "no reaction to key, once more"));
+  }
+  return false;
+}
+
+void Robot::settle(const Pred& expected) {
+  uint32_t start = t_.now(), since = start, v = screen.version();
+  while ((int32_t)(t_.now() - (start + 4000)) < 0 && t_.linkUp()) {
+    if (!patient_ && expected && expected(screen) && screen.drawn()) return;
+    keepAlive();
+    t_.pump(20);
+    if (screen.version() != v) { v = screen.version(); since = t_.now(); }
+    else if (t_.now() - since >= 400) return;
+  }
+}
+
+// ---- lifecycle -------------------------------------------------------------------
+Result Robot::connect() {
+  granted_ = -1;
+  named_ = patient_ = false;
+  // Nothing is pressed while connecting (only Esc on the splash or a notice), so a cancel
+  // ends it at once, also in the middle of a wait.
+  connecting_ = true;
+  struct Done { bool& f; ~Done() { f = false; } } done{connecting_};
+  auto cancelled = [this] { return fail(Result::Cancelled, tr("geannuleerd", "cancelled")); };
+  // The robot answers the PIN within half a second and starts sending at once. Now and then the
+  // link comes up and the robot stays silent (no answer to the PIN, or nothing after it): then
+  // one more link right away instead of a long wait, which nearly always works (Erik 2026-11-18).
+  for (int tries = 0;; tries++) {
+    if (tries) {
+      t_.disconnect();
+      say(tr("robot zegt niets, nog een keer", "robot silent, once more"));
+      granted_ = -1;
+    }
+    if (cancelNow()) return cancelled();
+    if (!t_.connect()) return cancelNow() ? cancelled() : fail(Result::ConnectFailed, tr("BLE-verbinding mislukt", "BLE connection failed"));
+    if (!tries) step(Step::Linked);
+    t_.write(computerType());
+    t_.write(getNodeSetting());
+    uint32_t end = t_.now() + 300;   // the robot answers with its name; without an answer, go on
+    while (!named_ && t_.linkUp() && !cancelNow() && (int32_t)(t_.now() - end) < 0) t_.pump(20);
+    if (!cancel_) t_.write(askPermission(pin_));
+    end = t_.now() + 3000;
+    while (granted_ < 0 && t_.linkUp() && !cancelNow() && (int32_t)(t_.now() - end) < 0) t_.pump(20);
+    if (cancel_) {
+      t_.disconnect();
+      return cancelled();
+    }
+    if (granted_ == 0) {   // only a real "no" (2020 = 00) means a wrong PIN
+      t_.disconnect();
+      return fail(Result::PinRejected, tr("pincode geweigerd", "PIN rejected"));
+    }
+    if (granted_ == 1) {
+      if (!tries) step(Step::Granted);
+      t_.write(connectWithLevel(1));
+      t_.write(connectPanel());
+      uint32_t at = lastRx_ = t_.now() - 1;   // it answers within a second; nothing in 5 s: silent
+      while (t_.linkUp() && !cancelNow() && (int32_t)(lastRx_ - at) <= 0 && t_.now() - at < 5000) t_.pump(20);
+      if ((int32_t)(lastRx_ - at) > 0) break;
+      if (cancel_) {
+        t_.disconnect();
+        return cancelled();
+      }
+    }
+    if (tries == 1) {
+      t_.disconnect();
+      return fail(Result::ConnectFailed, granted_ < 0 ? tr("geen antwoord op pincode", "no answer to PIN")
+                                                     : tr("robot zegt niets na de pincode", "robot silent after the PIN"));
+    }
+  }
+  connected_ = true;
+  lastAlive_ = t_.now() - 1000;
+  // A robot whose image set we lack sends it first (about 75 s over BLE, longer on a slow
+  // link): wait while it is sending, up to 4 minutes; 10 s without anything: it stopped.
+  auto shown = [](const Screen& s) { return s.isHome() || s.isRouteMenu() || !s.lines().empty(); };
+  // First the robot shows its splash image for about a second: Esc skips it (measured at the
+  // barn 2026-11-14: the splash takes the Esc, also with planning OFF; home 0.9 s sooner).
+  auto first = [shown](const Screen& s) { return s.isSplash() || shown(s); };
+  uint32_t start = lastRx_ = t_.now();
+  bool ok = false;
+  // A cancel makes waitUntil return at once: leave the loop then, not spin until 10 s of quiet.
+  while (!ok && t_.linkUp() && !cancel_ && t_.now() - lastRx_ < 10000 && t_.now() - start < 240000) ok = waitUntil(first, 1000);
+  if (ok && screen.isSplash()) {
+    t_.write(key(0, Key::Back));
+    t_.pump(80);
+    t_.write(key(7, Key::Back));
+    ok = waitUntil(shown, 10000);
+  }
+  if (!ok) return cancel_ ? cancelled() : fail(Result::NoScreen, tr("geen scherm ontvangen", "no screen received"));
+  auto home = [](const Screen& s) { return s.isHome(); };
+  settle(home);
+  // A notice at login ("MELDING: route is niet volgens specificaties", 2026-11-14): Esc until
+  // a known screen, as Erik does on the panel. Never on a driving screen or one that asks
+  // something: there Esc could stop the route or answer.
+  for (int i = 0; i < 3 && escapable(screen); i++) {
+    say(tr("melding weggedrukt (Esc)", "notice dismissed (Esc)"));
+    tap(Key::Back, [](const Screen& s) { return !escapable(s); });
+  }
+  // The main menu (left open, or where those Escs ended): home, so the status shows the planning.
+  if (screen.isMainMenu() && !cancel_) goHome();
+  if (!screen.isHome() && !screen.isRouteMenu()) {
+    waitUntil(home, 1000);
+    settle(home);
+  }
+  planningAtConnect_ = screen.planning();
+  if (planningAtConnect_ < 0 && screen.isRouteMenu()) planningAtConnect_ = 0;   // menu: only with planning OFF
+  say(tr("verbonden", "connected"));
+  if (owed_ >= 0) payBack();
+  step(Step::ScreenReady);
+  return Result::Ok;
+}
+
+// An earlier session lost its link while the robot was away from how it found it.
+void Robot::payBack() {
+  int want = owed_;
+  planningAtConnect_ = want;   // finish() of this session restores the same state
+  bool safe = screen.isHome() || screen.isRouteMenu() || screen.isMainMenu() || screen.isManual() || screen.isCharger();
+  if (!safe) { say(tr("tijdpad nog niet hersteld: robot is bezig", "planning not restored yet: robot is busy")); return; }
+  say(tr("vorige verbinding viel weg: robot terug zoals hij was", "previous link dropped: putting the robot back as it was"));
+  std::string e = err_;
+  if (screen.isManual() || screen.isCharger()) { manualWasOn_ = false; exitManual(); }
+  if (screen.isRouteMenu() || screen.isMainMenu()) goHome();
+  if (screen.isHome() && screen.planning() >= 0 && screen.planning() != want) switchPlanning(want == 1);
+  track();
+  err_ = e;
+}
+
+void Robot::disconnect() {
+  holdEnd();
+  connected_ = false;
+  t_.disconnect();
+}
+
+// ---- commands ---------------------------------------------------------------------
+Result Robot::press(Key k) {
+  tap(k, [](const Screen&) { return false; }, 300);
+  return Result::Ok;
+}
+
+void Robot::idle(uint32_t ms) {
+  if (!connected_) { t_.pump(ms); return; }
+  waitUntil([](const Screen&) { return false; }, ms);
+}
+
+bool Robot::onMainMenu() const { return screen.isMainMenu(); }
+
+// From the main menu: Up to the top row (Werken / Work), then Enter = home screen.
+void Robot::mainMenuToHome() {
+  if (screen.highlightedRow() == screen.topRow())
+    tap(Key::Enter, [](const Screen& s) { return s.isHome(); });
+  else
+    tap(Key::Up, [](const Screen& s) { return s.highlightedRow() == s.topRow(); });
+}
+
+Result Robot::goHome() {
+  for (int i = 0, escapes = 0; i < 12; i++) {
+    if (screen.isHome()) return Result::Ok;
+    if (onMainMenu()) { mainMenuToHome(); continue; }
+    // Left in manual control (HANDBEDIENING, standing still: nothing is held): Back out of it.
+    if (screen.isManual()) { driveEnd(); tap(Key::Back, [](const Screen& s) { return !s.isManual(); }); continue; }
+    // Any other screen that asks nothing (a submenu someone left open, a notice): Esc, the
+    // panel's own way back, until the main menu or home (Erik 2026-11-18).
+    if (escapable(screen) && escapes++ < 6) {
+      say(tr("onbekend scherm: Esc", "unknown screen: Esc"));
+      tap(Key::Back, [](const Screen& s) { return !escapable(s); });
+      continue;
+    }
+    if (!screen.isRouteMenu()) return fail(Result::Busy, tr("niet op beginscherm of routemenu; niets gedrukt", "not on home screen or route menu; nothing pressed"));
+    tap(Key::Back, [](const Screen& s) { return s.isHome(); });
+  }
+  return screen.isHome() ? Result::Ok : fail(Result::Unexpected, tr("beginscherm niet bereikt", "home screen not reached"));
+}
+
+Result Robot::setPlanning(bool on) {
+  if (cancelNow()) return fail(Result::Cancelled, tr("geannuleerd", "cancelled"));
+  // The user's choice: from now on this is the state to leave the robot in, also if the
+  // link drops halfway.
+  int before = planningAtConnect_;
+  planningAtConnect_ = on ? 1 : 0;
+  Result r = switchPlanning(on);
+  if (r != Result::Ok) {
+    planningAtConnect_ = before;
+    if (owed_ >= 0) owe(before);
+  }
+  track();
+  return r;
+}
+
+Result Robot::finish() {
+  if (!connected_ || !t_.linkUp()) return Result::Ok;
+  driveEnd();
+  // HANDM. LADER only when this session (or the panel's keys) took the robot there: one found
+  // there at connect may be on its way onto the charger.
+  if (screen.isManual() || (screen.isCharger() && owed_ >= 0)) exitManual();
+  if (screen.isRouteMenu() || screen.isMainMenu()) goHome();
+  if (planningAtConnect_ < 0 || !screen.isHome()) return Result::Ok;
+  int now = screen.planning();
+  if (now < 0 || now == planningAtConnect_) { track(); return Result::Ok; }
+  say(tr("tijdpad terug zoals bij verbinden", "planning back as at connect"));
+  return switchPlanning(planningAtConnect_ == 1);
+}
+
+Result Robot::switchPlanning(bool on) {
+  Result r = goHome();
+  if (r != Result::Ok) return r;
+  int want = on ? 1 : 0;
+  if (screen.planning() == want) return Result::Ok;
+  tap(Key::StartStop, [want](const Screen& s) { return s.planning() == want; });
+  if (screen.planning() != want) return fail(Result::Unexpected, on ? tr("planning ging niet AAN", "planning did not go ON") : tr("planning ging niet UIT", "planning did not go OFF"));
+  say(on ? tr("planning AAN", "planning ON") : tr("planning UIT", "planning OFF"));
+  step(on ? Step::PlanningOn : Step::PlanningOff);
+  return Result::Ok;
+}
+
+Result Robot::select(char letter) {
+  tap(Key::Enter, [](const Screen& s) { return s.isRouteMenu(); });
+  if (!screen.isRouteMenu()) return fail(Result::Unexpected, tr("routemenu niet gezien", "route menu not seen"));
+  // the selection bar can come after the text
+  waitUntil([](const Screen& s) { return !s.highlighted().empty(); }, 2000);
+  step(Step::Menu);
+  for (int i = 0; i < 6; i++) {
+    if (cancelNow()) return fail(Result::Cancelled, tr("geannuleerd", "cancelled"));
+    std::string sel = screen.highlighted();
+    int cur = sel.empty() ? -1 : routeIndex(sel[0]);
+    if (cur < 0) return fail(Result::Unexpected, std::string(tr("geselecteerde regel niet herkend: '", "selected row not recognised: '")) + sel + "'");
+    if (compact(sel).rfind(std::string(1, letter) + "->", 0) == 0) { step(Step::Selected); return Result::Ok; }
+    int want = routeIndex(letter);
+    char next = kRoutes[cur + (cur < want ? 1 : -1)];
+    tap(cur < want ? Key::Down : Key::Up,
+        [next](const Screen& s) { std::string h = s.highlighted(); return !h.empty() && h[0] == next; });
+  }
+  return fail(Result::Unexpected, tr("route niet geselecteerd", "route not selected"));
+}
+
+Result Robot::restore(bool wasOn) {
+  Result r = goHome();
+  if (r != Result::Ok) return r;
+  return wasOn ? switchPlanning(true) : Result::Ok;
+}
+
+Result Robot::stopRoute() {
+  if (!screen.isDriving())
+    return fail(Result::Busy, tr("rijdt geen route; niets gedrukt", "not driving a route; nothing pressed"));
+  tap(Key::StartStop, [](const Screen& s) { return !s.isDriving(); });
+  // Seen on the real robot (2026-11-11): the robot stops at once and asks "Route gestopt.
+  // Route afmaken? Ja / Pauze / Nee". Ja would FINISH the route (drive on), so nothing is
+  // answered here: the question stays on the robot until a person chooses.
+  if (screen.isDriving()) return fail(Result::Unexpected, tr("robot rijdt nog na Stop", "robot still driving after Stop"));
+  say(tr("route gestopt", "route stopped"));
+  return Result::Ok;
+}
+
+Result Robot::answerStop(bool finish) {
+  if (!screen.isStopQuestion())
+    return fail(Result::Busy, tr("geen stopvraag op het scherm; niets gedrukt", "no stop question on screen; nothing pressed"));
+  tap(finish ? Key::Soft1 : Key::Soft3, [](const Screen& s) { return !s.isStopQuestion(); });
+  if (screen.isStopQuestion()) return fail(Result::Unexpected, tr("stopvraag bleef staan", "stop question stayed"));
+  // The robot decided what happens to the planning (Nee leaves it off): nothing owed, and
+  // finish() leaves it as the robot set it.
+  planningAtConnect_ = -1;
+  owe(-1);
+  say(finish ? tr("route gaat verder", "route continues") : tr("route afgebroken", "route cancelled"));
+  return Result::Ok;
+}
+
+Result Robot::readRoutes(std::vector<std::string>& out) {
+  Result r = goHome();
+  if (r != Result::Ok) return r;
+  bool wasOn = screen.planning() == 1;
+  if (cancelNow()) return putBack(wasOn);
+  if (wasOn && (r = switchPlanning(false)) != Result::Ok) return r;
+  if (cancelNow()) return putBack(wasOn);
+  tap(Key::Enter, [](const Screen& s) { return s.isRouteMenu(); });
+  if (!screen.isRouteMenu()) { restore(wasOn); return fail(Result::Unexpected, tr("routemenu niet gezien", "route menu not seen")); }
+  step(Step::Menu);
+  out = screen.routeContents();
+  say(tr("routes gelezen", "routes read"));
+  Result rr = restore(wasOn);
+  if (rr == Result::Ok) step(Step::Restored);
+  return rr;
+}
+
+Result Robot::startRoute(char letter, bool dryRun) {
+  if (letter >= 'a' && letter <= 'd') letter -= 32;
+  if (routeIndex(letter) < 0) return fail(Result::Unexpected, tr("route moet A-D zijn", "route must be A-D"));
+  Result r = goHome();
+  if (r != Result::Ok) return r;
+  bool wasOn = screen.planning() == 1;
+  if (cancelNow()) return putBack(wasOn);
+  if (wasOn && (r = switchPlanning(false)) != Result::Ok) return r;
+  if (cancelNow()) return putBack(wasOn);
+
+  r = select(letter);   // Cancelled before each move
+  if (r != Result::Ok) { std::string e = err_; restore(wasOn); err_ = e; return r; }
+  if (dryRun) {
+    say(tr("proefrun: niet gestart", "dry run: not started"));
+    Result rr = restore(wasOn);
+    if (rr == Result::Ok) step(Step::Restored);
+    return rr;
+  }
+
+  // The last moment to cancel: once Start is pressed the route runs (stopRoute stops it).
+  if (cancelNow()) return putBack(wasOn);
+  committed_ = true;
+  tap(Key::StartStop, [](const Screen& s) { return s.isQuestion(); });
+  if (!screen.isQuestion())   // Start pressed, state unknown: press nothing more
+    return fail(Result::StartedNoAnswer, tr("geen tijdpad-vraag na Start (planning staat UIT)", "no planning question after Start (planning is OFF)"));
+  step(Step::StartPressed);
+  Key answer = wasOn ? Key::Soft1 : Key::Soft3;   // Ja (left) / Nee (right)
+  tap(answer, [](const Screen& s) { return !s.isQuestion(); });
+  if (screen.isQuestion()) return fail(Result::Unexpected, tr("tijdpad-vraag bleef staan", "planning question stayed"));
+  say(std::string("route ") + letter + tr(" gestart", " started"));
+  owe(-1);   // the answer told the robot what to do with the planning after the route
+  step(Step::Answered);
+  return Result::Ok;
+}
+
+// ---- manual drive ------------------------------------------------------------------
+bool Robot::inManual() const { return screen.isManual(); }
+
+Result Robot::enterManual() {
+  // Manual control chosen on "route afmaken?" (to drive the robot back to its charger, Erik
+  // 2026-11-14): the route is over, so Nee first. The planning stays off, as after any Nee.
+  if (screen.isStopQuestion()) {
+    Result r = answerStop(false);
+    if (r != Result::Ok) return r;
+  }
+  Result r = goHome();
+  if (r != Result::Ok) return r;
+  manualWasOn_ = screen.planning() == 1;
+  if (cancelNow()) return putBack(manualWasOn_);
+  if (manualWasOn_ && (r = switchPlanning(false)) != Result::Ok) return r;
+  if (cancelNow()) return putBack(manualWasOn_);
+  tap(Key::Enter, [](const Screen& s) { return s.isRouteMenu(); });
+  if (!screen.isRouteMenu()) { restore(manualWasOn_); return fail(Result::Unexpected, tr("routemenu niet gezien", "route menu not seen")); }
+  step(Step::Menu);
+  if (cancelNow()) return putBack(manualWasOn_);
+  tap(Key::Enter, [](const Screen& s) { return s.isQuestion(); });
+  if (!screen.isQuestion()) { restore(manualWasOn_); return fail(Result::Unexpected, tr("veiligheidsvraag niet gezien", "safety question not seen")); }
+  if (cancelNow()) {   // Nee on the safety question, back to the route menu, then home
+    tap(Key::Soft3, [](const Screen& s) { return s.isRouteMenu(); });
+    return putBack(manualWasOn_);
+  }
+  tap(Key::Soft1, [](const Screen& s) { return s.isManual(); });   // Ja
+  if (!screen.isManual()) {
+    exitManual();
+    return fail(Result::Unexpected, tr("handbediening niet gezien", "manual control not seen"));
+  }
+  say(tr("handbediening", "manual control"));
+  step(Step::Manual);
+  return Result::Ok;
+}
+
+Result Robot::enterCharger() {
+  if (inCharger()) return Result::Ok;
+  if (!inManual()) {
+    Result r = enterManual();
+    if (r != Result::Ok) return r;
+  }
+  tap(Key::Enter, [](const Screen& s) { return s.isCharger(); });
+  if (!inCharger()) {
+    std::string e = tr("laderscherm niet gezien", "charger screen not seen");
+    exitManual();
+    return fail(Result::Unexpected, e);
+  }
+  say(tr("naar de lader", "to the charger"));
+  return Result::Ok;
+}
+
+Result Robot::manualKey(Key k) {
+  if (k != Key::Soft1 && k != Key::Soft2 && k != Key::Soft3) return fail(Result::Unexpected, tr("alleen softkeys", "soft keys only"));
+  bool side = inCharger() && k != Key::Soft2;   // the charger's side
+  if (!inManual() && !side) return fail(Result::Busy, tr("niet in handbediening; niets gedrukt", "not in manual control; nothing pressed"));
+  if (held_) return fail(Result::Busy, tr("rijdt; eerst loslaten", "driving; release first"));
+  tap(k, [](const Screen&) { return false; }, 300);
+  return Result::Ok;
+}
+
+Result Robot::driveBegin() {
+  if (!inManual() && !inCharger()) return fail(Result::Busy, tr("niet in handbediening; niets gedrukt", "not in manual control; nothing pressed"));
+  if (driving()) return Result::Ok;
+  holdBegin(Key::StartStop);
+  say(tr("rijden: start ingedrukt", "drive: start pressed"));
+  return Result::Ok;
+}
+
+void Robot::holdBegin(Key k) {
+  holdEnd();
+  t_.write(key(0, k));
+  held_ = (int)k;
+  lastRepeat_ = t_.now();
+}
+
+void Robot::driveHold(uint32_t ms) {
+  uint32_t end = t_.now() + ms;
+  do {
+    if (!t_.linkUp()) { held_ = 0; return; }
+    if (held_ && t_.now() - lastRepeat_ >= 100) {
+      lastRepeat_ = t_.now();
+      t_.write(key(1, (Key)held_));
+    }
+    keepAlive();
+    t_.pump(10);
+  } while ((int32_t)(t_.now() - end) < 0);
+}
+
+void Robot::holdEnd() {
+  if (!held_) return;
+  if (held_ == (int)Key::StartStop) say(tr("rijden: start losgelaten", "drive: start released"));
+  t_.write(key(7, (Key)held_));
+  held_ = 0;
+}
+
+Result Robot::exitManual() {
+  driveEnd();
+  for (int i = 0; i < 8 && !screen.isHome(); i++) {
+    if (onMainMenu()) {
+      mainMenuToHome();
+    } else {
+      tap(Key::Back, [](const Screen& s) { return s.isHome() || s.isMainMenu(); });
+    }
+  }
+  if (!screen.isHome()) return fail(Result::Unexpected, tr("beginscherm niet bereikt", "home screen not reached"));
+  if (manualWasOn_) {
+    manualWasOn_ = false;
+    return switchPlanning(true);
+  }
+  return Result::Ok;
+}
+
+}  // namespace discovery
