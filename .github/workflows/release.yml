@@ -5,11 +5,11 @@ name: release
 #                                 releases/latest (settings > Wifi > Update, or automatically)
 #   scraper-control-<board>-<v>.bin  the firmware per board (now: m5stack-core = the M5 buttons)
 #   scraper-control-<board>-<v>.elf  the same with its symbols, to read a crash (GET /api/crash)
-#   scraper-control-<v>.apk       Android app (install by hand, or keep it updated with Obtainium)
-#   scraper-control-<v>-windows.exe, -macos.pkg   the desktop app's installers (not signed);
+#   agrigate-clean-<v>.apk        Android app (install by hand, or keep it updated with Obtainium)
+#   agrigate-clean-<v>-windows.exe, -macos.pkg   the desktop app's installers (not signed);
 #                                 the app then updates itself from releases.<win|osx>.signed.json
 #                                 (signed with the release key) and the -full.nupkg it names
-#   scraper-control_<v>_amd64.deb the Linux app; also in the apt repository on GitHub Pages
+#   agrigate-clean_<v>_amd64.deb  the Linux app; also in the apt repository on GitHub Pages
 # Run it by hand (Actions > release > Run workflow) when a version should go out.
 # The M5s download from github.com/<FW_REPO>/releases/latest, so every release must carry the
 # firmware: that is why the apps are not released separately.
@@ -150,7 +150,7 @@ jobs:
         run: |
           ./gradlew :androidApp:assembleRelease --console=plain
           mkdir ../out
-          cp androidApp/build/outputs/apk/release/*.apk "../out/scraper-control-$VERSION.apk"
+          cp androidApp/build/outputs/apk/release/*.apk "../out/agrigate-clean-$VERSION.apk"
       - uses: actions/upload-artifact@v7
         with:
           name: android
@@ -199,8 +199,8 @@ jobs:
             ./gradlew :composeApp:velopack --console=plain
             v=composeApp/build/velopack
             cp $v/*-full.nupkg $v/releases.*.json ../out/   # the app updates from these (publish signs the feed)
-            if [ "$RUNNER_OS" = macOS ]; then cp $v/*-Setup.pkg "../out/scraper-control-$VERSION-macos.pkg"
-            else cp $v/*-Setup.exe "../out/scraper-control-$VERSION-windows.exe"; fi
+            if [ "$RUNNER_OS" = macOS ]; then cp $v/*-Setup.pkg "../out/agrigate-clean-$VERSION-macos.pkg"
+            else cp $v/*-Setup.exe "../out/agrigate-clean-$VERSION-windows.exe"; fi
           fi
           ls ../out
       - uses: actions/upload-artifact@v7

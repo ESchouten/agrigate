@@ -15,9 +15,9 @@ import kotlin.test.assertTrue
 
 class DesktopUpdatesTest {
   private val root = File("..", "..")   // tests run in native/shared
-  private val feed = """{"Assets":[{"PackageId":"ScraperControl","Version":"1.6.190","Type":"Full","FileName":"ScraperControl-1.6.190-osx-full.nupkg","SHA256":"AB","Size":1},""" +
-    """{"PackageId":"ScraperControl","Version":"1.6.200","Type":"Delta","FileName":"d.nupkg","SHA256":"CD","Size":1},""" +
-    """{"PackageId":"ScraperControl","Version":"1.6.185","Type":"Full","FileName":"old.nupkg","SHA256":"EF","Size":1}]}"""
+  private val feed = """{"Assets":[{"PackageId":"AgrigateClean","Version":"1.6.190","Type":"Full","FileName":"AgrigateClean-1.6.190-osx-full.nupkg","SHA256":"AB","Size":1},""" +
+    """{"PackageId":"AgrigateClean","Version":"1.6.200","Type":"Delta","FileName":"d.nupkg","SHA256":"CD","Size":1},""" +
+    """{"PackageId":"AgrigateClean","Version":"1.6.185","Type":"Full","FileName":"old.nupkg","SHA256":"EF","Size":1}]}"""
 
   private fun keys() = KeyPairGenerator.getInstance("EC").apply { initialize(ECGenParameterSpec("secp256r1")) }.generateKeyPair()
 
@@ -52,7 +52,7 @@ class DesktopUpdatesTest {
 
   @Test fun theNewestFullReleaseAboveThisOne() {
     assertEquals("1.6.190", DesktopUpdates.newer(feed.toByteArray(), "1.6.183")?.version)
-    assertEquals("ScraperControl-1.6.190-osx-full.nupkg", DesktopUpdates.newer(feed.toByteArray(), "1.6.183")?.asset?.FileName)
+    assertEquals("AgrigateClean-1.6.190-osx-full.nupkg", DesktopUpdates.newer(feed.toByteArray(), "1.6.183")?.asset?.FileName)
     assertNull(DesktopUpdates.newer(feed.toByteArray(), "1.6.190"))
     assertNull(DesktopUpdates.newer(feed.toByteArray(), "1.7.0"))
     assertTrue(DesktopUpdates.compareVersions("1.6.10", "1.6.9") > 0)

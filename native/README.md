@@ -83,7 +83,7 @@ routes=ABC  names=A:Voergang,B:Stal+2
 ```
 
 Desktop: `--demo "<words>"` or `SCRAPER_DEMO`. Android: `adb shell am start -n
-nl.eschouten.scraper/.MainActivity --es demo "setup=done"`. iOS: environment `SCRAPER_DEMO`
+com.eschouten.agrigate.clean/nl.eschouten.scraper.MainActivity --es demo "setup=done"`. iOS: environment `SCRAPER_DEMO`
 or launch argument `-demo "<words>"`. The demo PIN is 4321.
 
 ## Widgets
@@ -92,7 +92,7 @@ or launch argument `-demo "<words>"`. The demo PIN is 4321.
 start the route with every safety rule, disconnect). Android: `RoutesWidget` (A-D) and
 `RouteTileWidget` (one route), tapped in the background. iOS 17+: the same two widgets in
 WidgetKit and `RouteIntent` for Siri and Shortcuts. The app and the widgets share the App
-Group `group.nl.eschouten.scraper`.
+Group `group.com.eschouten.agrigate.clean`.
 
 ## CI
 

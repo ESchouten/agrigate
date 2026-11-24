@@ -10,7 +10,7 @@ android {
   compileSdk { version = release(rootProject.extra["androidCompileSdk"] as Int) { minorApiLevel = 0 } }
   ndkVersion = "27.3.13750724" // the one on GitHub's Ubuntu runners: no NDK download in ci
   defaultConfig {
-    applicationId = "nl.eschouten.scraper"
+    applicationId = "com.eschouten.agrigate.clean"
     minSdk = rootProject.extra["androidMinSdk"] as Int
     targetSdk = 36
     versionCode = rootProject.extra["appBuild"] as Int

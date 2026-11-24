@@ -28,7 +28,7 @@ object DesktopUpdates {
   private val releases = System.getenv("SCRAPER_UPDATES") ?: "https://github.com/ESchouten/scraper-control/releases"
   /** What the release signs before a system's feed (firmware/sign_release.py --feed): a feed
    *  signed for one system is not one for another. */
-  internal fun prefix(channel: String) = "scraper-control desktop feed v1 $channel\n"
+  internal fun prefix(channel: String) = "agrigate clean desktop feed v1 $channel\n"
 
   /** The release key: the same as the buttons' (firmware/src/ReleaseKey.h). */
   internal const val RELEASE_KEY = "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE5+BVstQnXROhuybMANmQsU1sRAZK" +

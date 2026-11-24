@@ -44,7 +44,7 @@ import platform.Security.kSecValueData
  *  Secrets (the PINs) go to the Keychain, in the app group's access group so the widget can
  *  read them too, readable after the first unlock (a widget runs in the background). Where
  *  the Keychain cannot be used (an unsigned simulator build) they stay in UserDefaults. */
-class DefaultsStore(private val suiteName: String? = "group.nl.eschouten.scraper") : Store {
+class DefaultsStore(private val suiteName: String? = "group.com.eschouten.agrigate.clean") : Store {
   private val d = suiteName?.let { NSUserDefaults(suiteName = it) } ?: NSUserDefaults.standardUserDefaults
   override fun getString(key: String): String? = d.stringForKey(key)
   override fun putString(key: String, value: String?) {
@@ -61,7 +61,7 @@ class DefaultsStore(private val suiteName: String? = "group.nl.eschouten.scraper
 
 @OptIn(ExperimentalForeignApi::class, BetaInteropApi::class)
 private object Keychain {
-  private const val SERVICE = "nl.eschouten.scraper"
+  private const val SERVICE = "com.eschouten.agrigate.clean"
 
   fun get(account: String, group: String?): String? = memScoped {
     val out = alloc<CFTypeRefVar>()

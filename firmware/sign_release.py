@@ -23,7 +23,7 @@ import sys
 import tempfile
 
 BOARD = "m5stack-core"
-FEED_PREFIX = "scraper-control desktop feed v1 %s\n"   # % the system: as DesktopUpdates.prefix
+FEED_PREFIX = "agrigate clean desktop feed v1 %s\n"   # % the system: as DesktopUpdates.prefix
 FIELDS = ("version", "build", "size", "sha256")
 
 

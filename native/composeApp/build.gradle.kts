@@ -46,14 +46,13 @@ compose.desktop {
   application {
     mainClass = "nl.eschouten.scraper.app.MainKt"
     nativeDistributions {
-      // the installed name stays (Velopack finds the app by it), the window and app names say Agrigate Clean
-      packageName = "Scraper Control"
+      packageName = "Agrigate Clean"   // Linux: the package agrigate-clean
       // beyond what is found by itself: the web API (api/ApiServer), updates (app/DesktopUpdates)
       modules("jdk.httpserver", "java.net.http", "jdk.crypto.ec")
       // the app icon (from the iOS/Android icon), per system
       macOS {
         iconFile.set(project.file("icons/icon.icns"))
-        bundleID = "nl.eschouten.scraper.desktop"
+        bundleID = "com.eschouten.agrigate.clean.desktop"
         // macOS stops an app that uses Bluetooth without saying why (BLE and classic alike)
         infoPlist {
           extraKeysRawXml = """
@@ -94,15 +93,15 @@ val velopack by tasks.registering(Exec::class) {
   onlyIf { velopackOs }
   val app = layout.buildDirectory.dir("compose/binaries/main/app").get().asFile
   val out = layout.buildDirectory.dir("velopack").get().asFile
-  val (dir, exe) = if (hostOs.startsWith("mac")) File(app, "Scraper Control.app") to "Scraper Control"
-    else File(app, "Scraper Control") to "Scraper Control.exe"
+  val (dir, exe) = if (hostOs.startsWith("mac")) File(app, "Agrigate Clean.app") to "Agrigate Clean"
+    else File(app, "Agrigate Clean") to "Agrigate Clean.exe"
   val tools = File(System.getProperty("user.home"), ".dotnet/tools")   // where vpkTool puts it
   doFirst {
     out.deleteRecursively()
     listOf("vpk", "vpk.exe").map { File(tools, it) }.firstOrNull { it.exists() }?.let { executable = it.path }
   }
   commandLine(
-    "vpk", "pack", "--packId", "ScraperControl", "--packTitle", "Scraper Control",
+    "vpk", "pack", "--packId", "AgrigateClean", "--packTitle", "Agrigate Clean",
     "--packVersion", rootProject.extra["appVersion"] as String, "--packDir", dir.path, "--mainExe", exe,
     "--delta", "None", "--outputDir", out.path, "--yes",
   )

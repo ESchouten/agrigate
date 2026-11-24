@@ -8,7 +8,7 @@ import Shared
 import UserNotifications
 import WidgetKit
 
-let appGroup = "group.nl.eschouten.scraper"
+let appGroup = "group.com.eschouten.agrigate.clean"
 
 /// The store the app and its widgets share (App Group); also sets the app's language.
 func widgetStore() -> DefaultsStore {

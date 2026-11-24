@@ -55,7 +55,7 @@ Everything is in the [latest release](https://github.com/ESchouten/scraper-contr
 | Android | `.apk` | Open it on the phone and allow installing from your browser or files app. A newer version installs over the old one; [Obtainium](https://github.com/ImranR98/Obtainium) with this repository keeps it up to date. |
 | Windows | `.exe` | Not signed: at the blue warning choose More info > Run anyway. Installs for your user, no administrator needed. |
 | macOS | `.pkg` | Not signed: right-click > Open the first time, then allow Bluetooth. |
-| Linux | `.deb` | Add the apt repository once (below): `sudo apt upgrade` then keeps it up to date. Or just the file: `sudo apt install ./scraper-control_*.deb`. |
+| Linux | `.deb` | Add the apt repository once (below): `sudo apt upgrade` then keeps it up to date. Or just the file: `sudo apt install ./agrigate-clean_*.deb`. |
 | iOS | none yet | Build it with Xcode ([native/README.md](native/README.md)). |
 | Buttons | M5Stack Basic v2.7 (16 MB) | The first time with the [browser installer](https://eschouten.github.io/scraper-control/) (Chrome or Edge on a computer, USB-C data cable), or `esptool write-flash 0x0 scraper-control-m5stack-core-<version>-full.bin`. That erases the M5Stack; after that it updates itself over wifi. |
 
@@ -64,13 +64,14 @@ The apt repository (Debian, Ubuntu; amd64):
 ```bash
 curl -fsSL https://eschouten.github.io/scraper-control/apt/scraper-control.gpg | sudo tee /usr/share/keyrings/scraper-control.gpg > /dev/null
 echo "deb [signed-by=/usr/share/keyrings/scraper-control.gpg] https://eschouten.github.io/scraper-control/apt stable main" | sudo tee /etc/apt/sources.list.d/scraper-control.list
-sudo apt update && sudo apt install scraper-control
+sudo apt update && sudo apt install agrigate-clean
 ```
 
 On Windows and macOS the app checks for a new version at start and once a day and asks before
 it installs one; it only takes a release signed with the release key, like the buttons. An app
-installed from an older `.dmg` or `.exe` does not update itself: install the new one once (on
-Windows, remove the old "Scraper Control" first).
+that is still called Scraper Control does not update itself to Agrigate Clean: install Agrigate
+Clean once and remove Scraper Control (on Linux: `sudo apt install agrigate-clean && sudo apt
+remove scraper-control`). On Android and iOS it is a new app as well; add the robot again.
 
 ### First connection
 
