@@ -6,10 +6,9 @@ plugins {
 }
 
 val hasAndroid = findProject(":androidApp") != null   // settings.gradle.kts: an Android SDK is there
-// The robot driver (gradle.properties clean.driver): drivers/<name>/src, built with the C API in core/
-val driver = providers.gradleProperty("clean.driver").get()
-val driverDir = rootDir.resolve("../drivers/$driver")
-val driverSrc = driverDir.resolve("src")
+// The drivers (drivers/<name>/src), built with the C APIs in core/
+val driversDir = rootDir.resolve("../drivers")
+val driverSources = fileTree(driversDir) { include("*/src/*") }
 val apiDir = rootDir.resolve("../core")
 val secretsFile = rootDir.resolve("../drivers/secrets.h") // tools/secrets.py; optional
 
@@ -43,7 +42,7 @@ kotlin {
   listOf(iosArm64(), iosSimulatorArm64()).forEach { t ->
     t.compilations.getByName("main").cinterops.create("core") {
       definitionFile.set(file("src/nativeInterop/cinterop/core.def"))
-      includeDirs(apiDir)
+      includeDirs(apiDir, driversDir.resolve("discovery/src"))
       // libcore.a per target, built by buildCoreIos (macOS only)
       extraOpts("-libraryPath", layout.buildDirectory.dir("core-ios/${t.name}").get().asFile.path)
     }
@@ -90,20 +89,20 @@ val coreJniOut = layout.buildDirectory.dir("core-jni")
 val coreJniWork = layout.buildDirectory.dir("core-jni-cmake")
 val configureCoreJni by tasks.registering(Exec::class) {
   val out = coreJniOut.get().asFile.resolve("native").invariantSeparatorsPath
-  inputs.dir(driverSrc)
+  inputs.files(driverSources)
   inputs.dir(apiDir)
   inputs.files(secretsFile)
   outputs.dir(coreJniWork)
   doFirst { coreJniWork.get().asFile.run { deleteRecursively(); mkdirs() } } // a fresh CMake cache: the sources may have moved
   commandLine(
-    "cmake", "-S", apiDir.path, "-B", coreJniWork.get().asFile.path, "-DCLEAN_DRIVER=$driver", "-DCMAKE_BUILD_TYPE=Release",
+    "cmake", "-S", apiDir.path, "-B", coreJniWork.get().asFile.path, "-DCMAKE_BUILD_TYPE=Release",
     "-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=$out", "-DCMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE=$out",   // the second: a .dll on Windows
   )
 }
 val buildCoreJni by tasks.registering(Exec::class) {
   description = "Builds the robot driver with the JNI bridge (core/CMakeLists.txt) for this machine."
   dependsOn(configureCoreJni)
-  inputs.dir(driverSrc)
+  inputs.files(driverSources)
   inputs.dir(apiDir)
   inputs.files(secretsFile)
   outputs.dir(coreJniOut)
@@ -122,17 +121,17 @@ iosTargets.forEach { (target, sdkAndTriple) ->
   val task = tasks.register<Exec>("buildCoreIos${target.replaceFirstChar { it.uppercase() }}") {
     val out = layout.buildDirectory.dir("core-ios/$target").get().asFile
     onlyIf { System.getProperty("os.name").startsWith("Mac") }
-    inputs.dir(driverSrc)
+    inputs.files(driverSources)
     inputs.dir(apiDir)
     inputs.files(secretsFile)
     outputs.dir(out)
     doFirst { out.mkdirs() }
     workingDir(out)
-    val srcs = driverSrc.listFiles { f -> f.extension == "cpp" }!!.sorted().joinToString(" ") { "'$it'" }
+    val srcs = (driverSources.files + apiDir.resolve("session").listFiles()!!).filter { it.extension == "cpp" }.sorted().joinToString(" ") { "'$it'" }
     commandLine(
       "sh", "-c",
-      "xcrun --sdk $sdk clang++ -std=c++17 -O2 -target $triple -I'$driverSrc' " +
-        "-I'$apiDir' -c $srcs && xcrun ar rcs libcore.a *.o",
+      "rm -f *.o libcore.a && xcrun --sdk $sdk clang++ -std=c++17 -O2 -target $triple -I'$apiDir' -I'$apiDir/session' " +
+        "-I'$driversDir/discovery/src' -c $srcs && xcrun ar rcs libcore.a *.o",
     )
   }
   tasks.matching { it.name == "cinteropCore${target.replaceFirstChar { c -> c.uppercase() }}" }
@@ -141,7 +140,7 @@ iosTargets.forEach { (target, sdkAndTriple) ->
 
 tasks.withType<Test>().configureEach {
   // the simulated robot (python3) for the tests
-  environment("SIMULATOR_SCRIPT", driverDir.resolve("tests/fake_robot_server.py").path)
+  environment("SIMULATOR_SCRIPT", driversDir.resolve("discovery/tests/fake_robot_server.py").path)
   testLogging { events("passed", "failed"); exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL }
 }
 

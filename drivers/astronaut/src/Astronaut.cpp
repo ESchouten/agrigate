@@ -79,7 +79,7 @@ void stop(Session& s) { s.send(registration(false)); }
 }  // namespace
 
 extern const Driver astronaut = [] {
-  Driver d{"astronaut", "Astronaut", {"udp", nullptr, 6000}};
+  Driver d{"astronaut", "Astronaut", {{"udp", nullptr, 6000}}};
   d.identity = [](Session&) {};   // the robot tells by itself: nothing to ask
   d.tick = tick;
   d.incoming = incoming;

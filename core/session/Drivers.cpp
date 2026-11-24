@@ -3,9 +3,9 @@
 
 namespace agrigate {
 
-extern const Driver t4c, fullsense, astronaut;
+extern const Driver t4c, fullsense, astronaut, discovery;
 
-const Driver* const kDrivers[] = {&t4c, &fullsense, &astronaut};
+const Driver* const kDrivers[] = {&t4c, &fullsense, &astronaut, &discovery};
 const int kDriverCount = sizeof kDrivers / sizeof *kDrivers;
 
 }  // namespace agrigate

@@ -11,12 +11,14 @@ constexpr int64_t kSilentMs = 10000;   // a source that tells by itself and said
 
 Session::Session(const Driver& d, const std::string& a, std::string u, std::string p)
     : driver(d), address(a), user(std::move(u)), password(std::move(p)) {
-  if (driver.incoming) return;   // udp: the host sends to the address as it is
-  base_ = address.find("://") == std::string::npos ? std::string(d.link.scheme) + "://" + address : address;
+  if (driver.clean) robot.reset(driver.clean(*this));
+  const Link& link = d.links.front();
+  if (!link.scheme) return;   // not http: the host reaches the address as it is
+  base_ = address.find("://") == std::string::npos ? std::string(link.scheme) + "://" + address : address;
   while (!base_.empty() && base_.back() == '/') base_.pop_back();
   std::string host = base_.substr(base_.find("://") + 3);
   if (host.find(':', host.find(']') == std::string::npos ? 0 : host.find(']')) == std::string::npos)
-    base_ += ":" + std::to_string(d.link.port);
+    base_ += ":" + std::to_string(link.port);
 }
 
 void Session::ask(const char* method, const std::string& path, const std::string& body, Answer then, bool optional) {
@@ -95,16 +97,27 @@ void Session::response(int status, const std::string& body) {
   if (queue_.empty() && result_ == SESSION_OK) *updated_ = now;
 }
 
-bool Session::outgoing(std::string& datagram) const {
+bool Session::outgoing(std::string& datagram) {
+  for (std::string bytes; robot && robot->outgoing(bytes);) out_.push_back(std::move(bytes));
   if (out_.empty()) return false;
   datagram = out_.front();
   return true;
 }
 
-// Every contract a driver can serve: a new one adds its line here, its read to Driver, its data
-// to Session and its header to core/.
+// Every contract a driver can serve by reading: a new one adds its line here, its read to Driver,
+// its data to Session and its header to core/. ("clean" is commands on a robot: Clean.h.)
 const struct { const char* name; void (*Driver::*read)(Session&); } kContracts[] = {
     {"milk", &Driver::milk}, {"cow", &Driver::cow}, {"identity", &Driver::identity}};
+
+std::string linkJson(const Link& l) {
+  std::string o = "{\"kind\":" + quote(l.kind);
+  if (l.scheme) o += ",\"scheme\":" + quote(l.scheme);
+  if (l.port) o += ",\"port\":" + std::to_string(l.port);
+  const std::pair<const char*, const char*> texts[] = {{"service", l.service}, {"rx", l.rx}, {"tx", l.tx}, {"addressPrefix", l.addressPrefix}};
+  for (const auto& t : texts)
+    if (t.second) o += ",\"" + std::string(t.first) + "\":" + quote(t.second);
+  return o + "}";
+}
 
 int32_t copyOut(const std::string& s, char* buf, int32_t size) {
   if (buf && size > 0) {
@@ -130,9 +143,10 @@ int32_t session_drivers_json(char* buf, int32_t size) {
     bool first = true;
     for (const auto& c : kContracts)
       if (d.*c.read) { o += std::string(first ? "" : ",") + quote(c.name); first = false; }
-    o += "],\"link\":{\"kind\":" + quote(d.link.kind);
-    if (d.link.scheme) o += ",\"scheme\":" + quote(d.link.scheme);
-    o += ",\"port\":" + std::to_string(d.link.port) + "}}";
+    if (d.clean) o += std::string(first ? "" : ",") + "\"clean\"";
+    o += "],\"links\":[";
+    for (size_t l = 0; l < d.links.size(); l++) o += (l ? "," : "") + linkJson(d.links[l]);
+    o += "]}";
   }
   return copyOut(o + "]", buf, size);
 }
@@ -169,7 +183,17 @@ int32_t session_outgoing(session* s, uint8_t* buf, int32_t size) {
 
 void session_incoming(session* s, const uint8_t* data, int32_t len, int64_t now_ms) {
   s->now = now_ms;
-  if (s->driver.incoming && data && len > 0) s->driver.incoming(*s, std::string((const char*)data, (size_t)len));
+  if (!data || len <= 0) return;
+  if (s->robot) s->robot->incoming(data, (size_t)len);
+  else if (s->driver.incoming) s->driver.incoming(*s, std::string((const char*)data, (size_t)len));
+}
+
+void session_link_down(session* s) {
+  if (s->robot) s->robot->linkDown();
+}
+
+void session_wait(session* s, int32_t ms) {
+  if (s->robot) s->robot->wait(ms);
 }
 
 void session_stop(session* s) {

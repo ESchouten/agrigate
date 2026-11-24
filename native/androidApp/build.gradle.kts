@@ -16,7 +16,6 @@ android {
     versionCode = rootProject.extra["appBuild"] as Int
     versionName = rootProject.extra["appVersion"] as String   // 1.6.120 (build.gradle.kts)
     ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64") }
-    externalNativeBuild { cmake { arguments += "-DCLEAN_DRIVER=${providers.gradleProperty("clean.driver").get()}" } }
   }
   externalNativeBuild {
     cmake { path = file("../../core/CMakeLists.txt") }

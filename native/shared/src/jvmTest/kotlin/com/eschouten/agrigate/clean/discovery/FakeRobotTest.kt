@@ -14,12 +14,12 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
-private val stored = "DIS0018T4".encodeToByteArray()
+private val stored = """{"image":"444953303031385434"}"""   // what a session leaves to remember: the robot's image set, DIS0018T4
 
 class FakeRobotTest {
-  private fun run(o: FakeRobotOptions = FakeRobotOptions(), pin: String = "4321", version: ByteArray = stored, job: suspend (Robot) -> Unit = {}): FakeRobotLink = runBlocking {
+  private fun run(o: FakeRobotOptions = FakeRobotOptions(), pin: String = "4321", memory: String = stored, job: suspend (Robot) -> Unit = {}): FakeRobotLink = runBlocking {
     val link = FakeRobotLink(o = o)
-    val r = Robot(link, pin = pin, imageVersion = version)
+    val r = Robot(link, pin = pin, memory = memory)
     try {
       r.connect()
       job(r)
@@ -47,7 +47,7 @@ class FakeRobotTest {
     val steps = mutableListOf<CoreStep>()
     val link = runBlocking {
       val l = FakeRobotLink()
-      val r = Robot(l, pin = "4321", imageVersion = stored, onStep = { synchronized(steps) { steps += it } })
+      val r = Robot(l, pin = "4321", memory = stored, onStep = { synchronized(steps) { steps += it } })
       r.connect(); r.startRoute('C'); r.disconnect()
       l
     }
@@ -140,34 +140,36 @@ class FakeRobotTest {
   }
 
   @Test fun owedPlanningIsPaidBackAtConnect() {
-    val seen = mutableListOf<Int>()
+    val seen = mutableListOf<String>()
+    val owed = stored.dropLast(1) + ""","owedPlanning":true,"owedAt":${System.currentTimeMillis() - 60_000}}"""
     val link = runBlocking {
       val l = FakeRobotLink(o = FakeRobotOptions(planning = false, mode = "menu"))
-      val r = Robot(l, pin = "4321", imageVersion = stored, owedPlanning = 1, onOwed = { synchronized(seen) { seen += it } })
+      val r = Robot(l, pin = "4321", memory = owed, onMemory = { synchronized(seen) { seen += it } })
       r.connect()
-      assertEquals(-1, r.owedPlanning)
+      assertEquals(stored, r.memory)
       r.disconnect()
       l
     }
     assertEquals("home", link.log.mode)
     assertTrue(link.log.planning)
-    assertEquals(listOf(-1), seen)
+    assertEquals(listOf(stored), seen)
   }
 
   @Test fun panelKeysOweUntilFinish() {
-    val seen = mutableListOf<Int>()
+    val seen = mutableListOf<String>()
     runBlocking {
-      val r = Robot(FakeRobotLink(), pin = "4321", imageVersion = stored, onOwed = { synchronized(seen) { seen += it } })
+      val r = Robot(FakeRobotLink(), pin = "4321", memory = stored, onMemory = { synchronized(seen) { seen += it } })
       r.connect()
       r.press(RobotKey.StartStop) // planning off by hand on the panel
-      assertEquals(1, r.owedPlanning)
+      assertTrue(""""owedPlanning":true""" in r.memory, r.memory)
       r.disconnect() // finish() puts it back
     }
-    assertEquals(listOf(1, -1), seen)
+    assertEquals(2, seen.size)
+    assertEquals(stored, seen.last())
   }
 
   @Test fun imageDownload() {
-    val l = run(version = ByteArray(9))
+    val l = run(memory = "")
     assertEquals(52, l.log.imagesSent)
   }
 }

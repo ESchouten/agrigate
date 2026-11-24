@@ -1,6 +1,5 @@
-# "clean_jni": the robot driver with the C API and its JNI bridge, for the Kotlin apps
-# (Android through the NDK, desktop through :shared:buildCoreJni).
-# CLEAN_DRIVER: the folder in drivers/ to build (needed when there is more than one).
+# "clean_jni": every driver (drivers/<name>/src) with the C APIs and their JNI bridge, for the
+# Kotlin apps (Android through the NDK, desktop through :shared:buildCoreJni).
 cmake_minimum_required(VERSION 3.15)
 project(clean_jni LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
@@ -8,19 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-set(CLEAN_DRIVER "" CACHE STRING "robot driver (a folder in drivers/)")
-if(CLEAN_DRIVER STREQUAL "")
-  file(GLOB FOUND ${CMAKE_CURRENT_LIST_DIR}/../drivers/*/src/clean_c.cpp)   # the manure robot drivers
-  list(LENGTH FOUND N)
-  if(NOT N EQUAL 1)
-    message(FATAL_ERROR "set CLEAN_DRIVER to a folder in drivers/")
-  endif()
-  get_filename_component(FOUND ${FOUND} DIRECTORY)
-  get_filename_component(FOUND ${FOUND} DIRECTORY)
-  get_filename_component(CLEAN_DRIVER ${FOUND} NAME)
-endif()
-get_filename_component(DRIVER_SRC ${CMAKE_CURRENT_LIST_DIR}/../drivers/${CLEAN_DRIVER}/src ABSOLUTE)
-file(GLOB DRIVER_SOURCES ${DRIVER_SRC}/*.cpp)
+file(GLOB DRIVER_SOURCES ${CMAKE_CURRENT_LIST_DIR}/../drivers/*/src/*.cpp ${CMAKE_CURRENT_LIST_DIR}/session/*.cpp)
 set(JNI_SOURCES ${CMAKE_CURRENT_LIST_DIR}/jni/clean_jni.cpp)
 if(NOT ANDROID)   # classic Bluetooth serial for the desktop app (Android has its own API)
   if(WIN32)
@@ -62,7 +49,7 @@ if(NOT ANDROID AND (WIN32 OR APPLE))
   list(APPEND JNI_SOURCES ${CMAKE_CURRENT_LIST_DIR}/jni/updates_jni.cpp)
 endif()
 add_library(clean_jni SHARED ${DRIVER_SOURCES} ${JNI_SOURCES})
-target_include_directories(clean_jni PRIVATE ${DRIVER_SRC} ${CMAKE_CURRENT_LIST_DIR})
+target_include_directories(clean_jni PRIVATE ${CMAKE_CURRENT_LIST_DIR} ${CMAKE_CURRENT_LIST_DIR}/session ${CMAKE_CURRENT_LIST_DIR}/../drivers/discovery/src)
 if(NOT ANDROID)
   find_package(JNI REQUIRED)
   target_include_directories(clean_jni PRIVATE ${JNI_INCLUDE_DIRS})

@@ -54,7 +54,7 @@ class Robot:
 
 
 def test_listed():
-    assert {"id": "astronaut", "name": "Astronaut", "contracts": ["identity"], "link": {"kind": "udp", "port": 6000}} in drivers()
+    assert {"id": "astronaut", "name": "Astronaut", "contracts": ["identity"], "links": [{"kind": "udp", "port": 6000}]} in drivers()
 
 
 def test_registers_and_renews_every_two_seconds():

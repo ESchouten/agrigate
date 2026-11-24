@@ -87,15 +87,15 @@ def save_cached(address: str) -> None:
     d = _load(); d["address"] = address; _save(d)
 
 
-def load_image_version(address: str) -> bytes:
-    """Image-set version the robot gave us last time.
-    Sending it back on the robot's [5,0] request skips the ~75 s image download."""
-    v = _load().get("image_versions", {}).get(address)
-    return bytes.fromhex(v) if v else bytes(9)
+def load_memory(address: str) -> str:
+    """What the driver wanted kept for this robot (what skips the ~75 s of a first connection)."""
+    return _load().get("memory", {}).get(address, "")
 
 
-def save_image_version(address: str, version: bytes) -> None:
-    d = _load(); d.setdefault("image_versions", {})[address] = bytes(version).hex(); _save(d)
+def save_memory(address: str, memory: str) -> None:
+    d = _load()
+    if d.get("memory", {}).get(address) != memory:
+        d.setdefault("memory", {})[address] = memory; _save(d)
 
 
 async def _probe_for_nus(candidates: list[Found], limit: int = 5) -> list[Found]:

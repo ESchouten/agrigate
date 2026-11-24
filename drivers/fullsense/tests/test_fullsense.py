@@ -42,7 +42,7 @@ def read(farm, password="geheim"):
 
 def test_driver_is_listed():
     d = next(d for d in drivers() if d["id"] == "fullsense")
-    assert d["contracts"] == ["milk"] and d["link"]["port"] == 12080
+    assert d["contracts"] == ["milk"] and d["links"][0]["port"] == 12080
 
 
 def test_robots_states_and_alarm():

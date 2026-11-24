@@ -9,8 +9,8 @@
 
 namespace discovery {
 
-// The link to the robot. Buttons: BtLink (firmware/lib). Apps and Python: HostTransport
-// (clean_c.cpp). Tests: a pipe to the simulated robot.
+// The link to the robot. Buttons: BtLink (firmware/lib). Apps and Python: HostLink
+// (Discovery.cpp). Tests: a pipe to the simulated robot.
 class Transport {
  public:
   virtual ~Transport() {}

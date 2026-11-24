@@ -3,14 +3,18 @@
 // (Milk.h, Cow.h, Identity.h) is brought up to date. Over "http" it asks with get() and post(): the
 // session sends one request at a time through the host and hands each answer to the request's
 // own function, which may ask for more. Over "udp" it sends datagrams with send() and is handed
-// what the source says (incoming).
+// what the source says (incoming). A manure robot (Clean.h) is a conversation with its own timing:
+// its driver makes the session's robot, which also takes the link's bytes.
 #pragma once
 
 #include <deque>
 #include <functional>
 #include <map>
+#include <memory>
 #include <string>
+#include <vector>
 
+#include "Clean.h"
 #include "Cow.h"
 #include "Identity.h"
 #include "Json.h"
@@ -21,14 +25,21 @@ namespace agrigate {
 
 class Session;
 
+/** How a source is reached (session_c.h): what the host needs to know to open it. */
+struct Link {
+  const char* kind;               // "http", "udp", "ble-serial" or "bt-serial"
+  const char* scheme = nullptr;   // http: for an address without one
+  int port = 0;                   // http, udp: for an address without one
+  const char* service = nullptr;  // ble-serial, bt-serial: the service's UUID
+  const char* rx = nullptr;       // ble-serial: the characteristic written to (without response)
+  const char* tx = nullptr;       // ble-serial: the one that notifies
+  const char* addressPrefix = nullptr;   // serial: of the devices' addresses, lower case ("" = any)
+};
+
 struct Driver {
   const char* id;     // stored with a source: never change it
   const char* name;   // what the source is (the server software, the make of robot)
-  struct {
-    const char* kind;     // "http" or "udp"
-    const char* scheme;   // http: for an address without one
-    int port;             // for an address without one
-  } link;
+  std::vector<Link> links;   // the first is preferred; the messages are the same over each
 
   /** http: ask for a login and set Session::headers from the answer (or fail(SESSION_LOGIN_REJECTED)). */
   void (*login)(Session&) = nullptr;
@@ -38,6 +49,8 @@ struct Driver {
   void (*milk)(Session&) = nullptr;
   void (*cow)(Session&) = nullptr;
   void (*identity)(Session&) = nullptr;
+  /** "clean": the robot behind a new session (Clean.h), which the session then owns. */
+  clean::Robot* (*clean)(Session&) = nullptr;
 
   /** udp. tick: every ~100 ms, queue what has to be sent now. incoming: a datagram from the
    *  source. stop: queue the goodbye, if there is one. */
@@ -64,6 +77,8 @@ class Session {
   milk::Farm milk;
   cow::Herd cow;
   identity::Places identity;
+  std::unique_ptr<clean::Robot> robot;
+  std::string step;   // of the robot's running command, until the host took it (clean_next_step)
 
   // ---- http
   /** Sent with every request: the login, set by the driver. */
@@ -89,11 +104,11 @@ class Session {
   int read(void (*start)(Session&), int64_t* updated);
   std::string request() const;
   void response(int status, const std::string& body);
-  /** The next datagram to send (left on the queue), false when there is none. */
-  bool outgoing(std::string& datagram) const;
+  /** The next datagram (or a robot's next bytes) to send, left on the queue; false when there is none. */
+  bool outgoing(std::string& datagram);
   void sent() { out_.pop_front(); }
-  int result() const { return !queue_.empty() ? SESSION_IN_PROGRESS : result_; }
-  const std::string& error() const { return error_; }
+  int result() { return robot ? robot->result() : !queue_.empty() ? SESSION_IN_PROGRESS : result_; }
+  std::string error() { return robot ? robot->error() : error_; }
 
  private:
   struct Request { std::string method, path, body; Answer then; bool optional; };

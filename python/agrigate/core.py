@@ -1,8 +1,8 @@
-"""ctypes binding to the robot API in C (core/clean_c.h), built from the robot driver.
+"""ctypes binding to the C APIs (core/session_c.h and the contracts on it), built from the
+drivers, and a manure robot's session on it (core/clean_c.h).
 
-The core holds all robot logic (screens, route steps, safety rules); this module only
-moves bytes between it and a Bluetooth link. The same core runs on the M5Stack and in
-the apps.
+The drivers hold all logic (screens, route steps, safety rules, what a server's answers mean);
+this module only moves bytes. The same code runs on the M5Stack and in the apps.
 
 The library is $AGRIGATE_CORE_LIB, or the one next to this file, which is built on first
 use and after a change (needs a C++17 compiler). Or build it yourself:  python -m agrigate.build_core
@@ -12,13 +12,13 @@ from __future__ import annotations
 import ctypes
 import json
 import os
+import threading
 from pathlib import Path
 
-OK, CONNECT_FAILED, PIN_REJECTED, NO_SCREEN, BUSY, UNEXPECTED, STARTED_NO_ANSWER, CANCELLED = range(8)
+# results: session_c.h, then clean_c.h
+OK, UNREACHABLE, LOGIN_REJECTED, UNEXPECTED, UNSUPPORTED = range(5)
+BUSY, NO_CONFIRMATION, CANCELLED = 10, 11, 12
 IN_PROGRESS = 100
-
-WRITE_FN = ctypes.CFUNCTYPE(None, ctypes.c_void_p, ctypes.POINTER(ctypes.c_uint8), ctypes.c_int32)
-DONE_FN = ctypes.CFUNCTYPE(None, ctypes.c_void_p, ctypes.c_int32, ctypes.c_int32)
 
 HERE = Path(__file__).resolve().parent
 
@@ -46,30 +46,27 @@ def lib():
     global _lib
     if _lib is None:
         L = ctypes.CDLL(str(library_path()))
-        S = ctypes.c_void_p
-        L.clean_new.restype = S
-        L.clean_new.argtypes = [ctypes.c_char_p, ctypes.c_char_p, WRITE_FN, DONE_FN, ctypes.c_void_p]
-        L.clean_free.argtypes = [S]
-        L.clean_feed.argtypes = [S, ctypes.c_char_p, ctypes.c_int32]
-        L.clean_release.argtypes = [ctypes.POINTER(ctypes.c_uint8)]
-        L.clean_link_down.argtypes = [S]
-        L.clean_cancel.argtypes = [S]
-        for name, extra in (("clean_connect", []), ("clean_start_route", [ctypes.c_char, ctypes.c_int32]),
-                            ("clean_set_planning", [ctypes.c_int32]), ("clean_press", [ctypes.c_int32]),
-                            ("clean_finish", []), ("clean_stop_route", []), ("clean_wait", []),
-                            ("clean_answer_stop", [ctypes.c_int32])):
-            getattr(L, name).argtypes = [S] + extra
-            getattr(L, name).restype = ctypes.c_int32
-        for name in ("clean_status_json", "clean_last_error"):
-            getattr(L, name).argtypes = [S, ctypes.c_char_p, ctypes.c_int32]
-            getattr(L, name).restype = ctypes.c_int32
-        L.clean_image_version.argtypes = [S, ctypes.c_char_p]
-        L.clean_image_version.restype = ctypes.c_int32
-        L.clean_result_text_lang.argtypes = [ctypes.c_int32, ctypes.c_char_p]
-        L.clean_result_text_lang.restype = ctypes.c_char_p
-        L.clean_set_language.argtypes = [S, ctypes.c_char_p]
-        L.clean_links_json.argtypes = [ctypes.c_char_p, ctypes.c_int32]
-        L.clean_links_json.restype = ctypes.c_int32
+        S, out, i32 = ctypes.c_void_p, [ctypes.c_char_p, ctypes.c_int32], ctypes.c_int32
+        L.session_open.restype = S
+        L.session_open.argtypes = [ctypes.c_char_p] * 4
+        L.session_tick.argtypes = [S, ctypes.c_int64]
+        L.session_response.argtypes = [S, i32, ctypes.c_char_p, i32]
+        L.session_incoming.argtypes = [S, ctypes.c_char_p, i32, ctypes.c_int64]
+        L.session_wait.argtypes = [S, i32]
+        L.session_drivers_json.argtypes = out
+        L.identity_events_json.argtypes = [S, ctypes.c_int64] + out
+        L.clean_start_route.argtypes = [S, ctypes.c_char, i32]
+        L.clean_input.argtypes = [S, ctypes.c_char_p, i32]
+        L.clean_set_language.argtypes = L.clean_remember.argtypes = [S, ctypes.c_char_p]
+        for name in ("clean_set_planning", "clean_answer_stop"):
+            getattr(L, name).argtypes = [S, i32]
+        for name in ("session_close", "session_stop", "session_result", "session_link_down", "milk_read", "cow_read",
+                     "identity_read", "clean_connect", "clean_stop_route", "clean_read_routes", "clean_finish",
+                     "clean_cancel", "clean_release"):
+            getattr(L, name).argtypes = [S]
+        for name in ("session_request_json", "session_last_error", "session_outgoing", "milk_json", "cow_json",
+                     "identity_json", "clean_status_json", "clean_routes_json", "clean_next_step", "clean_memory"):
+            getattr(L, name).argtypes = [S] + out
         _lib = L
     return _lib
 
@@ -82,94 +79,103 @@ def text(fn, *args) -> str:
     return buf.value.decode(errors="replace")
 
 
-def links_info() -> list[dict]:
-    """How the driver's robots are reached, preferred first: [{"kind": "ble-serial", ...}, ...]
-    (see core/clean_c.h)."""
-    buf = ctypes.create_string_buffer(1024)
-    lib().clean_links_json(buf, len(buf))
-    return json.loads(buf.value.decode())
-
-
-def result_text(r: int, language: str = "en") -> str:
-    return lib().clean_result_text_lang(r, language.encode()).decode()
+def drivers() -> list[dict]:
+    """The drivers in this build: [{"id", "name", "contracts", "links"}, ...] (core/session_c.h)."""
+    return json.loads(text(lib().session_drivers_json))
 
 
 class CoreSession:
-    """One connection's worth of robot logic. `write(bytes)` is called (from the core's
-    thread) for every frame to send; call `feed(bytes)` for every notification.
+    """A session with one manure robot (core/clean_c.h). `write(bytes)` is called (from the
+    session's own thread) for every frame to send; call `feed(bytes)` for what the robot sends.
+    memory: what `memory()` gave last time for this robot.
 
     Commands are blocking here (`connect()`, `start_route()`, ...) and return a result
     code; run them in a thread (e.g. asyncio.to_thread) when on an event loop."""
 
-    def __init__(self, write, pin: str | None = None, image_version: bytes | None = None, language: str = "en"):
+    def __init__(self, write, pin: str | None = None, memory: str = "", language: str = "en", driver: str = "discovery"):
+        L = lib()
         self._write = write
-        self._wcb = WRITE_FN(self._on_write)
-        self._dcb = DONE_FN(lambda _u, _cmd, _res: None)
-        ver = image_version if image_version and len(image_version) == 9 else None
-        self._s = lib().clean_new((pin or "").encode(), ver, self._wcb, self._dcb, None)
-        lib().clean_set_language(self._s, language.encode())   # of last_error(): "nl" or "en"
+        self._s = L.session_open(driver.encode(), b"", b"", (pin or "").encode())
+        if not self._s:
+            raise ValueError(f"no driver '{driver}'")
+        L.clean_set_language(self._s, language.encode())   # of last_error(): "nl" or "en"
+        L.clean_remember(self._s, memory.encode())
+        self._news = threading.Condition()
+        self._pump = threading.Thread(target=self._run, daemon=True)
+        self._pump.start()
 
-    def _on_write(self, _user, data, n) -> None:
-        frame = ctypes.string_at(data, n)
-        lib().clean_release(data)
-        self._write(frame)
+    def _run(self) -> None:   # the link's exchange (core/session_c.h)
+        L, buf, s = lib(), ctypes.create_string_buffer(4096), self._s
+        while self._s:
+            L.session_wait(s, 250)
+            while (n := L.session_outgoing(s, buf, len(buf))) > 0:
+                self._write(buf.raw[:n])
+            with self._news:
+                self._news.notify_all()
 
     def close(self) -> None:
         if self._s:
-            lib().clean_free(self._s)
-            self._s = None
+            s, self._s = self._s, None
+            self._pump.join()
+            lib().session_close(s)
 
     def __del__(self):
         self.close()
 
     # bytes in / link state
     def feed(self, data: bytes) -> None:
-        lib().clean_feed(self._s, data, len(data))
+        if self._s:   # a robot may still say something while the session closes
+            lib().session_incoming(self._s, data, len(data), 0)
 
     def link_down(self) -> None:
-        lib().clean_link_down(self._s)
+        if self._s:
+            lib().session_link_down(self._s)
 
     def cancel(self) -> None:
         """Cancel the running command from another thread (e.g. on Ctrl+C): it ends with
         CANCELLED and the robot back as it was, until Start is pressed for a route."""
-        lib().clean_cancel(self._s)
+        if self._s:
+            lib().clean_cancel(self._s)
 
     # commands (blocking)
-    def _run(self, started: int) -> int:
-        if started == IN_PROGRESS:
-            return IN_PROGRESS
-        return lib().clean_wait(self._s)
+    def _do(self, started: int) -> int:
+        if started != OK:
+            return started
+        with self._news:
+            while (r := lib().session_result(self._s)) == IN_PROGRESS:
+                self._news.wait(0.5)
+        return r
 
     def connect(self) -> int:
-        return self._run(lib().clean_connect(self._s))
+        return self._do(lib().clean_connect(self._s))
 
     def start_route(self, letter: str, dry_run: bool = False) -> int:
-        return self._run(lib().clean_start_route(self._s, letter.upper().encode(), int(dry_run)))
+        return self._do(lib().clean_start_route(self._s, letter.upper().encode(), int(dry_run)))
 
     def stop_route(self) -> int:
-        return self._run(lib().clean_stop_route(self._s))
+        return self._do(lib().clean_stop_route(self._s))
 
     def answer_stop(self, finish: bool) -> int:
-        return self._run(lib().clean_answer_stop(self._s, int(finish)))
+        return self._do(lib().clean_answer_stop(self._s, int(finish)))
 
     def set_planning(self, on: bool) -> int:
-        return self._run(lib().clean_set_planning(self._s, int(on)))
+        return self._do(lib().clean_set_planning(self._s, int(on)))
 
-    def press(self, key: int) -> int:
-        return self._run(lib().clean_press(self._s, key))
+    def press(self, name: str) -> int:
+        """One of the robot's own inputs (a panel key), by the driver's name for it."""
+        return self._do(lib().clean_input(self._s, name.encode(), 0))
 
     def finish(self) -> int:
         """Back home from a safe menu, planning as at connect (before close)."""
-        return self._run(lib().clean_finish(self._s))
+        return self._do(lib().clean_finish(self._s))
 
     # state
     def status(self) -> dict:
         return json.loads(text(lib().clean_status_json, self._s))
 
     def last_error(self) -> str:
-        return text(lib().clean_last_error, self._s)
+        return text(lib().session_last_error, self._s)
 
-    def image_version(self) -> tuple[bytes, bool]:
-        buf = ctypes.create_string_buffer(9)
-        changed = lib().clean_image_version(self._s, buf)
-        return buf.raw, bool(changed)
+    def memory(self) -> str:
+        """What to keep for this robot until the next session."""
+        return text(lib().clean_memory, self._s)

@@ -1,4 +1,4 @@
-// How a robot is reached, as its driver describes it (clean_links_json, core/clean_c.h): a
+// How a robot is reached, as its driver describes it (session_drivers_json, core/session_c.h): a
 // list of kinds, preferred first. Each kind is implemented once per platform, or not at all
 // there (a scan skips it); a driver that talks another way adds a kind here and its link.
 package com.eschouten.agrigate.clean.link
@@ -8,7 +8,7 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import com.eschouten.agrigate.clean.core.RobotLink
-import com.eschouten.agrigate.clean.core.nativeLinksJson
+import com.eschouten.agrigate.clean.core.cleanDriver
 
 sealed class LinkSpec {
   abstract val kind: String
@@ -41,7 +41,7 @@ sealed class LinkSpec {
 }
 
 /** How this build's robot driver is reached, preferred first. */
-val driverLinks: List<LinkSpec> by lazy { LinkSpec.parseList(nativeLinksJson()) }
+val driverLinks: List<LinkSpec> by lazy { LinkSpec.parseList(cleanDriver?.get("links")?.toString() ?: "[]") }
 
 /** Classic Bluetooth robots nearby (by [spec]'s address prefix); empty where the platform has none. */
 internal expect suspend fun findClassicRobots(spec: LinkSpec.BtSerial): List<FoundDevice>

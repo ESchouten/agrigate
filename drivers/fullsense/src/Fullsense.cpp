@@ -111,7 +111,7 @@ void readMilk(Session& s) {
 }  // namespace
 
 extern const Driver fullsense = [] {
-  Driver d{"fullsense", "FULLSENSE", {"http", "http", 12080}};
+  Driver d{"fullsense", "FULLSENSE", {{"http", "http", 12080}}};
   d.login = login;
   d.milk = readMilk;
   return d;

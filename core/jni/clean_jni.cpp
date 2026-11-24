@@ -1,6 +1,6 @@
-// JNI bridge from Kotlin (Android and desktop JVM) to the C API in core/clean_c.h.
-// Kotlin side: native/shared/src/jniMain/kotlin/.../CoreJni.kt. No logic here, only
-// copying bytes and strings across and calling the listener back from the core's thread.
+// JNI bridge from Kotlin (Android and desktop JVM) to a manure robot's session: the C APIs in
+// core/session_c.h and core/clean_c.h. Kotlin side: native/shared/src/jniMain/kotlin/.../CoreJni.kt.
+// No logic here, only copying bytes and strings across.
 #include <jni.h>
 
 #include <cstdint>
@@ -8,63 +8,9 @@
 #include <vector>
 
 #include "clean_c.h"
+#include "discovery_c.h"
 
 namespace {
-
-JavaVM* gVm = nullptr;
-jmethodID gOnWrite = nullptr, gOnDone = nullptr, gOnProgress = nullptr;
-
-// The core's own thread calls back; attach it once and detach when that thread ends.
-struct Attached {
-  JNIEnv* env = nullptr;
-  bool attachedHere = false;
-  ~Attached() {
-    if (attachedHere && gVm) gVm->DetachCurrentThread();
-  }
-};
-
-JNIEnv* env() {
-  thread_local Attached a;
-  if (a.env) return a.env;
-  if (gVm->GetEnv(reinterpret_cast<void**>(&a.env), JNI_VERSION_1_6) == JNI_OK) return a.env;
-#ifdef __ANDROID__
-  gVm->AttachCurrentThread(&a.env, nullptr);
-#else
-  gVm->AttachCurrentThread(reinterpret_cast<void**>(&a.env), nullptr);
-#endif
-  a.attachedHere = true;
-  return a.env;
-}
-
-struct Session {
-  clean_session* s = nullptr;
-  jobject listener = nullptr;  // global ref
-};
-
-void onWrite(void* user, const uint8_t* data, int32_t len) {
-  auto* js = static_cast<Session*>(user);
-  JNIEnv* e = env();
-  jbyteArray arr = e->NewByteArray(len);
-  e->SetByteArrayRegion(arr, 0, len, reinterpret_cast<const jbyte*>(data));
-  clean_release(data);
-  e->CallVoidMethod(js->listener, gOnWrite, arr);
-  e->DeleteLocalRef(arr);
-  if (e->ExceptionCheck()) e->ExceptionClear();
-}
-
-void onDone(void* user, int32_t command, int32_t result) {
-  auto* js = static_cast<Session*>(user);
-  JNIEnv* e = env();
-  e->CallVoidMethod(js->listener, gOnDone, command, result);
-  if (e->ExceptionCheck()) e->ExceptionClear();
-}
-
-void onProgress(void* user, int32_t step) {
-  auto* js = static_cast<Session*>(user);
-  JNIEnv* e = env();
-  e->CallVoidMethod(js->listener, gOnProgress, step);
-  if (e->ExceptionCheck()) e->ExceptionClear();
-}
 
 std::string str(JNIEnv* e, jstring s) {
   if (!s) return {};
@@ -74,13 +20,19 @@ std::string str(JNIEnv* e, jstring s) {
   return r;
 }
 
-Session* S(jlong h) { return reinterpret_cast<Session*>(h); }
+session* S(jlong h) { return reinterpret_cast<session*>(h); }
 
-jstring text(JNIEnv* e, clean_session* s, int32_t (*fn)(clean_session*, char*, int32_t)) {
+jstring text(JNIEnv* e, session* s, int32_t (*fn)(session*, char*, int32_t)) {
   int32_t n = fn(s, nullptr, 0);
   std::vector<char> buf(static_cast<size_t>(n) + 1);
   fn(s, buf.data(), n + 1);
   return e->NewStringUTF(buf.data());
+}
+
+jbyteArray bytes(JNIEnv* e, const uint8_t* data, int32_t n) {
+  jbyteArray a = e->NewByteArray(n);
+  e->SetByteArrayRegion(a, 0, n, reinterpret_cast<const jbyte*>(data));
+  return a;
 }
 
 }  // namespace
@@ -89,100 +41,67 @@ jstring text(JNIEnv* e, clean_session* s, int32_t (*fn)(clean_session*, char*, i
 
 extern "C" {
 
-JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void*) {
-  gVm = vm;
-  return JNI_VERSION_1_6;
+// 0 for a driver that is not in this build.
+jlong JNI_FN(nativeOpen)(JNIEnv* e, jobject, jstring driver, jstring pin, jstring memory, jstring language) {
+  session* s = session_open(str(e, driver).c_str(), "", "", str(e, pin).c_str());
+  if (!s) return 0;
+  clean_set_language(s, str(e, language).c_str());
+  clean_remember(s, str(e, memory).c_str());
+  return reinterpret_cast<jlong>(s);
 }
 
-jlong JNI_FN(nativeNew)(JNIEnv* e, jobject, jstring pin, jbyteArray version, jobject listener) {
-  if (!gOnWrite) {
-    jclass c = e->GetObjectClass(listener);
-    gOnWrite = e->GetMethodID(c, "onWrite", "([B)V");
-    gOnDone = e->GetMethodID(c, "onDone", "(II)V");
-    gOnProgress = e->GetMethodID(c, "onProgress", "(I)V");
-    e->DeleteLocalRef(c);
-  }
-  auto* js = new Session();
-  js->listener = e->NewGlobalRef(listener);
-  std::string p = str(e, pin);
-  uint8_t v[9];
-  bool hasVersion = version && e->GetArrayLength(version) == 9;
-  if (hasVersion) e->GetByteArrayRegion(version, 0, 9, reinterpret_cast<jbyte*>(v));
-  js->s = clean_new(p.c_str(), hasVersion ? v : nullptr, onWrite, onDone, js);
-  clean_on_progress(js->s, onProgress);
-  return reinterpret_cast<jlong>(js);
-}
+void JNI_FN(nativeClose)(JNIEnv*, jobject, jlong h) { session_close(S(h)); }
 
-void JNI_FN(nativeFree)(JNIEnv* e, jobject, jlong h) {
-  Session* js = S(h);
-  clean_free(js->s);  // waits for the core's thread: no callbacks after this
-  e->DeleteGlobalRef(js->listener);
-  delete js;
-}
-
-void JNI_FN(nativeFeed)(JNIEnv* e, jobject, jlong h, jbyteArray data) {
+void JNI_FN(nativeIncoming)(JNIEnv* e, jobject, jlong h, jbyteArray data) {
   jsize n = e->GetArrayLength(data);
   std::vector<uint8_t> b(static_cast<size_t>(n));
   e->GetByteArrayRegion(data, 0, n, reinterpret_cast<jbyte*>(b.data()));
-  clean_feed(S(h)->s, b.data(), n);
+  session_incoming(S(h), b.data(), n, 0);
 }
 
-void JNI_FN(nativeLinkDown)(JNIEnv*, jobject, jlong h) { clean_link_down(S(h)->s); }
-jint JNI_FN(nativeConnect)(JNIEnv*, jobject, jlong h) { return clean_connect(S(h)->s); }
+// The next bytes to write, null when there are none.
+jbyteArray JNI_FN(nativeOutgoing)(JNIEnv* e, jobject, jlong h) {
+  std::vector<uint8_t> b(static_cast<size_t>(session_outgoing(S(h), nullptr, 0)));
+  if (b.empty()) return nullptr;
+  session_outgoing(S(h), b.data(), static_cast<int32_t>(b.size()));
+  return bytes(e, b.data(), static_cast<int32_t>(b.size()));
+}
+
+void JNI_FN(nativeLinkDown)(JNIEnv*, jobject, jlong h) { session_link_down(S(h)); }
+void JNI_FN(nativeWait)(JNIEnv*, jobject, jlong h, jint ms) { session_wait(S(h), ms); }
+jint JNI_FN(nativeResult)(JNIEnv*, jobject, jlong h) { return session_result(S(h)); }
+
+jint JNI_FN(nativeConnect)(JNIEnv*, jobject, jlong h) { return clean_connect(S(h)); }
 jint JNI_FN(nativeStartRoute)(JNIEnv*, jobject, jlong h, jchar letter, jboolean dryRun) {
-  return clean_start_route(S(h)->s, static_cast<char>(letter), dryRun ? 1 : 0);
+  return clean_start_route(S(h), static_cast<char>(letter), dryRun ? 1 : 0);
 }
-jint JNI_FN(nativeSetPlanning)(JNIEnv*, jobject, jlong h, jboolean on) {
-  return clean_set_planning(S(h)->s, on ? 1 : 0);
+jint JNI_FN(nativeSetPlanning)(JNIEnv*, jobject, jlong h, jboolean on) { return clean_set_planning(S(h), on ? 1 : 0); }
+jint JNI_FN(nativeStopRoute)(JNIEnv*, jobject, jlong h) { return clean_stop_route(S(h)); }
+jint JNI_FN(nativeAnswerStop)(JNIEnv*, jobject, jlong h, jboolean finish) { return clean_answer_stop(S(h), finish ? 1 : 0); }
+jint JNI_FN(nativeReadRoutes)(JNIEnv*, jobject, jlong h) { return clean_read_routes(S(h)); }
+jint JNI_FN(nativeFinish)(JNIEnv*, jobject, jlong h) { return clean_finish(S(h)); }
+jint JNI_FN(nativeInput)(JNIEnv* e, jobject, jlong h, jstring name, jboolean hold) {
+  return clean_input(S(h), str(e, name).c_str(), hold ? 1 : 0);
 }
-jint JNI_FN(nativeStopRoute)(JNIEnv*, jobject, jlong h) { return clean_stop_route(S(h)->s); }
-jint JNI_FN(nativeAnswerStop)(JNIEnv*, jobject, jlong h, jboolean finish) { return clean_answer_stop(S(h)->s, finish ? 1 : 0); }
-jint JNI_FN(nativeReadRoutes)(JNIEnv*, jobject, jlong h) { return clean_read_routes(S(h)->s); }
-jint JNI_FN(nativePress)(JNIEnv*, jobject, jlong h, jint key) { return clean_press(S(h)->s, key); }
-jint JNI_FN(nativeHold)(JNIEnv*, jobject, jlong h, jint key) { return clean_hold(S(h)->s, key); }
-void JNI_FN(nativeUnhold)(JNIEnv*, jobject, jlong h) { clean_unhold(S(h)->s); }
-void JNI_FN(nativeCancel)(JNIEnv*, jobject, jlong h) { clean_cancel(S(h)->s); }
-jint JNI_FN(nativeFinish)(JNIEnv*, jobject, jlong h) { return clean_finish(S(h)->s); }
-void JNI_FN(nativeSetOwedPlanning)(JNIEnv*, jobject, jlong h, jint owed) { clean_set_owed_planning(S(h)->s, owed); }
-jint JNI_FN(nativeOwedPlanning)(JNIEnv*, jobject, jlong h) { return clean_owed_planning(S(h)->s); }
+void JNI_FN(nativeRelease)(JNIEnv*, jobject, jlong h) { clean_release(S(h)); }
+void JNI_FN(nativeCancel)(JNIEnv*, jobject, jlong h) { clean_cancel(S(h)); }
 
-jstring JNI_FN(nativeStatusJson)(JNIEnv* e, jobject, jlong h) { return text(e, S(h)->s, clean_status_json); }
-jstring JNI_FN(nativeLastError)(JNIEnv* e, jobject, jlong h) { return text(e, S(h)->s, clean_last_error); }
-jstring JNI_FN(nativeRoutesJson)(JNIEnv* e, jobject, jlong h) { return text(e, S(h)->s, clean_routes_json); }
+jstring JNI_FN(nativeStatusJson)(JNIEnv* e, jobject, jlong h) { return text(e, S(h), clean_status_json); }
+jstring JNI_FN(nativeRoutesJson)(JNIEnv* e, jobject, jlong h) { return text(e, S(h), clean_routes_json); }
+jstring JNI_FN(nativeNextStep)(JNIEnv* e, jobject, jlong h) { return text(e, S(h), clean_next_step); }
+jstring JNI_FN(nativeMemory)(JNIEnv* e, jobject, jlong h) { return text(e, S(h), clean_memory); }
+jstring JNI_FN(nativeLastError)(JNIEnv* e, jobject, jlong h) { return text(e, S(h), session_last_error); }
 
-// 10 bytes: the 9-byte image version, then 1 if the robot sent a new one.
-jbyteArray JNI_FN(nativeImageVersion)(JNIEnv* e, jobject, jlong h) {
-  uint8_t out[10];
-  out[9] = static_cast<uint8_t>(clean_image_version(S(h)->s, out) == 1 ? 1 : 0);
-  jbyteArray arr = e->NewByteArray(10);
-  e->SetByteArrayRegion(arr, 0, 10, reinterpret_cast<const jbyte*>(out));
-  return arr;
-}
-
-void JNI_FN(nativeSetLanguage)(JNIEnv* e, jobject, jlong h, jstring lang) {
-  std::string l = str(e, lang);
-  clean_set_language(S(h)->s, l.c_str());
+jstring JNI_FN(nativeDriversJson)(JNIEnv* e, jobject) {
+  std::vector<char> buf(static_cast<size_t>(session_drivers_json(nullptr, 0)) + 1);
+  session_drivers_json(buf.data(), static_cast<int32_t>(buf.size()));
+  return e->NewStringUTF(buf.data());
 }
 
 jbyteArray JNI_FN(nativeEncryptPin)(JNIEnv* e, jobject, jstring pin) {
-  std::string p = str(e, pin);
   uint8_t buf[64];
-  int32_t n = clean_encrypt_pin(p.c_str(), buf, sizeof buf);
-  if (n > (int32_t)sizeof buf) n = sizeof buf;
-  jbyteArray a = e->NewByteArray(n);
-  e->SetByteArrayRegion(a, 0, n, reinterpret_cast<const jbyte*>(buf));
-  return a;
-}
-
-jstring JNI_FN(nativeResultText)(JNIEnv* e, jobject, jint result, jstring lang) {
-  std::string l = str(e, lang);
-  return e->NewStringUTF(clean_result_text_lang(result, l.c_str()));
-}
-
-jstring JNI_FN(nativeLinksJson)(JNIEnv* e, jobject) {
-  char buf[1024];
-  clean_links_json(buf, sizeof buf);
-  return e->NewStringUTF(buf);
+  int32_t n = discovery_encrypt_pin(str(e, pin).c_str(), buf, sizeof buf);
+  return bytes(e, buf, n > (int32_t)sizeof buf ? (int32_t)sizeof buf : n);
 }
 
 }  // extern "C"

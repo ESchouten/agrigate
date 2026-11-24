@@ -2,10 +2,8 @@
 
     python -m agrigate.build_core          # needs a C++17 compiler (g++/clang++)
 
-In it: one manure robot driver (a folder in drivers/ with a clean_c.cpp: $CLEAN_DRIVER, or the
-only one there) and every driver for a source on the farm (core/session/Drivers.cpp).
+In it: every driver (drivers/<name>/src) with what they share (core/session).
 """
-import os
 import subprocess
 import sys
 from pathlib import Path
@@ -15,18 +13,9 @@ ROOT = HERE.parent.parent
 LIBNAME = {"darwin": "libagrigate_core.dylib", "win32": "agrigate_core.dll"}.get(sys.platform, "libagrigate_core.so")
 
 
-def driver_src() -> Path:
-    name = os.environ.get("CLEAN_DRIVER")
-    found = [f.parent for f in sorted((ROOT / "drivers").glob("*/src/clean_c.cpp")) if not name or f.parent.parent.name == name]
-    if len(found) != 1:
-        raise FileNotFoundError("set CLEAN_DRIVER to one of: " + ", ".join(d.parent.name for d in found))
-    return found[0]
-
-
 def folders() -> list:
-    """The manure robot driver, what the drivers for a farm's sources share, and each of those drivers."""
-    servers = [d for d in sorted((ROOT / "drivers").glob("*/src")) if not (d / "clean_c.cpp").exists()]
-    return [driver_src(), ROOT / "core", ROOT / "core" / "session", *servers]
+    """The C APIs, what the drivers share, and each driver."""
+    return [ROOT / "core", ROOT / "core" / "session", *sorted((ROOT / "drivers").glob("*/src"))]
 
 
 def sources() -> list:

@@ -21,8 +21,8 @@ from . import core
 from . import discover as disc
 from .transport import BleTransport
 
-KEYS = {"back": 1, "esc": 1, "soft2": 2, "soft1": 4, "up": 8, "prog": 16, "down": 32,
-        "soft3": 64, "enter": 128, "start_stop": 256}
+KEYS = {"back": "Back", "esc": "Back", "soft1": "Soft1", "soft2": "Soft2", "soft3": "Soft3", "up": "Up",
+        "down": "Down", "prog": "Prog", "enter": "Enter", "start_stop": "StartStop"}   # the driver's names
 
 
 class RobotError(RuntimeError):
@@ -53,13 +53,12 @@ class Status:
 
     @classmethod
     def from_core(cls, d: dict) -> "Status":
-        p = d.get("planning", -1)
-        mv = d.get("batteryMv", -1)
-        return cls(planning=None if p < 0 else bool(p), clock=d.get("clock", ""),
-                   next_ride=d.get("nextRide", ""), route=d.get("route", ""), action=d.get("action", ""),
-                   action_no=d.get("actionNo", ""), ride_no=d.get("rideNo", ""),
-                   battery_mv=None if mv < 0 else mv, busy=d.get("busy", True), screen=d.get("screen", ""),
-                   stop_question=d.get("stopQuestion", False))
+        own = d.get("own", {})
+        return cls(planning=d.get("planning"), clock=own.get("clock", ""),
+                   next_ride=d.get("nextRun", ""), route=d.get("route", ""), action=d.get("activity", ""),
+                   action_no=own.get("actionNo", ""), ride_no=own.get("rideNo", ""),
+                   battery_mv=d.get("batteryMv"), busy=d.get("busy", True), screen=own.get("screen", ""),
+                   stop_question=d.get("finishQuestion", False))
 
 
 class Robot:
@@ -77,10 +76,10 @@ class Robot:
         feed = lambda data: self._core.feed(data) if self._core else None   # noqa: E731
         await self._open_link(feed)
         self._core = core.CoreSession(lambda frame: loop.call_soon_threadsafe(queue.put_nowait, frame),
-                                      self.pin, disc.load_image_version(self.address))
+                                      self.pin, disc.load_memory(self.address))
         self._writer = asyncio.create_task(self._write_loop(queue))
         r = await asyncio.to_thread(self._core.connect)
-        self._save_version()
+        disc.save_memory(self.address, self._core.memory())
         if r != core.OK:
             err = self._error(r)
             await self.disconnect()
@@ -92,6 +91,7 @@ class Robot:
                 await asyncio.wait_for(asyncio.to_thread(self._core.finish), 30)
             except Exception:
                 pass
+            disc.save_memory(self.address, self._core.memory())
             await asyncio.to_thread(self._core.close)
             self._core = None
         if self._writer:
@@ -139,19 +139,14 @@ class Robot:
             raise self._error(r)
 
     def _error(self, r: int) -> Exception:
-        why = f"{core.result_text(r)}: {self._core.last_error()}" if self._core else core.result_text(r)
+        why = "another command is still running" if r == core.IN_PROGRESS else self._core.last_error()
         if r == core.BUSY:
             return RobotBusy(why)
-        if r == core.PIN_REJECTED:
+        if r == core.LOGIN_REJECTED:
             return PinRejected(why)
-        if r == core.CONNECT_FAILED:
+        if r == core.UNREACHABLE:
             return ConnectionError(why)
         return RobotError(why)
-
-    def _save_version(self) -> None:
-        version, changed = self._core.image_version()
-        if changed:
-            disc.save_image_version(self.address, version)
 
     async def _write_loop(self, queue: asyncio.Queue) -> None:
         while True:
