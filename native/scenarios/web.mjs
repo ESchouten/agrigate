@@ -24,12 +24,12 @@ async function api(name, method, path, want, pin = '4321') {
   say(want.test(answer), name, answer)
   return Date.now() - t0
 }
-await api('api: the status', 'GET', '/api/status', /^200 \{"ok":true,/)
-await api('api: no PIN', 'GET', '/api/status', /^401 /, '')
-await api('api: the status read now', 'GET', '/api/status/fresh', /^200 \{"ok":true,.*"planning":/)
-await api('api: nothing to stop', 'POST', '/api/stop', /^502 \{"ok":false,"fault":"Busy",/)
-await api('api: a dry run', 'POST', '/api/route/A/dryRun', /^200 \{"ok":true,/)
-await api('api: a link in a browser starts nothing', 'GET', '/api/route/A', /^404 /)
+await api('api: the status', 'GET', '/api/clean/status', /^200 \{"ok":true,/)
+await api('api: no PIN', 'GET', '/api/clean/status', /^401 /, '')
+await api('api: the status read now', 'GET', '/api/clean/status/fresh', /^200 \{"ok":true,.*"planning":/)
+await api('api: nothing to stop', 'POST', '/api/clean/stop', /^502 \{"ok":false,"fault":"Busy",/)
+await api('api: a dry run', 'POST', '/api/clean/route/A/dryRun', /^200 \{"ok":true,/)
+await api('api: a link in a browser starts nothing', 'GET', '/api/clean/route/A', /^404 /)
 
 // ---- the web page ----
 const seen = []
@@ -59,8 +59,8 @@ await p.waitForTimeout(4_000)
 await p.mouse.click(150, 400) // route A
 await p.waitForTimeout(2_000)
 await p.mouse.click(195, 796) // "Eerst een proefrun"
-await check('page: a dry run reads the robot through the app', s => s === 'GET /api/status/fresh 200', 30_000)
-await check('page: the dry run is done by the app', s => s === 'POST /api/route/A/dryRun 200', 60_000)
+await check('page: a dry run reads the robot through the app', s => s === 'GET /api/clean/status/fresh 200', 30_000)
+await check('page: the dry run is done by the app', s => s === 'POST /api/clean/route/A/dryRun 200', 60_000)
 
 // the panel (a taller phone, so its card is in view): a key held by a finger for a second
 const finger = await ctx.newCDPSession(p)
@@ -72,20 +72,20 @@ await p.waitForTimeout(1_500)
 await p.mouse.click(195, 860) // "Bedieningspaneel"
 await p.waitForTimeout(1_500)
 await p.mouse.click(195, 602) // "Verbinden met het paneel"
-await check('page: the panel keeps the robot connection', s => s === 'GET /api/panel 200')
+await check('page: the panel keeps the robot connection', s => s === 'GET /api/clean/panel 200')
 const [kx, ky] = [78, 510] // Down
 await touch('touchStart', kx, ky)
 await p.waitForTimeout(1_200)
-await check('page: a held key is repeated', () => seen.filter(s => s === 'POST /api/panel/Down/down 200').length >= 2, 5_000)
+await check('page: a held key is repeated', () => seen.filter(s => s === 'POST /api/clean/panel/Down/down 200').length >= 2, 5_000)
 await touch('touchEnd')
-await check('page: the key comes up', s => s === 'POST /api/panel/Down/up 200', 5_000)
+await check('page: the key comes up', s => s === 'POST /api/clean/panel/Down/up 200', 5_000)
 
 // the tab closed while a finger holds a key: the app lets go by itself, and the next key (which
 // waits for that) is answered within seconds
 await touch('touchStart', kx, ky)
-await check('page: the key is down again', s => s === 'POST /api/panel/Down/down 200', 5_000)
+await check('page: the key is down again', s => s === 'POST /api/clean/panel/Down/down 200', 5_000)
 await p.close()
-const took = await api('api: a key held by a closed tab is let go', 'POST', '/api/panel/Up', /^200 /)
+const took = await api('api: a key held by a closed tab is let go', 'POST', '/api/clean/panel/Up', /^200 /)
 say(took < 4_000, 'api: within seconds', `${took} ms`)
 await browser.close()
 process.exit(failed ? 1 : 0)

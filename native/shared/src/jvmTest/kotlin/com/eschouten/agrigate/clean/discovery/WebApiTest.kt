@@ -87,10 +87,11 @@ class WebApiTest {
     val p = phone()
     assertTrue(p.setPlanning(false).ok)
     assertEquals(false, p.state.value.snapshot?.planning)
-    val (code, body) = raw("GET", "/api/status")
+    val (code, body) = raw("GET", "/api/clean/status")
     assertEquals(200, code)
     assertTrue("\"planning\":false" in body && "\"age\":" in body, body)
-    assertTrue(raw("GET", "/api/status/fresh").second.contains("\"ok\":true"))
+    assertTrue(raw("GET", "/api/clean/status/fresh").second.contains("\"ok\":true"))
+    assertEquals(200, raw("GET", "/api/status").first)   // where an app from before 1.6.224 asks
   }
 
   @Test fun aStopFromThePhoneAndTheAnswerOnThePhone() = runBlocking {
@@ -112,19 +113,19 @@ class WebApiTest {
     val o = phone(pin = "0000").refresh()
     assertFalse(o.ok)
     assertEquals(Problem.PinRejected, o.problem)
-    assertEquals(401, raw("GET", "/api/status", pin = null).first)   // no PIN: not counted
-    repeat(4) { assertEquals(401, raw("POST", "/api/planning/off", pin = "1").first) }
-    assertEquals(429, raw("GET", "/api/status").first)   // 5 wrong: a minute closed, also for the right one
+    assertEquals(401, raw("GET", "/api/clean/status", pin = null).first)   // no PIN: not counted
+    repeat(4) { assertEquals(401, raw("POST", "/api/clean/planning/off", pin = "1").first) }
+    assertEquals(429, raw("GET", "/api/clean/status").first)   // 5 wrong: a minute closed, also for the right one
     assertTrue(links.isEmpty())   // the robot was never touched
   }
 
   @Test fun unknownCallsAndChangesFromABrowserLink() {
     assertEquals(404, raw("GET", "/nothing").first)
-    assertEquals(404, raw("GET", "/api/route/A").first)   // a link opened in a browser starts nothing
-    assertEquals(404, raw("POST", "/api/route/E").first)
-    assertEquals(404, raw("POST", "/api/planning/maybe").first)
-    assertEquals(404, raw("POST", "/api/route/A/dry").first)   // a mistyped dry run starts nothing
-    assertEquals(404, raw("POST", "/api/status/fresh").first)
+    assertEquals(404, raw("GET", "/api/clean/route/A").first)   // a link opened in a browser starts nothing
+    assertEquals(404, raw("POST", "/api/clean/route/E").first)
+    assertEquals(404, raw("POST", "/api/clean/planning/maybe").first)
+    assertEquals(404, raw("POST", "/api/clean/route/A/dry").first)   // a mistyped dry run starts nothing
+    assertEquals(404, raw("POST", "/api/clean/status/fresh").first)
   }
 
   @Test fun thePanelThroughTheBarnComputer() = runBlocking {
@@ -141,14 +142,14 @@ class WebApiTest {
 
   @Test fun aHeldKeyIsLetGoWhenItsRepeatsStop() = runBlocking {
     simulate("--mode", "manual")
-    assertEquals(502, raw("POST", "/api/panel/StartStop/down").first)   // not connected: nothing held
-    assertEquals(200, raw("GET", "/api/panel").first)
-    assertEquals(200, raw("POST", "/api/panel/StartStop/down").first)   // a finger on the key, and then the page is gone
+    assertEquals(502, raw("POST", "/api/clean/panel/StartStop/down").first)   // not connected: nothing held
+    assertEquals(200, raw("GET", "/api/clean/panel").first)
+    assertEquals(200, raw("POST", "/api/clean/panel/StartStop/down").first)   // a finger on the key, and then the page is gone
     val t0 = System.currentTimeMillis()
-    assertEquals(200, raw("POST", "/api/panel/Soft1").first)   // the next key waits until that one is up
+    assertEquals(200, raw("POST", "/api/clean/panel/Soft1").first)   // the next key waits until that one is up
     val took = System.currentTimeMillis() - t0
     assertTrue(took in 400..3_000, "$took ms")
-    assertEquals(502, raw("POST", "/api/panel/Nothing").first)   // not a key of this robot
+    assertEquals(502, raw("POST", "/api/clean/panel/Nothing").first)   // not a key of this robot
   }
 
   @Test fun aPhoneThroughAComputerThroughAnotherDevice() = runBlocking {
@@ -175,10 +176,10 @@ class WebApiTest {
 
   @Test fun busyWhenThereIsNothingToStopOrAnswer() = runBlocking {
     simulate()
-    val (code, body) = raw("POST", "/api/stop")
+    val (code, body) = raw("POST", "/api/clean/stop")
     assertEquals(502, code)
     assertTrue("\"fault\":\"Busy\"" in body, body)
-    assertEquals(502, raw("POST", "/api/answer/no").first)
+    assertEquals(502, raw("POST", "/api/clean/answer/no").first)
   }
 
   @Test fun aDeviceThatIsNotThere() = runBlocking {

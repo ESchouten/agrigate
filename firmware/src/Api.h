@@ -14,8 +14,15 @@ struct ApiCall {
 
 // method "GET" / "POST" and the path. Nothing is in a query: a web server that drops part of
 // one (the M5's keeps only key=value) must never turn a dry run into a start.
-inline ApiCall parseCall(const std::string& method, const std::string& path) {
+// The robot's calls are under /api/clean/; the device's own (log, crash) under /api/. Until
+// 1.6.223 the robot's calls were under /api/ too: an app from then still finds them there.
+inline ApiCall parseCall(const std::string& method, const std::string& given) {
   ApiCall c;
+  if (method == "GET" && (given == "/api/log" || given == "/api/log/live" || given == "/api/crash")) {
+    c.kind = given == "/api/crash" ? ApiCall::Crash : given.size() > 8 ? ApiCall::LogLive : ApiCall::Log;
+    return c;
+  }
+  const std::string path = given.rfind("/api/clean/", 0) == 0 ? "/api/" + given.substr(11) : given;
   auto onOff = [&](const std::string& rest, const char* yes, const char* no, ApiCall::Kind k) {
     if (rest == yes || rest == no) {
       c.kind = k;
@@ -25,8 +32,6 @@ inline ApiCall parseCall(const std::string& method, const std::string& path) {
   if (method == "GET" && (path == "/api/status" || path == "/api/status/fresh")) {
     c.kind = ApiCall::Status;
     c.fresh = path.size() > 11;
-  } else if (method == "GET" && (path == "/api/log" || path == "/api/log/live" || path == "/api/crash")) {
-    c.kind = path == "/api/crash" ? ApiCall::Crash : path.size() > 8 ? ApiCall::LogLive : ApiCall::Log;
   } else if (method != "POST") {
     return c;   // everything else changes something: never from a link opened in a browser
   } else if (path.rfind("/api/route/", 0) == 0 && path.size() >= 12 && (path.size() == 12 || path.compare(12, std::string::npos, "/dryRun") == 0)) {

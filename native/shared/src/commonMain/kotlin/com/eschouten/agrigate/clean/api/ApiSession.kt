@@ -137,11 +137,18 @@ class ApiSession(private val p: RobotProfile) : CleanSession {
     }
   }
 
+  /** A device from before 1.6.224 has the robot's calls under api/ and answers 404 under api/clean/. */
+  private var under = "api/clean"
+
   private suspend fun call(method: HttpMethod, path: String) {
+    suspend fun ask(under: String) = client.request("$base/$under/$path") {
+      this.method = method
+      header(HttpHeaders.Authorization, "Bearer ${p.pin}")
+    }
     val res = try {
-      client.request("$base/api/$path") {
-        this.method = method
-        header(HttpHeaders.Authorization, "Bearer ${p.pin}")
+      ask(under).let { first ->
+        if (first.status.value != 404 || under == "api") first
+        else ask("api").also { if (it.status.value != 404) under = "api" }
       }
     } catch (e: CancellationException) {
       throw e

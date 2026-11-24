@@ -5,30 +5,35 @@
 #include "../src/Api.h"
 
 int main() {
-  ApiCall c = parseCall("GET", "/api/status");
+  ApiCall c = parseCall("GET", "/api/clean/status");
   assert(c.kind == ApiCall::Status && !c.fresh);
-  assert(parseCall("GET", "/api/status/fresh").fresh);
-  assert(parseCall("GET", "/api/status/now").kind == ApiCall::None);
-  assert(parseCall("POST", "/api/status").kind == ApiCall::None);   // reading is a GET
-  c = parseCall("POST", "/api/route/B");
+  assert(parseCall("GET", "/api/clean/status/fresh").fresh);
+  assert(parseCall("GET", "/api/clean/status/now").kind == ApiCall::None);
+  assert(parseCall("POST", "/api/clean/status").kind == ApiCall::None);   // reading is a GET
+  c = parseCall("POST", "/api/clean/route/B");
   assert(c.kind == ApiCall::Route && c.route == 'B');
-  assert(parseCall("POST", "/api/route/d").route == 'D');
+  assert(parseCall("POST", "/api/clean/route/d").route == 'D');
   assert(!c.dryRun);
-  c = parseCall("POST", "/api/route/A/dryRun");
+  c = parseCall("POST", "/api/clean/route/A/dryRun");
   assert(c.kind == ApiCall::Route && c.route == 'A' && c.dryRun);
-  for (const char* bad : {"/api/route/E", "/api/route/", "/api/route/AB", "/api/route", "/api/route/A/dry", "/api/route/E/dryRun"})
+  for (const char* bad : {"/api/clean/route/E", "/api/clean/route/", "/api/clean/route/AB", "/api/clean/route", "/api/clean/route/A/dry", "/api/clean/route/E/dryRun"})
     assert(parseCall("POST", bad).kind == ApiCall::None);
-  assert(parseCall("GET", "/api/route/A").kind == ApiCall::None);   // a link in a browser starts nothing
-  c = parseCall("POST", "/api/planning/on");
+  assert(parseCall("GET", "/api/clean/route/A").kind == ApiCall::None);   // a link in a browser starts nothing
+  c = parseCall("POST", "/api/clean/planning/on");
   assert(c.kind == ApiCall::Planning && c.yes);
-  c = parseCall("POST", "/api/planning/off");
+  c = parseCall("POST", "/api/clean/planning/off");
   assert(c.kind == ApiCall::Planning && !c.yes);
-  assert(parseCall("POST", "/api/planning/maybe").kind == ApiCall::None);
-  c = parseCall("POST", "/api/answer/yes");
+  assert(parseCall("POST", "/api/clean/planning/maybe").kind == ApiCall::None);
+  c = parseCall("POST", "/api/clean/answer/yes");
   assert(c.kind == ApiCall::Answer && c.yes);
-  c = parseCall("POST", "/api/answer/no");
+  c = parseCall("POST", "/api/clean/answer/no");
   assert(c.kind == ApiCall::Answer && !c.yes);
   assert(parseCall("GET", "/").kind == ApiCall::None);
+  // an app from before /api/clean/ still finds the robot's calls under /api/
+  assert(parseCall("POST", "/api/route/B").route == 'B' && parseCall("GET", "/api/status/fresh").fresh);
+  assert(parseCall("POST", "/api/planning/off").kind == ApiCall::Planning && parseCall("POST", "/api/stop").kind == ApiCall::Stop);
+  // the device's own calls are not the robot's
+  assert(parseCall("GET", "/api/clean/log").kind == ApiCall::None && parseCall("GET", "/api/clean/crash").kind == ApiCall::None);
   assert(parseCall("GET", "/api/log").kind == ApiCall::Log);
   assert(parseCall("GET", "/api/log/live").kind == ApiCall::LogLive);
   assert(parseCall("GET", "/api/crash").kind == ApiCall::Crash);
@@ -52,8 +57,8 @@ int main() {
   assert(wrap.check("Bearer 1", "1", 0xFFFFFFF0u + 30000) == 429);
   assert(wrap.check("Bearer 1", "1", 0xFFFFFFF0u + 61000) == 200);
 
-  assert(parseCall("POST", "/api/stop").kind == ApiCall::Stop);
-  assert(parseCall("GET", "/api/stop").kind == ApiCall::None);
+  assert(parseCall("POST", "/api/clean/stop").kind == ApiCall::Stop);
+  assert(parseCall("GET", "/api/clean/stop").kind == ApiCall::None);
   ApiStatus st;
   assert(toJson(st) == "{\"planning\":null,\"nextRun\":\"\",\"batteryMv\":null,\"activity\":\"\",\"route\":\"\","
                        "\"busy\":false,\"driving\":false,\"finishQuestion\":false}");
