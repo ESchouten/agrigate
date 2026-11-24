@@ -75,7 +75,7 @@ void stop(Session& s) { s.send(registration(false)); }
 
 }  // namespace
 
-extern const Driver lfw = {"lfw", "LFW", 6000, tick, incoming, stop};
+extern const Driver astronaut = {"astronaut", "Astronaut", 6000, tick, incoming, stop};
 
 }  // namespace live
 }  // namespace robot

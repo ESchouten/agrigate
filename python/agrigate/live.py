@@ -1,7 +1,7 @@
 """Live: which animal is at each robot right now, from the robots themselves (core/live_c.h).
 
     from agrigate.live import Listener
-    with Listener("lfw", "10.4.1.101") as robot:      # one per robot
+    with Listener("astronaut", "10.4.1.101") as robot:      # one per robot
         ...
         robot.state()            # {"connected", "lastMessage", "animal": {"number", "name", "responder", "since"}}
         robot.events(after=0)    # {"events": [{"seq", "time", "kind": "arrival", ...}], "last": n}

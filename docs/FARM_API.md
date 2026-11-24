@@ -7,7 +7,7 @@ nothing in it changes anything on the farm.
 
 - **Live**, from the robots themselves (`core/live_c.h`): the robot says which cow it identified
   the moment it reads her responder. One listener per robot, so a farm with ten robots works the
-  same as one with one. Driver: `lfw`.
+  same as one with one. Driver: `astronaut`.
 - **The herd**, from the farm's server (`core/cow_c.h`): name, numbers, lactation, days in milk,
   reproduction, inseminations, pregnancy checks. Read again every 5 minutes. Driver: `t4c`.
 
@@ -27,8 +27,8 @@ FARM_SERVER_TOKEN=<token> FARM_SERVER_PASSWORD=<licence key> python farm_server.
 {
   "listen": "0.0.0.0:8099",
   "robots": [
-    {"name": "Robot 1", "driver": "lfw", "address": "10.4.1.101"},
-    {"name": "Robot 2", "driver": "lfw", "address": "10.4.1.102"}
+    {"name": "Robot 1", "driver": "astronaut", "address": "10.4.1.101"},
+    {"name": "Robot 2", "driver": "astronaut", "address": "10.4.1.102"}
   ],
   "server": {"driver": "t4c", "address": "10.4.1.1:6969", "user": ""},
   "cowRefreshSeconds": 300
@@ -89,7 +89,7 @@ Every robot with the animal it identified last:
 
 ```json
 {"robots": [
-  {"name": "Robot 2", "driver": "lfw", "address": "10.4.1.102", "connected": true,
+  {"name": "Robot 2", "driver": "astronaut", "address": "10.4.1.102", "connected": true,
    "lastMessage": 1795437955121,
    "animal": {"number": "73", "name": "JANNA 4", "responder": "1000073", "since": 1795437955042,
               "lifeNumber": "NL 100000073", "workNumber": "", "production": "milking",
@@ -139,7 +139,7 @@ the last good read stay. `/api/animals/<key>` gives one animal, or 404.
 
 | Drivers | Live (robot) | Herd (server) |
 |---|---|---|
-| `lfw` + `t4c` | number, name, responder | everything above; `workNumber` is empty (T4C has none: in the Netherlands it is usually the last four digits before the check digit of the life number) |
+| `astronaut` + `t4c` | number, name, responder | everything above; `workNumber` is empty (T4C has none: in the Netherlands it is usually the last four digits before the check digit of the life number) |
 
 The makes behind the drivers are in the README's table. A new make adds a live driver (`drivers/<name>/src`, [DRIVERS.md](DRIVERS.md)) and/or a herd read
 in its server driver; this API stays the same.

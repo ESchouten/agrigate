@@ -1,5 +1,5 @@
 """Offline tests: the Python API (python/, on top of this driver) against the simulated robot.
-Run: python3 drivers/lely/tests/test_api.py   (builds the core library first)"""
+Run: python3 drivers/discovery/tests/test_api.py   (builds the core library first)"""
 import asyncio, os, sys, tempfile, types
 from pathlib import Path
 

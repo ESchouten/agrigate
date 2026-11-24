@@ -1,6 +1,6 @@
 """Offline tests: the LFW live driver through its C API (core/live_c.h), fed with datagrams as
 a robot's proxy sends them (the format was read on two Astronaut A4s). Run:
-python3 drivers/lfw/tests/test_lfw.py"""
+python3 drivers/astronaut/tests/test_astronaut.py"""
 import ctypes, json, os, struct, sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -22,7 +22,7 @@ def cow(responder, number, name):
 class Robot:
     def __init__(self):
         self.L = _lib()
-        self.s = self.L.live_open(b"lfw", b"10.4.1.101")
+        self.s = self.L.live_open(b"astronaut", b"10.4.1.101")
 
     def tick(self, t):
         self.L.live_tick(self.s, t)
@@ -49,7 +49,7 @@ def registration(on):
 
 
 def test_listed():
-    assert {"id": "lfw", "name": "LFW", "link": {"kind": "udp", "port": 6000}} in drivers()
+    assert {"id": "astronaut", "name": "Astronaut", "link": {"kind": "udp", "port": 6000}} in drivers()
 
 
 def test_registers_and_renews_every_two_seconds():

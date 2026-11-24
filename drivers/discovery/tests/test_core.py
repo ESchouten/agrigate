@@ -1,6 +1,6 @@
 """The Lely core (C++) against the simulated robot, through host_main.cpp, and real screens
 from the robot through replay.cpp.
-Run: python3 drivers/lely/tests/test_core.py"""
+Run: python3 drivers/discovery/tests/test_core.py"""
 import os, struct, subprocess, sys, tempfile, time
 from concurrent.futures import ThreadPoolExecutor
 

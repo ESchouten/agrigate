@@ -34,16 +34,16 @@ script.
 
 | Robot | Kind | Connection | Driver |
 |---|---|---|---|
-| Lely Discovery | Manure scraper | Bluetooth LE, or classic Bluetooth on older robots (not on iOS) | [`drivers/lely`](drivers/lely) |
+| Lely Discovery | Manure scraper | Bluetooth LE, or classic Bluetooth on older robots (not on iOS) | [`drivers/discovery`](drivers/discovery) |
 | Lely Astronaut | Milking robot and herd, read only | The farm's T4C server on the local network | [`drivers/t4c`](drivers/t4c/API.md) |
-| Lely Astronaut A4 | Which cow is in the box, live (experimental) | The robot itself on the robot network (UDP) | [`drivers/lfw`](drivers/lfw/API.md) |
+| Lely Astronaut A4 | Which cow is in the box, live (experimental) | The robot itself on the robot network (UDP) | [`drivers/astronaut`](drivers/astronaut/API.md) |
 | Fullwood M²erlin | Milking robot, read only | The farm's FULLSENSE server on the local network | [`drivers/fullsense`](drivers/fullsense/API.md) |
 
 Milking robots are new: their state, alarms and figures, the herd (numbers, lactation,
 reproduction, inseminations) and which cow is at which robot right now can be read with Python
 (`farm.py`), not yet in the apps or on the buttons. The **farm service** (`python/farm_server.py`)
 offers it over HTTP to other programs on the farm, such as a camera system that wants to know which
-cow it sees: [docs/FARM_API.md](docs/FARM_API.md). The `t4c` and `lfw` drivers were checked on a real
+cow it sees: [docs/FARM_API.md](docs/FARM_API.md). The `t4c` and `astronaut` drivers were checked on a real
 farm; the FULLSENSE driver has not met a real server yet (see each driver's page).
 
 ## Install
