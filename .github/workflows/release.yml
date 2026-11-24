@@ -49,7 +49,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          n=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$GITHUB_SHA&status=success" -q .total_count)
+          # the run's own conclusion: GitHub's status=success filter can miss a run for a while
+          n=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$GITHUB_SHA" -q '[.workflow_runs[] | select(.conclusion == "success")] | length')
           test "$n" -gt 0 || { echo "ci has not passed for $GITHUB_SHA (yet)"; exit 1; }
 
   firmware:
