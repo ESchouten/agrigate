@@ -1,19 +1,19 @@
 /* Robots that are not reached themselves: the farm's management server knows them and answers
  * over HTTP on the farm network. This is what every kind of robot shares there: the drivers
  * (drivers/<name>/, one per server software), a session with one server and the HTTP exchange.
- * What a kind of robot can do is in its own header on top of this one (milking_c.h); a next
- * kind adds its header the same way. Manure scrapers are reached directly: scraper_c.h.
+ * What a kind of robot can do is in its own header on top of this one (milk_c.h); a next
+ * kind adds its header the same way. Manure scrapers are reached directly: clean_c.h.
  *
  * The driver decides what to ask and understands the answers; the HTTP itself is the host's
- * job, as Bluetooth is in scraper_c.h. So the same driver runs in the apps, in Python and on a
+ * job, as Bluetooth is in clean_c.h. So the same driver runs in the apps, in Python and on a
  * microcontroller:
  *   s = robot_open("<driver>", "192.168.1.10", user, password)
- *   milking_read(s)                                   (or another kind's call)
+ *   milk_read(s)                                      (or another kind's call)
  *   while (robot_request_json(s, buf, size) > 0) {    {"method","url","headers":{..},"body"}
  *     ...send that request...
  *     robot_response(s, status, body, len)            status 0: no answer
  *   }
- *   robot_result(s) == ROBOT_OK  ->  milking_json(s, buf, size)
+ *   robot_result(s) == ROBOT_OK  ->  milk_json(s, buf, size)
  *   robot_close(s)
  * No threads and no callbacks: one call at a time per session. A session logs in by itself,
  * keeps its login for the next read and logs in again when the server no longer takes it. */
@@ -45,7 +45,7 @@ enum {
 };
 
 /* The drivers in this build: a JSON array of
- *   {"id", "name" (the server software), "kinds": ["milking", ..],
+ *   {"id", "name" (the server software), "kinds": ["milk", ..],
  *    "link": {"kind": "http", "scheme": "http", "port": 80}}
  * "http": the user gives the server's address; scheme and port are the defaults for an address
  * without them. Copies into buf (NUL-terminated, cut to size) and returns the full length, as

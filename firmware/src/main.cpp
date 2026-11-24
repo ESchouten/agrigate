@@ -1,8 +1,8 @@
-// Scraper Control buttons for M5Stack Basic: left / middle / right button start route A / B / C.
+// Agrigate Clean buttons for M5Stack Basic: left / middle / right button start route A / B / C.
 // Each press: connect (~2 s), start the route with all checks, disconnect.
 // Hold the middle button 1.5 s for manual drive (HANDBEDIENING), see manualSession(); there
 // hold the right button for the charger approach (HANDM. LADER).
-// The screens follow the Scraper Control app's look (red header, light cards), drawn with LVGL (Ui.h).
+// The screens follow the Agrigate Clean app's look (red header, light cards), drawn with LVGL (Ui.h).
 // Hold the left button 1.5 s to switch the planning (tijdpad) on or off.
 // Hold the right button 1.5 s for the settings: PIN, which robot, wifi (set up on the M5
 // itself, or WPS) and updates (signed releases from GitHub).
@@ -49,7 +49,7 @@
 #define FW_BUILD 0
 #endif
 #define FW_BOARD "m5stack-core"
-#define FW_REPO "ESchouten/scraper-control"   // where the signed releases are
+#define FW_REPO "ESchouten/agrigate"   // where the signed releases are
 static const char kRoutes[3] = {'A', 'B', 'C'};   // the route of the left, middle and right button
 
 using namespace driver;
@@ -262,7 +262,7 @@ static void idle() {
   static uint32_t heapAt = 0;
   if (!heapAt || millis() - heapAt > 60000) { heapAt = millis() | 1; logHeap("home"); }
   homeDrawnAt = millis();
-  ui::Screen scr("Scraper Control");
+  ui::Screen scr("Agrigate Clean");
   card(10, 56, 300, 54, kCard);
   if (haveSeen) {
     bool on = seen.planning == 1;
@@ -881,13 +881,13 @@ static uint32_t lastWifiTry = 0;   // wifiTick: 0 = try at once
 static WebServer server(80);   // the web API, while the wifi is up (wifiTick)
 static bool serving = false;
 
-// The M5 on the network: http://scraper-control-1a2b.local, a fixed name of its own (the end of
+// The M5 on the network: http://agrigate-clean-1a2b.local, a fixed name of its own (the end of
 // its MAC), so two never swap names after a restart (Erik 2026-11-16).
 static String hostName() {
   uint8_t m[6];
   WiFi.macAddress(m);
   char b[24];
-  snprintf(b, sizeof b, "scraper-control-%02x%02x", m[4], m[5]);
+  snprintf(b, sizeof b, "agrigate-clean-%02x%02x", m[4], m[5]);
   return b;
 }
 
@@ -1076,10 +1076,10 @@ static void wpsSetup() {
   esp_wps_config_t cfg;
   std::memset(&cfg, 0, sizeof cfg);
   cfg.wps_type = WPS_TYPE_PBC;
-  std::strncpy(cfg.factory_info.manufacturer, "Scraper Control", sizeof cfg.factory_info.manufacturer - 1);
+  std::strncpy(cfg.factory_info.manufacturer, "Agrigate", sizeof cfg.factory_info.manufacturer - 1);
   std::strncpy(cfg.factory_info.model_number, "1", sizeof cfg.factory_info.model_number - 1);
-  std::strncpy(cfg.factory_info.model_name, "Scraper-knop", sizeof cfg.factory_info.model_name - 1);
-  std::strncpy(cfg.factory_info.device_name, "scraper-control", sizeof cfg.factory_info.device_name - 1);
+  std::strncpy(cfg.factory_info.model_name, "Agrigate Clean", sizeof cfg.factory_info.model_name - 1);
+  std::strncpy(cfg.factory_info.device_name, "agrigate-clean", sizeof cfg.factory_info.device_name - 1);
   bool started = esp_wifi_wps_enable(&cfg) == ESP_OK && esp_wifi_wps_start(0) == ESP_OK;
   bool cancelled = false;
   uint32_t t0 = millis();
@@ -1161,7 +1161,7 @@ static bool httpsGet(WiFiClientSecure& client, std::string url, long& length) {
     client.setHandshakeTimeout(10);
     if (pressedDuringAuto() || !client.connect(host.c_str(), 443, 10000)) return false;
     client.print(String("GET ") + path.c_str() + " HTTP/1.0\r\nHost: " + host.c_str() +
-                 "\r\nUser-Agent: scraper-control\r\nConnection: close\r\n\r\n");
+                 "\r\nUser-Agent: agrigate-clean\r\nConnection: close\r\n\r\n");
     int code = statusCode(readLine(client).c_str());
     length = -1;
     for (;;) {
@@ -1563,7 +1563,7 @@ static void drawWifi() {
   serve();   // after an update check (apiOff)
   ui::Screen scr(tx->wifiRow);
   if (serving) {   // a QR code, as large as fits, that adds this robot to the app (Erik 2026-11-16)
-    qr(String("scraper-control://add?via=") + hostName() + ".local&pin=" + pin, 16, 54, 140, 4);
+    qr(String("agrigate-clean://add?via=") + hostName() + ".local&pin=" + pin, 16, 54, 140, 4);
     text(tx->linkApp, 172, 60, kBold, kInk);
     text(hostName(), 172, 88, kSmall, kMuted);
     text(".local", 172, 106, kSmall, kMuted);

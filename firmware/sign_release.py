@@ -1,7 +1,7 @@
 """Signs a release with the release key: a firmware build for the devices' own updates (prints
 its block for update.ini), or a desktop app's update feed.
 
-    python3 firmware/sign_release.py out/scraper-control-m5stack-core-1.6.412.bin --key key.pem \\
+    python3 firmware/sign_release.py out/agrigate-clean-m5stack-core-1.6.412.bin --key key.pem \\
         --version 1.6.412 --build 412 >> out/update.ini
     python3 firmware/sign_release.py --message out/update.ini     # prints what the signatures cover
     python3 firmware/sign_release.py --feed releases.win.json --key key.pem > releases.win.signed.json
@@ -23,7 +23,7 @@ import sys
 import tempfile
 
 BOARD = "m5stack-core"
-FEED_PREFIX = "scraper-control desktop feed v1 %s\n"   # % the system: as DesktopUpdates.prefix
+FEED_PREFIX = "agrigate clean desktop feed v1 %s\n"   # % the system: as DesktopUpdates.prefix
 FIELDS = ("version", "build", "size", "sha256")
 
 

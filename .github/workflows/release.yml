@@ -3,13 +3,13 @@ name: release
 #   update.ini                    the devices' update manifest: one signed block per board, naming
 #                                 that board's file. The only fixed name: devices look for it in
 #                                 releases/latest (settings > Wifi > Update, or automatically)
-#   scraper-control-<board>-<v>.bin  the firmware per board (now: m5stack-core = the M5 buttons)
-#   scraper-control-<board>-<v>.elf  the same with its symbols, to read a crash (GET /api/crash)
-#   scraper-control-<v>.apk       Android app (install by hand, or keep it updated with Obtainium)
-#   scraper-control-<v>-windows.exe, -macos.pkg   the desktop app's installers (not signed);
+#   agrigate-clean-<board>-<v>.bin  the firmware per board (now: m5stack-core = the M5 buttons)
+#   agrigate-clean-<board>-<v>.elf  the same with its symbols, to read a crash (GET /api/crash)
+#   agrigate-clean-<v>.apk        Android app (install by hand, or keep it updated with Obtainium)
+#   agrigate-clean-<v>-windows.exe, -macos.pkg   the desktop app's installers (not signed);
 #                                 the app then updates itself from releases.<win|osx>.signed.json
 #                                 (signed with the release key) and the -full.nupkg it names
-#   scraper-control_<v>_amd64.deb the Linux app; also in the apt repository on GitHub Pages
+#   agrigate-clean_<v>_amd64.deb  the Linux app; also in the apt repository on GitHub Pages
 # Run it by hand (Actions > release > Run workflow) when a version should go out.
 # The M5s download from github.com/<FW_REPO>/releases/latest, so every release must carry the
 # firmware: that is why the apps are not released separately.
@@ -92,18 +92,18 @@ jobs:
         run: |
           test -n "$FIRMWARE_SIGNING_KEY" || { echo "secret FIRMWARE_SIGNING_KEY is missing"; exit 1; }
           mkdir out
-          BIN="out/scraper-control-m5stack-core-$VERSION.bin"
+          BIN="out/agrigate-clean-m5stack-core-$VERSION.bin"
           grep -q "$VERSION" firmware/.pio/build/m5stack-core/firmware.bin || { echo "the firmware does not carry version $VERSION"; exit 1; }
           cp firmware/.pio/build/m5stack-core/firmware.bin "$BIN"
           cp firmware/.pio/build/m5stack-core/firmware.elf "${BIN%.bin}.elf"   # reads a crash (docs/API.md)
-          echo "# Scraper Control $VERSION: one block per board" > out/update.ini
+          echo "# Agrigate Clean $VERSION: one block per board" > out/update.ini
           python3 firmware/sign_release.py "$BIN" --board m5stack-core --key "$FIRMWARE_SIGNING_KEY" --version "$VERSION" --build "$BUILD" >> out/update.ini
           cat out/update.ini
       - name: First-install image (bootloader, partitions and app in one file, from address 0)
         run: |
           pip install "esptool>=5"
           B=firmware/.pio/build/m5stack-core
-          esptool --chip esp32 merge-bin -o "out/scraper-control-m5stack-core-$VERSION-full.bin" \
+          esptool --chip esp32 merge-bin -o "out/agrigate-clean-m5stack-core-$VERSION-full.bin" \
             --flash-mode dio --flash-freq 80m --flash-size 16MB \
             0x1000 $B/bootloader.bin 0x8000 $B/partitions.bin \
             0xe000 ~/.platformio/packages/framework-arduinoespressif32/tools/partitions/boot_app0.bin \
@@ -142,15 +142,15 @@ jobs:
         run: |
           test -n "$ANDROID_KEYSTORE" || { echo "secret ANDROID_KEYSTORE is missing"; exit 1; }
           echo "$ANDROID_KEYSTORE" | base64 -d > "$RUNNER_TEMP/release.jks"
-          echo "SCRAPER_KEYSTORE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+          echo "AGRIGATE_KEYSTORE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
       - name: Build the APK
         working-directory: native
         env:
-          SCRAPER_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          AGRIGATE_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
         run: |
           ./gradlew :androidApp:assembleRelease --console=plain
           mkdir ../out
-          cp androidApp/build/outputs/apk/release/*.apk "../out/scraper-control-$VERSION.apk"
+          cp androidApp/build/outputs/apk/release/*.apk "../out/agrigate-clean-$VERSION.apk"
       - uses: actions/upload-artifact@v7
         with:
           name: android
@@ -199,8 +199,8 @@ jobs:
             ./gradlew :composeApp:velopack --console=plain
             v=composeApp/build/velopack
             cp $v/*-full.nupkg $v/releases.*.json ../out/   # the app updates from these (publish signs the feed)
-            if [ "$RUNNER_OS" = macOS ]; then cp $v/*-Setup.pkg "../out/scraper-control-$VERSION-macos.pkg"
-            else cp $v/*-Setup.exe "../out/scraper-control-$VERSION-windows.exe"; fi
+            if [ "$RUNNER_OS" = macOS ]; then cp $v/*-Setup.pkg "../out/agrigate-clean-$VERSION-macos.pkg"
+            else cp $v/*-Setup.exe "../out/agrigate-clean-$VERSION-windows.exe"; fi
           fi
           ls ../out
       - uses: actions/upload-artifact@v7
@@ -236,10 +236,10 @@ jobs:
         run: |
           mkdir site
           cp docs/install/index.html site/
-          cp "fw/scraper-control-m5stack-core-$VERSION-full.bin" site/scraper-control-m5stack-core-full.bin
+          cp "fw/agrigate-clean-m5stack-core-$VERSION-full.bin" site/agrigate-clean-m5stack-core-full.bin
           cat > site/manifest.json <<JSON
-          {"name": "Scraper Control buttons", "version": "$VERSION", "new_install_prompt_erase": true,
-           "builds": [{"chipFamily": "ESP32", "parts": [{"path": "scraper-control-m5stack-core-full.bin", "offset": 0}]}]}
+          {"name": "Agrigate Clean buttons", "version": "$VERSION", "new_install_prompt_erase": true,
+           "builds": [{"chipFamily": "ESP32", "parts": [{"path": "agrigate-clean-m5stack-core-full.bin", "offset": 0}]}]}
           JSON
       - name: Apt repository with this release's .deb (sudo apt upgrade; README > Install), signed
         env:
@@ -252,7 +252,8 @@ jobs:
           cd site/apt
           dpkg-scanpackages --arch amd64 pool /dev/null > dists/stable/main/binary-amd64/Packages
           gzip -9k dists/stable/main/binary-amd64/Packages
-          apt-ftparchive -o APT::FTPArchive::Release::Origin="Scraper Control" -o APT::FTPArchive::Release::Label="Scraper Control" \
+          # Origin and Label stay: apt refuses a repository whose Origin changed until a person allows it
+          apt-ftparchive -o APT::FTPArchive::Release::Origin="Agrigate" -o APT::FTPArchive::Release::Label="Agrigate" \
             -o APT::FTPArchive::Release::Suite=stable -o APT::FTPArchive::Release::Codename=stable \
             -o APT::FTPArchive::Release::Architectures=amd64 -o APT::FTPArchive::Release::Components=main \
             release dists/stable > Release   # written outside dists/stable, or it lists itself
@@ -260,7 +261,7 @@ jobs:
           export GNUPGHOME="$RUNNER_TEMP/gnupg" && mkdir -m 700 "$GNUPGHOME"
           echo "$APT_SIGNING_KEY" | gpg --batch --import
           gpg --batch --yes --clearsign -o dists/stable/InRelease dists/stable/Release
-          gpg --export > scraper-control.gpg   # the key apt checks (signed-by)
+          gpg --export > agrigate.gpg   # the key apt checks (signed-by)
       - uses: actions/upload-pages-artifact@v5
         with:
           path: site
@@ -292,8 +293,8 @@ jobs:
         run: |
           ls -laR dist
           gh release create "v$VERSION" dist/* \
-            --title "Scraper Control $VERSION" \
-            --notes "Scraper Control $VERSION.
+            --title "Agrigate Clean $VERSION" \
+            --notes "Agrigate Clean $VERSION.
 
           - M5 buttons: they install this version themselves (settings, or automatically once a day / on a new wifi connection).
           - Android: install the .apk, or follow this repository with Obtainium for automatic updates.

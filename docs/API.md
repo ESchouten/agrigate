@@ -10,7 +10,7 @@ out of their own Bluetooth range. The device that serves it holds the Bluetooth 
   goes through that computer's web API like any app's.
 
 Each device has a fixed name of its own on the network, from its network address:
-`http://scraper-control-1a2b.local` (buttons: Settings > Wifi; desktop: Settings > Web page and API).
+`http://agrigate-clean-1a2b.local` (buttons: Settings > Wifi; desktop: Settings > Web page and API).
 
 **In the apps**, a robot can go through such a device instead of Bluetooth: in the robot's
 settings, Connection, enter the device's address. Routes, the schedule, the status and the stop
@@ -75,9 +75,9 @@ cable.
 | `GET /api/crash` | The last crash (a core dump), as a file; `404` when there is none. It stays until the next crash. After a crash the log names where it happened. Each release carries the firmware's `.elf`, which turns the addresses into code (`esp-coredump` from `pip install esp-coredump`, version and board as on the buttons). |
 
 ```bash
-curl -N -H "Authorization: Bearer 1234" http://scraper-control-1a2b.local/api/log/live
-curl -o crash.bin -H "Authorization: Bearer 1234" http://scraper-control-1a2b.local/api/crash
-esp-coredump info_corefile -t raw -c crash.bin scraper-control-m5stack-core-1.6.211.elf
+curl -N -H "Authorization: Bearer 1234" http://agrigate-clean-1a2b.local/api/log/live
+curl -o crash.bin -H "Authorization: Bearer 1234" http://agrigate-clean-1a2b.local/api/crash
+esp-coredump info_corefile -t raw -c crash.bin agrigate-clean-m5stack-core-1.6.211.elf
 ```
 
 ## Answers
@@ -104,7 +104,7 @@ unknown call.
 ## Examples
 
 ```bash
-curl -H "Authorization: Bearer 1234" http://scraper-control-1a2b.local/api/status/fresh
-curl -X POST -H "Authorization: Bearer 1234" http://scraper-control-1a2b.local/api/route/A
-curl -X POST -H "Authorization: Bearer 1234" http://scraper-control-1a2b.local/api/planning/off
+curl -H "Authorization: Bearer 1234" http://agrigate-clean-1a2b.local/api/status/fresh
+curl -X POST -H "Authorization: Bearer 1234" http://agrigate-clean-1a2b.local/api/route/A
+curl -X POST -H "Authorization: Bearer 1234" http://agrigate-clean-1a2b.local/api/planning/off
 ```

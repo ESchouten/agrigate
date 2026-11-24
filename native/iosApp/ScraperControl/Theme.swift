@@ -1,4 +1,4 @@
-// Scraper Control design system: the same values as the Compose app (Theme.kt). Brand red for brand surfaces and the one primary action; the rest is warm
+// Agrigate Clean design system: the same values as the Compose app (Theme.kt). Brand red for brand surfaces and the one primary action; the rest is warm
 // neutral. Status is never colour alone: always an icon and a word as well.
 import Shared
 import SwiftUI

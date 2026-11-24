@@ -1,4 +1,4 @@
-// JNI for nl.eschouten.scraper.link.DesktopBt (desktop only), over bt_serial.h.
+// JNI for com.eschouten.agrigate.clean.link.DesktopBt (desktop only), over bt_serial.h.
 #include <jni.h>
 
 #include <cstdio>
@@ -57,7 +57,7 @@ std::string str(JNIEnv* e, jstring s) {
 }
 }  // namespace
 
-#define BT_FN(name) JNIEXPORT JNICALL Java_nl_eschouten_scraper_link_DesktopBt_##name
+#define BT_FN(name) JNIEXPORT JNICALL Java_com_eschouten_agrigate_clean_link_DesktopBt_##name
 
 extern "C" {
 

@@ -3,11 +3,11 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "scraper-control"
+name = "agrigate"
 version = "1.6"
-description = "Control a manure scraper robot over Bluetooth LE"
+description = "Agrigate: manure robots over Bluetooth, milking robots and the herd from the farm's server"
 requires-python = ">=3.9"
 dependencies = ["bleak>=0.22"]
 
 [tool.setuptools]
-packages = ["scraper_control"]
+packages = ["agrigate"]

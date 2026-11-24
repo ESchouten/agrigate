@@ -1,4 +1,4 @@
-headers = scraper_c.h
-package = nl.eschouten.scraper.core.c
+headers = clean_c.h
+package = com.eschouten.agrigate.clean.core.c
 staticLibraries = libcore.a
 linkerOpts = -lc++

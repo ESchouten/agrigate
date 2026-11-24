@@ -53,7 +53,7 @@ std::string words(const std::string& name) {
 }
 
 const char* state(const std::string& display) {
-  using namespace milking::state;
+  using namespace milk::state;
   static const char* const kStates[][2] = {
       {"Emergency", Emergency}, {"Alarm", Alarm}, {"WaitingForCow", Idle}, {"Idle", Idle}, {"Milking", Milking},
       {"Releasing", Milking},   // the cow is still in the box
@@ -78,31 +78,31 @@ void login(Session& s) {
   });
 }
 
-void readMilking(Session& s) {
+void readMilk(Session& s) {
   s.get("/api/Location/GetLocations?locationType=1", [&s](const Json& locations) {   // 1: the milking robots
     for (const Json& l : locations.items) {
-      milking::Robot r;
+      milk::Robot r;
       r.id = l["id"].str();
       r.name = l["description"].str();
       r.group = l["locationGroup"]["name"].str();
-      size_t i = s.milking.robots.size();
-      s.milking.robots.push_back(r);
+      size_t i = s.milk.robots.size();
+      s.milk.robots.push_back(r);
       if (given(l["currentStatusRecordingId"].str()))
         s.get("/api/MerlinStatus/GetMerlinStatus?merlinStatusId=" + l["currentStatusRecordingId"].str(), [&s, i](const Json& status) {
-          milking::Robot& robot = s.milking.robots[i];
+          milk::Robot& robot = s.milk.robots[i];
           robot.raw = name(status["displayStatus"], kDisplay);
           robot.state = state(robot.raw);
           robot.since = status["start"].str();
         }, true);
       if (given(l["currentMerlinAlarmId"].str()))
         s.get("/api/MerlinAlarm/GetMerlinAlarm?merlinAlarmId=" + l["currentMerlinAlarmId"].str(), [&s, i](const Json& a) {
-          milking::Alarm alarm;
+          milk::Alarm alarm;
           alarm.time = a["timestamp"].str();
           alarm.severity = severity(name(a["alarmClass"], kAlarmClass));
           alarm.code = name(a["alarmCode"], kAlarm);
           alarm.text = words(alarm.code);
           if (alarm.code.empty()) alarm.code = a["alarmCode"].str();   // a code newer than this list
-          if (alarm.code != "NoAlarm") s.milking.robots[i].alarms.push_back(alarm);
+          if (alarm.code != "NoAlarm") s.milk.robots[i].alarms.push_back(alarm);
         }, true);
     }
   });
@@ -110,6 +110,6 @@ void readMilking(Session& s) {
 
 }  // namespace
 
-extern const Driver fullsense = {"fullsense", "FULLSENSE", "http", 12080, login, readMilking};
+extern const Driver fullsense = {"fullsense", "FULLSENSE", "http", 12080, login, readMilk};
 
 }  // namespace robot

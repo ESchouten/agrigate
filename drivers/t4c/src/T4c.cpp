@@ -40,33 +40,33 @@ bool refused(Session& s, const Json& answer, const char* what) {
   return true;
 }
 
-void readMilking(Session& s) {
+void readMilk(Session& s) {
   s.get("/t4capi/astronaut/overviews", [&s](const Json& answer) {
     if (refused(s, answer, "robots")) return;
     for (const Json& o : answer["data"].items) {
-      milking::Robot r;
+      milk::Robot r;
       r.id = o["id"].str();
       r.name = o["name"].str();
       r.group = o["barnName"].str();
       r.raw = o["robotStatus"].str();   // a number whose meaning is not known yet: the state stays "unknown"
       r.lastVisit = o["lastProcessTime"].str();
-      s.milking.robots.push_back(r);
+      s.milk.robots.push_back(r);
     }
-    for (size_t i = 0; i < s.milking.robots.size(); i++) {
-      const std::string id = s.milking.robots[i].id;
+    for (size_t i = 0; i < s.milk.robots.size(); i++) {
+      const std::string id = s.milk.robots[i].id;
       s.get("/t4capi/alarms/astronaut/" + id, [&s, i](const Json& answer) {
         for (const Json& a : answer["data"].items) {
-          milking::Alarm alarm;
+          milk::Alarm alarm;
           alarm.time = a["creationDate"].str();
           alarm.code = a["indicationId"].str();
           alarm.text = a["description"].str();
-          s.milking.robots[i].alarms.push_back(alarm);
+          s.milk.robots[i].alarms.push_back(alarm);
         }
       }, true);
       s.get("/t4capi/astronaut/" + id + "/detail", [&s, i](const Json& answer) {
         const Json& detail = answer["data"];
         const Json& kpi = detail["astronautKpis"].at(0);
-        milking::Robot& r = s.milking.robots[i];
+        milk::Robot& r = s.milk.robots[i];
         r.milkKg = kpi["totalMilkProduced"].num();
         r.milkings = kpi["numberOfMilking"].num();
         r.failedMilkings = detail["failedMilkingKpi"]["totalFailedMilkingCount"].num();
@@ -81,19 +81,19 @@ void readMilking(Session& s) {
 // T4C's ReproductionStatusId (GET /t4capi/reproductionstatustypes on a real server)
 const char* reproduction(double id) {
   switch ((int)id) {
-    case 1: case 2: case 7: return herd::reproduction::Open;   // open, never inseminated, open (cycling)
-    case 3: return herd::reproduction::Inseminated;
-    case 4: case 6: case 8: case 9: return herd::reproduction::Pregnant;   // pregnant, auto, "pregnant ?", probably
-    case 5: return herd::reproduction::DoNotBreed;
-    default: return herd::reproduction::Unknown;
+    case 1: case 2: case 7: return cow::reproduction::Open;   // open, never inseminated, open (cycling)
+    case 3: return cow::reproduction::Inseminated;
+    case 4: case 6: case 8: case 9: return cow::reproduction::Pregnant;   // pregnant, auto, "pregnant ?", probably
+    case 5: return cow::reproduction::DoNotBreed;
+    default: return cow::reproduction::Unknown;
   }
 }
 
 const char* production(const std::string& p) {
-  if (p == "In Lactation") return herd::production::Milking;
-  if (p == "Dry Off") return herd::production::Dry;
-  if (p == "Young Stock") return herd::production::Young;
-  return herd::production::Unknown;
+  if (p == "In Lactation") return cow::production::Milking;
+  if (p == "Dry Off") return cow::production::Dry;
+  if (p == "Young Stock") return cow::production::Young;
+  return cow::production::Unknown;
 }
 
 // ICAR (integrationglobal) words
@@ -127,43 +127,43 @@ std::string found(const std::map<std::string, std::string>& in, const std::strin
   return it == in.end() ? "" : it->second;
 }
 
-herd::Animal* animal(Session& s, HerdRead& h, const Json& icarAnimal) {
+cow::Animal* animal(Session& s, HerdRead& h, const Json& icarAnimal) {
   auto it = h.byLife.find(icarAnimal["id"].str());
-  return it == h.byLife.end() ? nullptr : &s.herd.animals[it->second];
+  return it == h.byLife.end() ? nullptr : &s.cow.animals[it->second];
 }
 
-void readHerd(Session& s) {
+void readCow(Session& s) {
   auto h = std::make_shared<HerdRead>();
   s.get("/t4capi/Animals/active", [&s, h](const Json& answer) {
     if (refused(s, answer, "animals")) return;
     for (const Json& a : answer["data"].items) {
-      herd::Animal x;
+      cow::Animal x;
       x.id = a["id"].str();
       x.number = a["userNumber"].str();
       x.name = a["name"].str();
       x.lifeNumber = a["lifeNumber"].str();
       x.responder = a["responderNumber"].str();
-      x.birthDate = herd::day(a["birthDate"].str());
+      x.birthDate = cow::day(a["birthDate"].str());
       x.group = a["location"].str();
-      h->byId[x.id] = s.herd.animals.size();
-      h->byLife[x.lifeNumber] = s.herd.animals.size();
-      s.herd.animals.push_back(x);
+      h->byId[x.id] = s.cow.animals.size();
+      h->byLife[x.lifeNumber] = s.cow.animals.size();
+      s.cow.animals.push_back(x);
     }
-    for (size_t from = 0; from < s.herd.animals.size(); from += 150) {   // as the server's own pages ask
+    for (size_t from = 0; from < s.cow.animals.size(); from += 150) {   // as the server's own pages ask
       std::string q;
-      for (size_t i = from; i < s.herd.animals.size() && i < from + 150; i++) q += (q.empty() ? "?" : "&") + std::string("animalIds=") + s.herd.animals[i].id;
+      for (size_t i = from; i < s.cow.animals.size() && i < from + 150; i++) q += (q.empty() ? "?" : "&") + std::string("animalIds=") + s.cow.animals[i].id;
       s.get("/t4capi/Animal/status" + q, [&s, h](const Json& answer) {
         for (const Json& st : answer["data"].items) {
           auto it = h->byId.find(st["animalId"].str());
           if (it == h->byId.end()) continue;
-          herd::Animal& x = s.herd.animals[it->second];
+          cow::Animal& x = s.cow.animals[it->second];
           x.reproduction = reproduction(st["reproductionStatusId"].num(0));
           x.reproductionRaw = st["reproductionStatus"].str();
           x.production = production(st["productionStatus"].str());
           x.lactation = st["lactationNumber"].num();
-          x.daysInMilk = x.production == std::string(herd::production::Young) ? -1 : st["daysInLactation"].num();
+          x.daysInMilk = x.production == std::string(cow::production::Young) ? -1 : st["daysInLactation"].num();
           const double preg = st["pregnancyDays"].num();
-          x.pregnantDays = x.reproduction == std::string(herd::reproduction::Pregnant) && preg > 0 ? preg : -1;
+          x.pregnantDays = x.reproduction == std::string(cow::reproduction::Pregnant) && preg > 0 ? preg : -1;
         }
       });
     }
@@ -180,16 +180,16 @@ void readHerd(Session& s) {
       const std::string farm = "?ucnNumber=" + h->ucn;
       s.get("/t4capi/integrationglobal/parturitions" + farm, [&s, h](const Json& answer) {
         for (const Json& e : answer["data"].items)
-          if (herd::Animal* x = animal(s, *h, e["animal"])) {
-            const std::string d = herd::day(e["eventDateTime"].str());
+          if (cow::Animal* x = animal(s, *h, e["animal"])) {
+            const std::string d = cow::day(e["eventDateTime"].str());
             if (d > x->calvingDate) x->calvingDate = d;
           }
       }, true);
       s.get("/t4capi/integrationglobal/inseminations" + farm, [&s, h](const Json& answer) {
         for (const Json& e : answer["data"].items)
-          if (herd::Animal* x = animal(s, *h, e["animal"])) {
-            herd::Insemination n;
-            n.date = herd::day(e["eventDateTime"].str());
+          if (cow::Animal* x = animal(s, *h, e["animal"])) {
+            cow::Insemination n;
+            n.date = cow::day(e["eventDateTime"].str());
             n.sireCode = idOf(e["sireIdentifiers"], "nl.aicode");
             n.sireLifeNumber = idOf(e["sireIdentifiers"], "eu.bovine");
             n.sireName = found(h->sireByCode, n.sireCode);
@@ -200,12 +200,12 @@ void readHerd(Session& s) {
       }, true);
       s.get("/t4capi/integrationglobal/pregnancy-checks" + farm, [&s, h](const Json& answer) {
         for (const Json& e : answer["data"].items)
-          if (herd::Animal* x = animal(s, *h, e["animal"])) x->pregnancyChecks.push_back({herd::day(e["eventDateTime"].str()), checkResult(e["result"].str())});
+          if (cow::Animal* x = animal(s, *h, e["animal"])) x->pregnancyChecks.push_back({cow::day(e["eventDateTime"].str()), checkResult(e["result"].str())});
       }, true);
       s.get("/t4capi/integrationglobal/gestations" + farm, [&s, h](const Json& answer) {
         for (const Json& e : answer["data"].items)
-          if (herd::Animal* x = animal(s, *h, e["animal"]))
-            if (x->reproduction == std::string(herd::reproduction::Pregnant)) x->expectedCalving = herd::day(e["expectedCalvingDate"].str());
+          if (cow::Animal* x = animal(s, *h, e["animal"]))
+            if (x->reproduction == std::string(cow::reproduction::Pregnant)) x->expectedCalving = cow::day(e["expectedCalvingDate"].str());
       }, true);
     });
   });
@@ -213,6 +213,6 @@ void readHerd(Session& s) {
 
 }  // namespace
 
-extern const Driver t4c = {"t4c", "T4C", "http", 6969, login, readMilking, readHerd};
+extern const Driver t4c = {"t4c", "T4C", "http", 6969, login, readMilk, readCow};
 
 }  // namespace robot

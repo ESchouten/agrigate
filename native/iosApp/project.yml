@@ -4,7 +4,7 @@
 # set-version.sh for the version (1.6.<build>). UI tests: ./run-ui-tests.sh
 name: ScraperControl
 options:
-  bundleIdPrefix: nl.eschouten
+  bundleIdPrefix: com.eschouten.agrigate
   deploymentTarget:
     iOS: "16.0"
 settings:
@@ -44,14 +44,14 @@ targets:
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
         NSLocalNetworkUsageDescription: Om de robot te bedienen via een ander apparaat in je netwerk.
-        CFBundleURLTypes:   # scraper-control://add?... from the QR code of the buttons or a computer
-          - CFBundleURLName: nl.eschouten.scraper.add
-            CFBundleURLSchemes: [scraper-control]
+        CFBundleURLTypes:   # agrigate-clean://add?... from the QR code of the buttons or a computer
+          - CFBundleURLName: com.eschouten.agrigate.clean.add
+            CFBundleURLSchemes: [agrigate-clean]
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: nl.eschouten.scraper
+        PRODUCT_BUNDLE_IDENTIFIER: com.eschouten.agrigate.clean
         GENERATE_INFOPLIST_FILE: YES
-        INFOPLIST_KEY_CFBundleDisplayName: Scraper Control
+        INFOPLIST_KEY_CFBundleDisplayName: Agrigate Clean
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription: Om de robot te bedienen via Bluetooth.
@@ -66,7 +66,7 @@ targets:
     info:
       path: Widgets/Info.plist
       properties:
-        CFBundleDisplayName: Scraper Control
+        CFBundleDisplayName: Agrigate Clean
         NSBluetoothAlwaysUsageDescription: Om de robot te bedienen via Bluetooth.   # a tap connects from here
         NSLocalNetworkUsageDescription: Om de robot te bedienen via een ander apparaat in je netwerk.
         NSAppTransportSecurity:
@@ -75,7 +75,7 @@ targets:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: nl.eschouten.scraper.widgets
+        PRODUCT_BUNDLE_IDENTIFIER: com.eschouten.agrigate.clean.widgets
         CODE_SIGN_ENTITLEMENTS: Widgets/Widgets.entitlements
   ScraperControlUITests:
     type: bundle.ui-testing
@@ -86,7 +86,7 @@ targets:
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
-        PRODUCT_BUNDLE_IDENTIFIER: nl.eschouten.scraper.uitests
+        PRODUCT_BUNDLE_IDENTIFIER: com.eschouten.agrigate.clean.uitests
         TEST_TARGET_NAME: ScraperControl
 schemes:
   ScraperControl:

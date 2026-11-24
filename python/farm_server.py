@@ -7,7 +7,7 @@ Stop with Ctrl+C.
 import json
 import sys
 
-from scraper_control.farm_server import serve
+from agrigate.farm_server import serve
 
 
 def main():

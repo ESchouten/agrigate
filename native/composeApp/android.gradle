@@ -3,7 +3,7 @@ apply plugin: 'com.android.kotlin.multiplatform.library'
 
 kotlin {
   androidLibrary {
-    namespace = 'nl.eschouten.scraper.ui'
+    namespace = 'com.eschouten.agrigate.clean.ui'
     compileSdk { version = release(rootProject.ext.androidCompileSdk) { minorApiLevel = 0 } }
     minSdk = rootProject.ext.androidMinSdk
   }

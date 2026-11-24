@@ -15,7 +15,7 @@
 
   <application
       android:name=".ScraperApp"
-      android:label="Scraper Control"
+      android:label="Agrigate Clean"
       android:icon="@mipmap/ic_launcher"
       android:theme="@style/Theme.Scraper"
       android:enableOnBackInvokedCallback="true"
@@ -35,7 +35,7 @@
         <action android:name="android.intent.action.VIEW" />
         <category android:name="android.intent.category.DEFAULT" />
         <category android:name="android.intent.category.BROWSABLE" />
-        <data android:scheme="scraper-control" android:host="add" />
+        <data android:scheme="agrigate-clean" android:host="add" />
       </intent-filter>
     </activity>
     <receiver android:name=".RoutesWidget" android:label="@string/widget_routes_label" android:exported="true">

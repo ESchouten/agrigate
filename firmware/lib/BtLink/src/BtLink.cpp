@@ -29,7 +29,7 @@ std::string lower(std::string s) {
 void startBle() {
   if (BLEDevice::getInitialized()) return;
   if (BtLink::makeRoom) BtLink::makeRoom();
-  BLEDevice::init("scraper-control");
+  BLEDevice::init("agrigate-clean");
   BLEDevice::setMTU(247);
 }
 
@@ -38,7 +38,7 @@ bool startClassic() {
   startBle();   // Bluedroid with BLE first; classic joins the same host
   if (sppStarted) return true;
   if (BtLink::makeRoom) BtLink::makeRoom();
-  sppStarted = spp.begin("scraper-control", true);   // master: we connect out
+  sppStarted = spp.begin("agrigate-clean", true);   // master: we connect out
   return sppStarted;
 }
 

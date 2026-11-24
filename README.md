@@ -1,7 +1,18 @@
-# Scraper Control
+# Agrigate
 
-Control your manure scraper robot with three physical buttons, a phone or computer app, or a
-Python script.
+Open software for the robots in the barn: one gate to all of them, whatever their make.
+
+| | For | State |
+|---|---|---|
+| **Agrigate Clean** | Manure robots: routes, schedule, manual driving | Apps, buttons, Python |
+| **Agrigate Milk** | Milking robots: state, alarms, figures (read only) | Python |
+| **Agrigate Cow** | The herd from the farm's server, and which cow is at which robot (read only) | Python, farm service |
+| **Agrigate Feed** | Feeding robots | Not yet |
+
+## Agrigate Clean
+
+Control your manure robot with three physical buttons, a phone or computer app, or a Python
+script.
 
 - **Buttons** (M5Stack): one route per button; hold for the schedule, manual driving and
   settings. Wifi is set up on the device itself, and it updates itself from the signed releases.
@@ -37,29 +48,31 @@ farm; the FULLSENSE driver has not met a real server yet (see each driver's page
 
 ## Install
 
-Everything is in the [latest release](https://github.com/ESchouten/scraper-control/releases/latest).
+Everything is in the [latest release](https://github.com/ESchouten/agrigate/releases/latest).
 
 | Device | File | How |
 |---|---|---|
 | Android | `.apk` | Open it on the phone and allow installing from your browser or files app. A newer version installs over the old one; [Obtainium](https://github.com/ImranR98/Obtainium) with this repository keeps it up to date. |
 | Windows | `.exe` | Not signed: at the blue warning choose More info > Run anyway. Installs for your user, no administrator needed. |
 | macOS | `.pkg` | Not signed: right-click > Open the first time, then allow Bluetooth. |
-| Linux | `.deb` | Add the apt repository once (below): `sudo apt upgrade` then keeps it up to date. Or just the file: `sudo apt install ./scraper-control_*.deb`. |
+| Linux | `.deb` | Add the apt repository once (below): `sudo apt upgrade` then keeps it up to date. Or just the file: `sudo apt install ./agrigate-clean_*.deb`. |
 | iOS | none yet | Build it with Xcode ([native/README.md](native/README.md)). |
-| Buttons | M5Stack Basic v2.7 (16 MB) | The first time with the [browser installer](https://eschouten.github.io/scraper-control/) (Chrome or Edge on a computer, USB-C data cable), or `esptool write-flash 0x0 scraper-control-m5stack-core-<version>-full.bin`. That erases the M5Stack; after that it updates itself over wifi. |
+| Buttons | M5Stack Basic v2.7 (16 MB) | The first time with the [browser installer](https://eschouten.github.io/agrigate/) (Chrome or Edge on a computer, USB-C data cable), or `esptool write-flash 0x0 agrigate-clean-m5stack-core-<version>-full.bin`. That erases the M5Stack; after that it updates itself over wifi. |
 
 The apt repository (Debian, Ubuntu; amd64):
 
 ```bash
-curl -fsSL https://eschouten.github.io/scraper-control/apt/scraper-control.gpg | sudo tee /usr/share/keyrings/scraper-control.gpg > /dev/null
-echo "deb [signed-by=/usr/share/keyrings/scraper-control.gpg] https://eschouten.github.io/scraper-control/apt stable main" | sudo tee /etc/apt/sources.list.d/scraper-control.list
-sudo apt update && sudo apt install scraper-control
+curl -fsSL https://eschouten.github.io/agrigate/apt/agrigate.gpg | sudo tee /usr/share/keyrings/agrigate.gpg > /dev/null
+echo "deb [signed-by=/usr/share/keyrings/agrigate.gpg] https://eschouten.github.io/agrigate/apt stable main" | sudo tee /etc/apt/sources.list.d/agrigate.list
+sudo apt update && sudo apt install agrigate-clean
 ```
 
 On Windows and macOS the app checks for a new version at start and once a day and asks before
 it installs one; it only takes a release signed with the release key, like the buttons. An app
-installed from an older `.dmg` or `.exe` does not update itself: install the new one once (on
-Windows, remove the old "Scraper Control" first).
+that is still called Scraper Control does not update itself to Agrigate Clean: install Agrigate
+Clean once and remove Scraper Control (on Linux: `sudo apt install agrigate-clean && sudo apt
+remove scraper-control`, with the apt source above). On every device it is a new app: add the robot
+again.
 
 ### First connection
 
@@ -87,11 +100,11 @@ hold left = done.
 
 | Folder | What |
 |---|---|
-| `core/` | The robot APIs, one per kind of robot and the same for every make: `scraper_c.h` (manure scrapers), `robot_c.h` with `milking_c.h` and `herd_c.h` (read through the farm's server), `live_c.h` (what a robot says on the farm network) |
+| `core/` | The robot APIs, one per kind of robot and the same for every make: `clean_c.h` (manure scrapers), `robot_c.h` with `milk_c.h` and `cow_c.h` (read through the farm's server), `live_c.h` (what a robot says on the farm network) |
 | `drivers/` | One folder per robot type or server software: everything specific to it |
 | `firmware/` | The M5Stack buttons (PlatformIO) |
 | `native/` | The apps: shared Kotlin, Compose for Android and desktop, SwiftUI for iOS ([README](native/README.md)) |
-| `python/` | The Python library `scraper_control` and the command lines `scraper.py`, `farm.py` and `farm_server.py` |
+| `python/` | The Python library `agrigate` and the command lines `clean.py`, `farm.py` and `farm_server.py` |
 | `tools/` | Build secrets |
 
 Every client only provides the link to the robot (bytes in, bytes out, or a request and its
@@ -104,7 +117,7 @@ answer); the driver says which kind of link it needs. A new robot type is a new 
 python3 tools/secrets.py                          # once: build secrets from ~/.scraper-control/secrets
 cd firmware && pio run -e m5stack-core -t upload  # the buttons (USB the first time)
 cd native && ./gradlew :composeApp:run            # the desktop app (see native/README.md)
-cd python && pip install -e . && python scraper.py --scan
+cd python && pip install -e . && python clean.py --scan
 ```
 
 Without build secrets everything builds and the tests pass, but a real robot may refuse to

@@ -1,7 +1,7 @@
 # Lely Discovery driver: protocol and behaviour
 
 The driver is `src/` (C++17). The M5Stack uses it directly, the apps (JNI and Kotlin/Native) and
-Python (ctypes) through the generic C API `core/scraper_c.h`, which `src/scraper_c.cpp`
+Python (ctypes) through the generic C API `core/clean_c.h`, which `src/clean_c.cpp`
 implements. Link: "ble-serial". Tested against the simulated robot (`tests/fake_robot.py`) with
 `tests/test_core.py` (the driver directly) and `tests/test_api.py` (through Python). Everything below
 was checked on a real Discovery (November 2026), unless stated otherwise.
@@ -181,8 +181,8 @@ Recognition by shape (`Screen::isHome()` etc., works in every language):
 The **robot's language** (`Screen::language()`, `"language"` in the status JSON: `nl`, `en` or
 empty) does come from words. It is only used for the language of a user interface (the M5 follows
 it); the recognition above does not depend on it. The texts the core makes itself (result, error
-detail, log) are Dutch or English: `Robot::lang`, `scraper_set_language(s, "en")`,
-`scraper_result_text_lang(r, "en")`.
+detail, log) are Dutch or English: `Robot::lang`, `clean_set_language(s, "en")`,
+`clean_result_text_lang(r, "en")`.
 
 Screens we know (Dutch robot):
 ```

@@ -6,8 +6,8 @@ plugins {
 }
 
 val hasAndroid = findProject(":androidApp") != null   // settings.gradle.kts: an Android SDK is there
-// The robot driver (gradle.properties scraper.driver): drivers/<name>/src, built with the C API in core/
-val driver = providers.gradleProperty("scraper.driver").get()
+// The robot driver (gradle.properties clean.driver): drivers/<name>/src, built with the C API in core/
+val driver = providers.gradleProperty("clean.driver").get()
 val driverDir = rootDir.resolve("../drivers/$driver")
 val driverSrc = driverDir.resolve("src")
 val apiDir = rootDir.resolve("../core")
@@ -22,11 +22,11 @@ val generateVersion by tasks.registering {
   inputs.property("build", appBuild)
   outputs.dir(versionDir)
   doLast {
-    val f = versionDir.get().asFile.resolve("nl/eschouten/scraper/AppVersion.kt")
+    val f = versionDir.get().asFile.resolve("com/eschouten/agrigate/clean/AppVersion.kt")
     f.parentFile.mkdirs()
     f.writeText(
       "// Generated from gradle.properties (scraper.version) + the build number. Do not edit.\n" +
-        "package nl.eschouten.scraper\n\n" +
+        "package com.eschouten.agrigate.clean\n\n" +
         "object AppVersion {\n  const val NAME = \"$appVersion\"\n  const val BUILD = $appBuild\n}\n",
     )
   }
@@ -73,7 +73,7 @@ kotlin {
       kotlin.srcDir("src/jniMain/kotlin")
       dependencies {
         implementation("io.ktor:ktor-client-cio:$ktor")
-        implementation("org.jmdns:jmdns:3.6.5")   // the desktop's web API as scraper-control-1a2b.local
+        implementation("org.jmdns:jmdns:3.6.5")   // the desktop's web API as agrigate-clean-1a2b.local
         implementation("com.google.zxing:core:3.5.4")   // its QR code for a phone's camera
       }
     }
@@ -96,7 +96,7 @@ val configureCoreJni by tasks.registering(Exec::class) {
   outputs.dir(coreJniWork)
   doFirst { coreJniWork.get().asFile.run { deleteRecursively(); mkdirs() } } // a fresh CMake cache: the sources may have moved
   commandLine(
-    "cmake", "-S", apiDir.path, "-B", coreJniWork.get().asFile.path, "-DSCRAPER_DRIVER=$driver", "-DCMAKE_BUILD_TYPE=Release",
+    "cmake", "-S", apiDir.path, "-B", coreJniWork.get().asFile.path, "-DCLEAN_DRIVER=$driver", "-DCMAKE_BUILD_TYPE=Release",
     "-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=$out", "-DCMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE=$out",   // the second: a .dll on Windows
   )
 }

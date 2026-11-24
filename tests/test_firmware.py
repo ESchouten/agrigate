@@ -8,7 +8,7 @@ sys.path.insert(0, os.path.join(ROOT, "firmware", "test_host"))
 from driver import host_flags  # noqa: E402
 import lvgl_host  # noqa: E402
 
-BIN = os.path.join(tempfile.gettempdir(), "scraper_fw_test")
+BIN = os.path.join(tempfile.gettempdir(), "clean_fw_test")
 
 
 def check(name, cond, err):
@@ -34,14 +34,14 @@ def editors_and_manifest():
         subprocess.check_call(["openssl", "ecparam", "-name", "prime256v1", "-genkey", "-noout", "-out", key])
         text = "# test\n"
         for board in ("m5stack-core", "other-board"):
-            binf = os.path.join(tmp, f"scraper-control-{board}-0.0.1.bin")
+            binf = os.path.join(tmp, f"agrigate-clean-{board}-0.0.1.bin")
             with open(binf, "wb") as f:
                 f.write(os.urandom(3000))
             text += subprocess.check_output([sys.executable, sign, binf, "--key", key, "--board", board,
                                              "--version", "0.0.1", "--build", "7"], text=True)
         with open(man, "w") as f:
             f.write(text)
-        check("manifest: names its file", "file=scraper-control-m5stack-core-0.0.1.bin" in text, text)
+        check("manifest: names its file", "file=agrigate-clean-m5stack-core-0.0.1.bin" in text, text)
         py = subprocess.check_output([sys.executable, sign, "--message", man], text=True)
         cc = "".join(subprocess.run([exe, b], input=text, capture_output=True, text=True, check=True).stdout
                      for b in ("m5stack-core", "other-board"))

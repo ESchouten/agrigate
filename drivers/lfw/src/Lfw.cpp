@@ -18,7 +18,7 @@ constexpr uint32_t kMagicMessage = 0xD156;    // a message the proxy hands on
 constexpr uint32_t kMagicClient = 0xD157;     // a client (de)registering
 constexpr uint16_t kCowNumberName = 0x116;    // MSG_REQUEST_COW_NR_NAME: responder, cow number, name
 constexpr int64_t kRenewMs = 2000;
-const char kClientName[] = "scraper-control";  // how the proxy lists this client (22 bytes at most)
+const char kClientName[] = "agrigate";  // how the proxy lists this client (22 bytes at most)
 
 uint32_t u32(const std::string& d, size_t at) {
   return (uint32_t)(uint8_t)d[at] | (uint32_t)(uint8_t)d[at + 1] << 8 | (uint32_t)(uint8_t)d[at + 2] << 16 | (uint32_t)(uint8_t)d[at + 3] << 24;

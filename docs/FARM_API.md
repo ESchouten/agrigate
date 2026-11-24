@@ -8,7 +8,7 @@ nothing in it changes anything on the farm.
 - **Live**, from the robots themselves (`core/live_c.h`): the robot says which cow it identified
   the moment it reads her responder. One listener per robot, so a farm with ten robots works the
   same as one with one. Driver: `lfw`.
-- **The herd**, from the farm's server (`core/herd_c.h`): name, numbers, lactation, days in milk,
+- **The herd**, from the farm's server (`core/cow_c.h`): name, numbers, lactation, days in milk,
   reproduction, inseminations, pregnancy checks. Read again every 5 minutes. Driver: `t4c`.
 
 Each live event and each robot's animal carries the herd's fields next to what the robot said, so
@@ -31,7 +31,7 @@ FARM_SERVER_TOKEN=<token> FARM_SERVER_PASSWORD=<licence key> python farm_server.
     {"name": "Robot 2", "driver": "lfw", "address": "10.4.1.102"}
   ],
   "server": {"driver": "t4c", "address": "10.4.1.1:6969", "user": ""},
-  "herdRefreshSeconds": 300
+  "cowRefreshSeconds": 300
 }
 ```
 
@@ -106,7 +106,7 @@ Every robot with the animal it identified last:
 
 ### `GET /api/animals` and `GET /api/animals/<number | responder | life number>`
 
-The herd as the server knows it (`core/herd_c.h` describes every field), plus `atRobot`:
+The herd as the server knows it (`core/cow_c.h` describes every field), plus `atRobot`:
 `{"robot", "since"}` when the animal is a robot's current animal, else `null`.
 
 ```json
@@ -129,11 +129,11 @@ the last good read stay. `/api/animals/<key>` gives one animal, or 404.
 ### `GET /api/status`
 
 ```json
-{"service": "scraper-control farm", "version": 1, "time": 1795437727482, "robots": 2,
- "robotsConnected": 2, "herd": {"animals": 92, "updated": 1795437721591, "error": ""}, "lastEvent": 0}
+{"service": "agrigate farm", "version": 1, "time": 1795437727482, "robots": 2,
+ "robotsConnected": 2, "cow": {"animals": 92, "updated": 1795437721591, "error": ""}, "lastEvent": 0}
 ```
 
-`herd` is `null` without a server.
+`cow` is `null` without a server.
 
 ## What each driver gives
 

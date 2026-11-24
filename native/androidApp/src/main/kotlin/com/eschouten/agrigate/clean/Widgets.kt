@@ -1,0 +1,232 @@
+// Home-screen widgets: routes A-D of a robot, and one route as a tile. What they show and
+// what a tap does come from the shared module (app/WidgetBridge.kt); this file only draws
+// RemoteViews and runs the tap in the background.
+package com.eschouten.agrigate.clean
+
+import android.app.Activity
+import android.Manifest
+import android.app.AlertDialog
+import android.app.PendingIntent
+import android.appwidget.AppWidgetManager
+import android.appwidget.AppWidgetProvider
+import android.content.BroadcastReceiver
+import android.content.ComponentName
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
+import android.os.Bundle
+import android.view.View
+import android.widget.RemoteViews
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
+import androidx.core.app.NotificationChannelCompat
+import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
+import com.eschouten.agrigate.clean.app.PrefsStore
+import com.eschouten.agrigate.clean.app.Settings
+import com.eschouten.agrigate.clean.app.WidgetBar
+import com.eschouten.agrigate.clean.app.WidgetBridge
+import com.eschouten.agrigate.clean.app.WidgetNotice
+import com.eschouten.agrigate.clean.texts.tr
+
+object WidgetViews {
+  private class Tile(val root: Int, val letter: Int, val name: Int)
+  private val tiles = mapOf(
+    "A" to Tile(R.id.route_a, R.id.letter_a, R.id.name_a),
+    "B" to Tile(R.id.route_b, R.id.letter_b, R.id.name_b),
+    "C" to Tile(R.id.route_c, R.id.letter_c, R.id.name_c),
+    "D" to Tile(R.id.route_d, R.id.letter_d, R.id.name_d),
+  )
+
+  fun store(c: Context) = PrefsStore(c).also { Settings.load(it) } // also sets the app's language
+
+  /** Redraw every widget (after a run, a rename, ...). */
+  fun refreshAll(c: Context) {
+    val m = AppWidgetManager.getInstance(c)
+    for (cls in listOf(RoutesWidget::class.java, RouteTileWidget::class.java)) {
+      val ids = m.getAppWidgetIds(ComponentName(c, cls))
+      for (id in ids) m.updateAppWidget(id, views(c, id, cls == RouteTileWidget::class.java))
+    }
+  }
+
+  fun views(c: Context, widgetId: Int, tile: Boolean): RemoteViews {
+    val store = store(c)
+    val robotUid = store.getString("w.robot.$widgetId")
+    return if (tile) {
+      val t = WidgetBridge.tile(store, robotUid, store.getString("w.route.$widgetId"))
+      RemoteViews(c.packageName, R.layout.widget_tile).apply {
+        setTextViewText(R.id.letter, t.route)
+        setTextViewText(R.id.name, t.title)
+        setTextViewText(R.id.detail, t.detail)
+        setOnClickPendingIntent(R.id.route_root, tap(c, widgetId * 10, t.robotUid) { putExtra("route", t.route) })
+      }
+    } else {
+      // the launcher draws the first lying down (the lowest it gets), the second upright (the highest)
+      val b = WidgetBridge.bar(store, robotUid)
+      val size = AppWidgetManager.getInstance(c).getAppWidgetOptions(widgetId)
+      RemoteViews(
+        bar(c, widgetId, b, size.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT)),
+        bar(c, widgetId, b, size.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT)),
+      )
+    }
+  }
+
+  /** The routes widget at [height] dp (0 = not known): lower than the full layout needs, the
+   *  one-row layout. Both have the same ids. */
+  private fun bar(c: Context, widgetId: Int, b: WidgetBar, height: Int) =
+    RemoteViews(c.packageName, if (height in 1 until 150) R.layout.widget_routes_row else R.layout.widget_routes).apply {
+      setTextViewText(R.id.title, b.title)
+      val shown = b.routes.associateBy { it.route }
+      tiles.forEach { (letter, t) ->
+        setViewVisibility(t.root, if (letter in shown) View.VISIBLE else View.GONE)
+        setOnClickPendingIntent(t.root, tap(c, widgetId * 10 + 1 + "ABCD".indexOf(letter), b.robotUid) { putExtra("route", letter) })
+        shown[letter]?.let {
+          setTextViewText(t.name, it.title)
+          setContentDescription(t.root, tr.startRoute(it.title))
+        }
+      }
+      setTextViewText(R.id.status, b.status)
+      // the schedule known: a chip with a switch, a tap switches it to the other state; else opens the app
+      val on = b.scheduleOn
+      setViewVisibility(R.id.schedule_switch, if (on == null) View.GONE else View.VISIBLE)
+      setInt(R.id.schedule, "setBackgroundResource", if (on == null) 0 else R.drawable.widget_chip)
+      if (on != null) {
+        setImageViewResource(R.id.schedule_switch, if (on) R.drawable.widget_switch_on else R.drawable.widget_switch_off)
+        setContentDescription(R.id.schedule, tr.widgetSwitchPlanning(!on))
+      }
+      setOnClickPendingIntent(
+        R.id.schedule,
+        if (on != null) tap(c, widgetId * 10 + 5, b.robotUid) { putExtra("on", !on) }
+        else PendingIntent.getActivity(c, widgetId, Intent(c, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT),
+      )
+    }
+
+  /** A tap for [WidgetTapReceiver]: a "route", or the schedule switched "on" (true/false). */
+  private fun tap(c: Context, code: Int, robotUid: String?, what: Intent.() -> Unit): PendingIntent {
+    val i = Intent(c, WidgetTapReceiver::class.java).setAction("com.eschouten.agrigate.clean.TAP").putExtra("robot", robotUid).apply(what)
+    return PendingIntent.getBroadcast(c, code, i, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+  }
+}
+
+class RoutesWidget : AppWidgetProvider() {
+  override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) {
+    ids.forEach { manager.updateAppWidget(it, WidgetViews.views(context, it, tile = false)) }
+  }
+
+  /** Resized: its height picks the layout. */
+  override fun onAppWidgetOptionsChanged(context: Context, manager: AppWidgetManager, id: Int, options: Bundle) {
+    manager.updateAppWidget(id, WidgetViews.views(context, id, tile = false))
+  }
+}
+
+class RouteTileWidget : AppWidgetProvider() {
+  override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) {
+    ids.forEach { manager.updateAppWidget(it, WidgetViews.views(context, it, tile = true)) }
+  }
+}
+
+/** A widget tap: connect, start the route or switch the schedule, disconnect, in the
+ *  background (up to 55 s). */
+class WidgetTapReceiver : BroadcastReceiver() {
+  override fun onReceive(context: Context, intent: Intent) {
+    val route = intent.getStringExtra("route")
+    val on = if (intent.hasExtra("on")) intent.getBooleanExtra("on", false) else null
+    if (route == null && on == null) return
+    val robot = intent.getStringExtra("robot")
+    val app = context.applicationContext
+    val pending = goAsync()
+    CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
+      try {
+        val store = WidgetViews.store(app)
+        val refresh = { WidgetViews.refreshAll(app) }
+        val out = withTimeoutOrNull(55_000) {
+          if (on != null) WidgetBridge.setPlanning(store, robot, on, refresh) else WidgetBridge.tap(store, robot, route!!, refresh)
+        }
+        val n = if (on != null) WidgetBridge.planningNotice(out) else WidgetBridge.notice(store, robot, route!!, out)
+        n?.let { WidgetNotify.show(app, it) }
+        (app as? ScraperApp)?.widgetRan()
+      } finally {
+        pending.finish()
+      }
+    }
+  }
+}
+
+/** A failed widget start as a notification: the widget itself only shows "Mislukt". */
+object WidgetNotify {
+  private const val CHANNEL = "widget-failures"
+  private const val ID = 7
+
+  /** Android 13+: notifications need the user's OK, asked when a widget is placed. */
+  fun needsPermission(c: Context) =
+    Build.VERSION.SDK_INT >= 33 && c.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+
+  fun show(c: Context, n: WidgetNotice) {
+    if (needsPermission(c)) return
+    val m = NotificationManagerCompat.from(c)
+    m.createNotificationChannel(
+      NotificationChannelCompat.Builder(CHANNEL, NotificationManagerCompat.IMPORTANCE_HIGH).setName(tr.widgetFailuresChannel).build(),
+    )
+    val open = PendingIntent.getActivity(c, 0, Intent(c, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+    m.notify(
+      ID,
+      NotificationCompat.Builder(c, CHANNEL).setSmallIcon(android.R.drawable.stat_notify_error)
+        .setContentTitle(n.title)
+        .setContentText(n.body)
+        .setStyle(NotificationCompat.BigTextStyle().bigText(n.body))
+        .setContentIntent(open)
+        .setAutoCancel(true)
+        .build(),
+    )
+  }
+}
+
+/** When a widget is placed: pick the robot (and for the tile, the route). Skipped when there
+ *  is only one choice. */
+class WidgetConfigureActivity : Activity() {
+  private var widgetId = AppWidgetManager.INVALID_APPWIDGET_ID
+
+  override fun onCreate(savedInstanceState: Bundle?) {
+    super.onCreate(savedInstanceState)
+    setResult(RESULT_CANCELED)
+    widgetId = intent?.extras?.getInt(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID) ?: AppWidgetManager.INVALID_APPWIDGET_ID
+    if (widgetId == AppWidgetManager.INVALID_APPWIDGET_ID) {
+      finish()
+      return
+    }
+    val tile = AppWidgetManager.getInstance(this).getAppWidgetInfo(widgetId)?.provider?.className == RouteTileWidget::class.java.name
+    val store = WidgetViews.store(this)
+    val options = WidgetBridge.choices(store, tile)
+    if (options.isEmpty()) {
+      AlertDialog.Builder(this).setTitle(tr.setupFirst).setMessage(tr.setupFirstBody)
+        .setPositiveButton("OK") { _, _ -> finish() }.setOnCancelListener { finish() }.show()
+      return
+    }
+    if (options.size == 1) {
+      done(options[0].robotUid, options[0].route)
+      return
+    }
+    AlertDialog.Builder(this).setTitle(if (tile) tr.whichRoute else tr.whichRobot)
+      .setItems(options.map { it.label }.toTypedArray()) { _, i -> done(options[i].robotUid, options[i].route) }
+      .setOnCancelListener { finish() }.show()
+  }
+
+  private fun done(robotUid: String, route: String?) {
+    val store = WidgetViews.store(this)
+    store.putString("w.robot.$widgetId", robotUid)
+    if (route != null) store.putString("w.route.$widgetId", route)
+    WidgetViews.refreshAll(this)
+    setResult(RESULT_OK, Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId))
+    // a failed start from the widget is reported as a notification: ask for that now
+    if (WidgetNotify.needsPermission(this)) requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1) else finish()
+  }
+
+  override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+    super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+    finish()
+  }
+}

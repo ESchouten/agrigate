@@ -11,11 +11,11 @@ try:
 except ImportError:
     m = types.ModuleType("bleak"); m.BleakClient = m.BleakScanner = object; sys.modules["bleak"] = m
 
-from scraper_control import Robot, RobotBusy, api
+from agrigate import Robot, RobotBusy, api
 from fake_robot import FakeRobot
 
-from scraper_control.build_core import LIBNAME, build
-os.environ["SCRAPER_CORE_LIB"] = str(build(Path(tempfile.mkdtemp()) / LIBNAME))
+from agrigate.build_core import LIBNAME, build
+os.environ["AGRIGATE_CORE_LIB"] = str(build(Path(tempfile.mkdtemp()) / LIBNAME))
 
 ADDR = "00:12:FF:A0:80:01"
 
@@ -104,7 +104,7 @@ def test_stop_route_while_driving():
 
 def test_image_version_is_remembered():
     from pathlib import Path
-    from scraper_control import discover
+    from agrigate import discover
     discover.CACHE = Path(tempfile.mkdtemp()) / "last.json"
     h = make()
     async def go():

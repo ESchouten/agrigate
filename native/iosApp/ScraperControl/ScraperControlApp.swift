@@ -2,7 +2,7 @@
 // screen shows and does comes from the shared screen models (ui/), the same ones the Compose
 // app draws; this app only lays them out the iOS way.
 //
-// Demo robot (UI tests, screenshots): environment SCRAPER_DEMO="setup=done ui=en", or the
+// Demo robot (UI tests, screenshots): environment AGRIGATE_DEMO="setup=done ui=en", or the
 // launch argument -demo "<words>" (see shared app/AppStart.kt).
 import Shared
 import SwiftUI
@@ -27,7 +27,7 @@ var tr: Tr { TextsKt.tr }
 
   init() {
     let args = ProcessInfo.processInfo.arguments
-    var demo = ProcessInfo.processInfo.environment["SCRAPER_DEMO"]
+    var demo = ProcessInfo.processInfo.environment["AGRIGATE_DEMO"]
     if let i = args.firstIndex(of: "-demo") { demo = i + 1 < args.count ? args[i + 1] : "" }
     isDemo = demo != nil
     let store = widgetStore()   // the App Group: the widgets read the same store

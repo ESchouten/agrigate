@@ -5,8 +5,8 @@ import ctypes, json, os, struct, sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 from farm_test import run  # noqa: builds the library and points the Python API at it
-from scraper_control.core import text
-from scraper_control.live import _lib, drivers
+from agrigate.core import text
+from agrigate.live import _lib, drivers
 
 T0 = 1_795_430_000_000   # ms
 
@@ -45,7 +45,7 @@ class Robot:
 
 
 def registration(on):
-    return struct.pack("<IH", 0xD157, 1 if on else 0) + b"scraper-control".ljust(22, b"\0")
+    return struct.pack("<IH", 0xD157, 1 if on else 0) + b"agrigate".ljust(22, b"\0")
 
 
 def test_listed():

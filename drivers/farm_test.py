@@ -10,10 +10,10 @@ try:
 except ImportError:
     m = types.ModuleType("bleak"); m.BleakClient = m.BleakScanner = object; sys.modules["bleak"] = m
 
-from scraper_control.build_core import LIBNAME, build
-os.environ.setdefault("SCRAPER_CORE_LIB", str(build(Path(tempfile.mkdtemp()) / LIBNAME)))
+from agrigate.build_core import LIBNAME, build
+os.environ.setdefault("AGRIGATE_CORE_LIB", str(build(Path(tempfile.mkdtemp()) / LIBNAME)))
 
-from scraper_control.farm import Farm, FarmError, drivers  # noqa: for the tests
+from agrigate.farm import Farm, FarmError, drivers  # noqa: for the tests
 
 
 class FakeFarm:

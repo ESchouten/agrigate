@@ -40,12 +40,12 @@ def server() -> FakeFarm:
 
 def read(farm, password="geheim"):
     with Farm("t4c", farm.address, "erik", password) as f:
-        return f.milking()["robots"]
+        return f.milk()["robots"]
 
 
 def test_driver_is_listed():
     d = next(d for d in drivers() if d["id"] == "t4c")
-    assert d["kinds"] == ["milking", "herd"] and d["link"] == {"kind": "http", "scheme": "http", "port": 6969}
+    assert d["kinds"] == ["milk", "cow"] and d["link"] == {"kind": "http", "scheme": "http", "port": 6969}
 
 
 def test_robots_alarms_and_figures():
@@ -86,10 +86,10 @@ def test_wrong_password():
 def test_one_login_for_many_reads_and_a_new_one_when_it_ran_out():
     farm = server()
     with Farm("t4c", farm.address, "erik", "geheim") as f:
-        f.milking(); f.milking()
+        f.milk(); f.milk()
         assert farm.count(LOGIN) == 1
         farm.token = "login-2"   # the server forgot the first
-        assert len(f.milking()["robots"]) == 2 and farm.count(LOGIN) == 2
+        assert len(f.milk()["robots"]) == 2 and farm.count(LOGIN) == 2
 
 
 def test_a_login_the_server_does_not_take_ends_the_read():
@@ -113,7 +113,7 @@ def test_a_login_the_server_does_not_take_ends_the_read():
 def test_no_server():
     try:
         with Farm("t4c", closed_address(), "erik", "geheim", timeout=2) as f:
-            f.milking()
+            f.milk()
     except FarmError as e:
         assert e.result == 1
     else:
@@ -124,14 +124,14 @@ def test_a_missing_detail_is_left_out():
     farm = server()
     farm.routes["GET /t4capi/astronaut/101/detail"] = (500, "boom")
     with Farm("t4c", farm.address, "erik", "geheim") as f:
-        one = f.milking()["robots"][0]
+        one = f.milk()["robots"][0]
         assert one["milkings"] is None and len(one["alarms"]) == 1 and "astronaut/101/detail: HTTP 500" in f.notes
 
 
 def test_a_recording_leaves_the_login_out():
     farm, recording = server(), []
     with Farm("t4c", farm.address, "erik", "geheim", recording=recording) as f:
-        f.milking()
+        f.milk()
     assert len(recording) == 6 and recording[1]["answer"]["data"][0]["name"] == "Robot 1"
     assert "login-1" not in str(recording) and "geheim" not in str(recording)
 

@@ -8,7 +8,7 @@ import Shared
 import UserNotifications
 import WidgetKit
 
-let appGroup = "group.nl.eschouten.scraper"
+let appGroup = "group.com.eschouten.agrigate.clean"
 
 /// The store the app and its widgets share (App Group); also sets the app's language.
 func widgetStore() -> DefaultsStore {
@@ -88,7 +88,7 @@ func notifyFailure(_ n: WidgetNotice) async {
   try? await center.add(UNNotificationRequest(identifier: "widget-failure", content: content, trigger: nil))
 }
 
-/// "Start route A with Scraper Control" in Siri and Shortcuts.
+/// "Start route A with Agrigate Clean" in Siri and Shortcuts.
 struct RouteShortcuts: AppShortcutsProvider {
   static var appShortcuts: [AppShortcut] {
     AppShortcut(

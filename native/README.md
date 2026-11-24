@@ -1,4 +1,4 @@
-# Scraper Control: native apps
+# Agrigate Clean: native apps
 
 The apps. One shared Kotlin module with all behaviour, and
 a native UI per platform that only draws what the shared module says:
@@ -10,7 +10,7 @@ a native UI per platform that only draws what the shared module says:
 | iOS | SwiftUI (`iosApp`) | Kable (CoreBluetooth) | cinterop (`libcore.a`) |
 | Web page | Compose for Web, wasm (`composeApp`) | none: the web API of the desktop app that serves it | none |
 
-The driver is chosen in `gradle.properties` (`scraper.driver`), its Kotlin side is listed in
+The driver is chosen in `gradle.properties` (`clean.driver`), its Kotlin side is listed in
 `shared/.../model/Registry.kt`.
 
 ```
@@ -82,8 +82,8 @@ delay=<ms per answer>  scan=<ms>  setup=done (skip onboarding)  ui=nl|en (app)
 routes=ABC  names=A:Voergang,B:Stal+2
 ```
 
-Desktop: `--demo "<words>"` or `SCRAPER_DEMO`. Android: `adb shell am start -n
-nl.eschouten.scraper/.MainActivity --es demo "setup=done"`. iOS: environment `SCRAPER_DEMO`
+Desktop: `--demo "<words>"` or `AGRIGATE_DEMO`. Android: `adb shell am start -n
+com.eschouten.agrigate.clean/.MainActivity --es demo "setup=done"`. iOS: environment `AGRIGATE_DEMO`
 or launch argument `-demo "<words>"`. The demo PIN is 4321.
 
 ## Widgets
@@ -92,7 +92,7 @@ or launch argument `-demo "<words>"`. The demo PIN is 4321.
 start the route with every safety rule, disconnect). Android: `RoutesWidget` (A-D) and
 `RouteTileWidget` (one route), tapped in the background. iOS 17+: the same two widgets in
 WidgetKit and `RouteIntent` for Siri and Shortcuts. The app and the widgets share the App
-Group `group.nl.eschouten.scraper`.
+Group `group.com.eschouten.agrigate.clean`.
 
 ## CI
 

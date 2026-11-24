@@ -5,7 +5,7 @@
 // while holding one (the app must let go). Checks the calls the page makes; a screen is printed
 // when a step fails.
 //   node web.mjs      (needs: npm i playwright && npx playwright install chromium; the app
-//                      started with SCRAPER_DEMO="setup=done api=on")
+//                      started with AGRIGATE_DEMO="setup=done api=on")
 import { chromium } from 'playwright'
 
 const base = 'http://localhost:8080'
