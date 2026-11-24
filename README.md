@@ -71,7 +71,8 @@ On Windows and macOS the app checks for a new version at start and once a day an
 it installs one; it only takes a release signed with the release key, like the buttons. An app
 that is still called Scraper Control does not update itself to Agrigate Clean: install Agrigate
 Clean once and remove Scraper Control (on Linux: `sudo apt install agrigate-clean && sudo apt
-remove scraper-control`). On Android and iOS it is a new app as well; add the robot again.
+remove scraper-control`, with the apt source above). On every device it is a new app: add the robot
+again.
 
 ### First connection
 
