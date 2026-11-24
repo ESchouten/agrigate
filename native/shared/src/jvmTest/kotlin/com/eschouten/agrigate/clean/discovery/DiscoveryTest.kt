@@ -21,12 +21,12 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
-private val stored = "DIS0018T4".encodeToByteArray()
+private val stored = """{"image":"444953303031385434"}"""   // what a session leaves to remember: the robot's image set, DIS0018T4
 
 private fun drive(args: List<String> = emptyList(), pin: String = "4321", job: suspend (Robot) -> Unit = {}): JsonObject =
   runBlocking {
     val link = SimulatorLink(args = args)
-    val robot = Robot(link, pin = pin, imageVersion = stored)
+    val robot = Robot(link, pin = pin, memory = stored)
     try {
       robot.connect()
       job(robot)
@@ -55,7 +55,7 @@ class DiscoveryTest {
   @Test fun routeCWithPlanningOnAnswersJaWithProgressSteps() = runBlocking {
     val steps = Collections.synchronizedList(mutableListOf<CoreStep>())
     val link = SimulatorLink(args = listOf("--planning", "on"))
-    val robot = Robot(link, pin = "4321", imageVersion = stored, onStep = { steps.add(it) })
+    val robot = Robot(link, pin = "4321", memory = stored, onStep = { steps.add(it) })
     robot.connect()
     robot.startRoute('C')
     robot.disconnect()
@@ -76,7 +76,10 @@ class DiscoveryTest {
     robot = Robot(SimulatorLink(), pin = "4321", onStep = { if (it == CoreStep.Syncing) percents.add(robot.status().syncPercent) })
     robot.connect()
     robot.disconnect()
-    assertEquals((0 until 52).map { it * 100 / 52 }, percents.toList())
+    // a step per image; the status is at least as new as its step
+    assertEquals(52, percents.size)
+    assertEquals(percents.sortedBy { it }, percents.toList())
+    assertEquals(51 * 100 / 52, percents.last())
   }
 
   @Test fun routeBWithPlanningOffAnswersNeeAndDoesNotToggle() {
@@ -109,7 +112,7 @@ class DiscoveryTest {
 
   @Test fun englishErrorText() = runBlocking {
     val link = SimulatorLink()
-    val robot = Robot(link, pin = "0000", imageVersion = stored, language = "en")
+    val robot = Robot(link, pin = "0000", memory = stored, language = "en")
     val e = assertFailsWith<PinRejected> { robot.connect() }
     assertTrue(e.message!!.isNotBlank())
     Unit
@@ -117,11 +120,11 @@ class DiscoveryTest {
 
   @Test fun newImageVersionIsReported() = runBlocking {
     val link = SimulatorLink()
-    val robot = Robot(link, pin = "4321", imageVersion = ByteArray(9))
+    val robot = Robot(link, pin = "4321")
     robot.connect()
     robot.disconnect()
     val rep = Json.parseToJsonElement(link.report()).jsonObject
     assertEquals(52, rep["images_sent"]!!.jsonPrimitive.int)
-    assertEquals("DIS0018T4", robot.newImageVersion!!.decodeToString())
+    assertEquals(stored, robot.memory)
   }
 }

@@ -1,8 +1,8 @@
 # Lely Discovery driver: protocol and behaviour
 
 The driver is `src/` (C++17). The M5Stack uses it directly, the apps (JNI and Kotlin/Native) and
-Python (ctypes) through the generic C API `core/clean_c.h`, which `src/clean_c.cpp`
-implements. Link: "ble-serial". Tested against the simulated robot (`tests/fake_robot.py`) with
+Python (ctypes) through the contract `core/clean_c.h` on a session, which `src/Discovery.cpp`
+serves. Links: "ble-serial", "bt-serial". Tested against the simulated robot (`tests/fake_robot.py`) with
 `tests/test_core.py` (the driver directly) and `tests/test_api.py` (through Python). Everything below
 was checked on a real Discovery (November 2026), unless stated otherwise.
 
@@ -22,7 +22,7 @@ was checked on a real Discovery (November 2026), unless stated otherwise.
 | – (M5) | `enterCharger()` | onto the charger, see below; `manualKey(Soft1 / Soft3)` = its side, `driveBegin()` = Start |
 | – | `readRoutes(out)` | what routes A–D consist of (only reads) |
 | (in `disconnect()`) | `finish()` | leave the robot as it was found: back to the home screen from a safe menu, schedule as at connect (unless `set_planning` changed it on purpose) |
-| (after every command) | `owedPlanning()` / `setOwedPlanning(v)` | if the link drops before `finish()` could run, the host keeps what the robot is still "owed" (schedule 1/0, -1 = nothing) and hands it to the next session; `connect()` then first puts the robot back. While the robot drives or shows another screen the value stays owed. Apps: per robot, at most 6 hours old; M5: in RTC memory (survives a restart, not a power cut), 6 hours |
+| (after every command) | `owedPlanning()` / `setOwedPlanning(v)` | if the link drops before `finish()` could run, the host keeps what the robot is still "owed" (schedule 1/0, -1 = nothing) and hands it to the next session; `connect()` then first puts the robot back. While the robot drives or shows another screen the value stays owed. Apps and Python: in what the driver has them keep per robot (`clean_memory`, with the image set's version), at most 6 hours old; M5: in RTC memory (survives a restart, not a power cut), 6 hours |
 | `await disconnect()` | `disconnect()` | |
 | `DiscoveryBusy` / `DiscoveryError` | `Result::Busy` / `Result::Unexpected` / … | errors |
 

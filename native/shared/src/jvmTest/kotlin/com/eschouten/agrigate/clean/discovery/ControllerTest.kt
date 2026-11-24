@@ -207,7 +207,7 @@ class ControllerTest {
     val store = MemoryStore()
     val c = controller(store = store)
     assertTrue(c.refresh().ok)
-    assertEquals("444953303031385434", Settings.load(store).robot.extra["imageVersion"])
+    assertEquals("""{"image":"444953303031385434"}""", Settings.load(store).robot.extra["memory"])
   }
 
   @Test fun holdKeepsTheLinkOpenUntilRelease() = runBlocking {

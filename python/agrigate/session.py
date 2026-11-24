@@ -27,9 +27,8 @@ import threading
 import time
 import urllib.parse
 
-from .core import lib, text
+from .core import LOGIN_REJECTED, OK, UNEXPECTED, UNREACHABLE, UNSUPPORTED, drivers, lib as _lib, text  # noqa: F401
 
-OK, UNREACHABLE, LOGIN_REJECTED, UNEXPECTED, UNSUPPORTED = range(5)
 SECRET = ("token", "password", "license")   # answer fields left out of a recording
 
 
@@ -42,30 +41,6 @@ class SessionError(Exception):
 
 def now_ms() -> int:
     return int(time.time() * 1000)
-
-
-def _lib():
-    L = lib()
-    if L.session_open.restype is not ctypes.c_void_p:
-        S, out = ctypes.c_void_p, [ctypes.c_char_p, ctypes.c_int32]
-        L.session_open.restype = S
-        L.session_open.argtypes = [ctypes.c_char_p] * 4
-        L.session_close.argtypes = L.session_stop.argtypes = L.session_result.argtypes = [S]
-        L.session_tick.argtypes = [S, ctypes.c_int64]
-        L.session_response.argtypes = [S, ctypes.c_int32, ctypes.c_char_p, ctypes.c_int32]
-        L.session_incoming.argtypes = [S, ctypes.c_char_p, ctypes.c_int32, ctypes.c_int64]
-        L.session_drivers_json.argtypes = out
-        L.identity_events_json.argtypes = [S, ctypes.c_int64] + out
-        for name in ("session_request_json", "session_last_error", "session_outgoing", "milk_json", "cow_json", "identity_json"):
-            getattr(L, name).argtypes = [S] + out
-        for name in ("milk_read", "cow_read", "identity_read"):
-            getattr(L, name).argtypes = [S]
-    return L
-
-
-def drivers() -> list[dict]:
-    """The drivers in this build: [{"id", "name", "contracts", "link"}, ...]."""
-    return json.loads(text(_lib().session_drivers_json))
 
 
 def _hide(value):
@@ -86,7 +61,9 @@ class Session:
         info = next((d for d in drivers() if d["id"] == driver), None)
         if not info:
             raise ValueError(f"no driver '{driver}': one of " + ", ".join(d["id"] for d in drivers()))
-        self.driver, self.address, self.contracts, self.link = driver, address, info["contracts"], info["link"]
+        self.driver, self.address, self.contracts, self.link = driver, address, info["contracts"], info["links"][0]
+        if self.link["kind"] not in ("http", "udp"):
+            raise ValueError(f"'{driver}' is reached over {self.link['kind']}: see agrigate.Robot")
         self.timeout, self.recording, self.on_event = timeout, recording, on_event
         self.notes = ""   # what the last read had to leave out
         self._s = _lib().session_open(driver.encode(), address.encode(), user.encode(), password.encode())

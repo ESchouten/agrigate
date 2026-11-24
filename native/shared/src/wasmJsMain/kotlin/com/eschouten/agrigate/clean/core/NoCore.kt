@@ -2,12 +2,15 @@
 // robot goes through that computer's web API (api/ApiSession). Nothing on the page calls these.
 package com.eschouten.agrigate.clean.core
 
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+
 private fun onTheServer(): Nothing = error("the robot driver runs on the computer that serves the page, not in the browser")
 
-internal actual fun newCoreNative(pin: String, imageVersion: ByteArray?, language: String, callbacks: CoreCallbacks): CoreNative = onTheServer()
+internal actual fun openCoreNative(driver: String, pin: String, memory: String, language: String): CoreNative? = onTheServer()
 
-internal actual fun nativeResultText(code: Int, language: String): String = onTheServer()
+internal actual fun nativeDriversJson(): String = "[]"
 
 internal actual fun nativeEncryptPin(pin: String): ByteArray = onTheServer()
 
-internal actual fun nativeLinksJson(): String = "[]"
+internal actual val waitingDispatcher: CoroutineDispatcher get() = Dispatchers.Default

@@ -20,25 +20,32 @@ the same C++ runs on a phone, a computer and a microcontroller.
 
 | Domain | Contract | In `core/` | Drivers |
 |---|---|---|---|
-| Clean | Manure robots: routes, schedule, manual driving, status | `clean_c.h` | `discovery` |
+| Clean | Manure robots: routes, schedule, status, and each make's own panel | `clean_c.h` | `discovery` |
 | Milk | Milking robots: state, alarms, figures | `milk_c.h` | `t4c`, `fullsense` |
 | Cow | The herd | `cow_c.h` | `t4c` |
 | Cow | Identity: which animal is where | `identity_c.h` | `astronaut` |
 
-Milk, Cow and identity are read on a **session** (`session_c.h`): one source, one driver, one
-link. `session_c.h` is the host's side (how to keep the session going, per link); the contracts
-on top never mention it. Links there: `http` (a request and its answer) and `udp` (datagrams, for
-a source that tells by itself). Every driver is in every build (`core/session/Drivers.cpp`);
-used by Python (`agrigate.session`, `farm.py`, `farm_server.py`).
+Every contract works on a **session** (`session_c.h`): one source, one driver, one link.
+`session_c.h` is the host's side (how to keep the session going, per link); the contracts on top
+never mention it. The links: `http` (a request and its answer), `udp` (datagrams, for a source
+that tells by itself) and `ble-serial` / `bt-serial` (bytes both ways over Bluetooth, for a
+robot that is spoken with key by key). Every driver is in every build
+(`core/session/Drivers.cpp`): the apps (`native/shared/.../core`), Python (`agrigate`,
+`agrigate.session`, `farm.py`, `farm_server.py`). The buttons use the Clean driver's C++
+directly, on a microcontroller's one thread.
 
-Clean still has its own session inside `clean_c.h`, on the links `ble-serial` and `bt-serial`
-(bytes both ways), with one driver per build; used by the buttons, the apps and Python.
+Milk, Cow and identity are read. Clean is commands: a call starts one and the session carries
+it out. What every manure robot has is in the contract (routes, the schedule, the safety stop
+and its question, the status); what only one make has is the driver's own and goes by name:
+its panel's keys (`clean_input`), its steps while a command runs, and the `own` part of the
+status (its display, its manual control). `clean_memory` is what the driver wants kept with a
+robot between sessions; a host stores it without reading it.
 
 ## A new driver on a session
 
 One file, `drivers/<name>/src/<Name>.cpp`, with an `agrigate::Driver` (`core/session/Session.h`):
 
-1. Its link: `{"http", "http", <port>}` or `{"udp", nullptr, <port>}`.
+1. Its links, the preferred first: `{{"http", "http", <port>}}` or `{{"udp", nullptr, <port>}}`.
 2. Per contract the source serves, one function that brings that contract's data in the session
    up to date (`Milk.h`, `Cow.h`, `Identity.h`). Leave a contract the source does not know empty.
    - Over `http`: `login` asks for a login and puts what the server wants to see again in the
@@ -57,6 +64,11 @@ follows identity.
 
 These drivers only read. What a `udp` driver sends is no more than the source needs to keep
 telling, never a command.
+
+A manure robot's driver serves `clean`: it makes the session's robot (`core/session/Clean.h`),
+which takes the commands and the link's bytes. `drivers/discovery/src/Discovery.cpp` is the
+example: a robot spoken with key by key, so its conversation runs on a thread of its own behind
+the session.
 
 Its tests go in `drivers/<name>/tests/test_*.py`: a server on the test computer that answers as
 the real one does (`drivers/farm_test.py`), or datagrams fed through the C API
@@ -81,4 +93,5 @@ distance is decided per contract and per command, in the driver.
 ## A new link
 
 A link is added once in `session_c.h` (what the host moves) and once in each host
-(`python/agrigate/session.py`). Drivers and contracts on other links do not change.
+(`python/agrigate/session.py`, the apps' `link/`). Drivers and contracts on other links do not
+change.

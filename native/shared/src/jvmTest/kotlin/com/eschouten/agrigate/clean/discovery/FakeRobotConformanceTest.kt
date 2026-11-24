@@ -42,13 +42,13 @@ private suspend fun replay(link: RobotLink, frames: List<ByteArray>, notificatio
 }
 
 class FakeRobotConformanceTest {
-  private val stored = "DIS0018T4".encodeToByteArray()
+  private val stored = """{"image":"444953303031385434"}"""   // what a session leaves to remember: the robot's image set, DIS0018T4
 
   private fun check(planning: Boolean, mode: String, lang: String = "nl", session: suspend (Robot) -> Unit) = runBlocking {
     val args = listOf("--planning", if (planning) "on" else "off", "--mode", mode, "--lang", lang)
     // 1. what the core writes, against the Python robot
     val rec = RecordingLink(SimulatorLink(args = args))
-    val robot = Robot(rec, pin = "4321", imageVersion = stored)
+    val robot = Robot(rec, pin = "4321", memory = stored)
     try {
       robot.connect()
       session(robot)

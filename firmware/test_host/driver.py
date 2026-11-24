@@ -21,5 +21,5 @@ def host_flags():
 
 
 def core_sources():
-    """The driver's robot API (without its C interface, which the buttons do not use)."""
-    return sorted(p for p in glob.glob(os.path.join(driver_dir(), "src", "*.cpp")) if not p.endswith("clean_c.cpp"))
+    """The driver's robot API (without its session for the apps, which the buttons do not use)."""
+    return sorted(p for p in glob.glob(os.path.join(driver_dir(), "src", "*.cpp")) if not p.endswith("Discovery.cpp"))

@@ -7,7 +7,6 @@ import kotlinx.coroutines.Deferred
 import com.eschouten.agrigate.clean.core.*
 import com.eschouten.agrigate.clean.link.*
 
-import kotlin.time.Clock
 import kotlinx.coroutines.delay
 import com.eschouten.agrigate.clean.app.RobotProfile
 import com.eschouten.agrigate.clean.model.Capability
@@ -107,8 +106,8 @@ object Discovery : CleanModel() {
   override fun uninstallDemo() = Demo.uninstall()
 }
 
-private const val OWED = "owedPlanning"
-private const val OWED_FOR_MS = 6 * 60 * 60 * 1000L // 6 hours
+private const val MEMORY = "memory"
+private val MEMORY_BEFORE = setOf("imageVersion", "owedPlanning")   // what versions up to 1.6.223 kept instead
 
 /** One connection to one Discovery, through the C++ core. */
 class DiscoverySession(
@@ -141,18 +140,11 @@ class DiscoverySession(
     val id = profile.robotId ?: throw CleanException(CleanFault.NotFound, tr.noRobotNearby)
     val link = sim?.link?.invoke(id) ?: openLink(profile.link, id, profile.robotName.ifEmpty { null })
     val r = Robot(
-      link, pin = profile.pin, imageVersion = imageVersion(), language = tr.code, onStep = { onStep(RunStep(it.name, if (it == CoreStep.Syncing) robot?.status()?.syncPercent ?: 0 else null)) },
-      owedPlanning = owedPlanning(), onOwed = ::keepOwed,
+      link, pin = profile.pin, memory = memory(), language = tr.code, onStep = { onStep(RunStep(it.name, if (it == CoreStep.Syncing) robot?.status()?.syncPercent ?: 0 else null)) },
+      onMemory = ::keep,
     )
     robot = r
-    try {
-      guard { r.connect() }
-    } finally {
-      r.newImageVersion?.let { v ->
-        profile = profile.copy(extra = profile.extra + ("imageVersion" to v.toHexString()))
-        onChanged(profile)
-      }
-    }
+    guard { r.connect() }
   }
 
   override suspend fun disconnect() {
@@ -191,23 +183,13 @@ class DiscoverySession(
     guard { if (until == null) robot!!.press(key) else robot!!.hold(key, until) }
   }
 
-  /** Planning owed by a session whose link dropped, as "1@<epoch ms>"; too old = forgotten
-   *  (someone may have changed the robot on purpose since). */
-  private fun owedPlanning(now: Long = Clock.System.now().toEpochMilliseconds()): Int {
-    val (v, at) = (profile.extra[OWED] ?: return -1).split('@').let { it[0].toIntOrNull() to it.getOrNull(1)?.toLongOrNull() }
-    return if (v != null && at != null && now - at in 0..OWED_FOR_MS) v else -1
-  }
+  /** What the driver keeps with this robot (the core's clean_memory). */
+  private fun memory(): String =
+    profile.extra[MEMORY] ?: profile.extra["imageVersion"]?.let { """{"image":"$it"}""" } ?: ""
 
-  private fun keepOwed(v: Int) {
-    val extra = if (v < 0) profile.extra - OWED else profile.extra + (OWED to "$v@${Clock.System.now().toEpochMilliseconds()}")
-    if (extra == profile.extra) return
-    profile = profile.copy(extra = extra)
+  private fun keep(memory: String) {
+    profile = profile.copy(extra = profile.extra - MEMORY_BEFORE + (MEMORY to memory))
     onChanged(profile)
-  }
-
-  private fun imageVersion(): ByteArray? {
-    val h = profile.extra["imageVersion"] ?: return null
-    return runCatching { h.hexToByteArray() }.getOrNull()?.takeIf { it.size == 9 }
   }
 
   /** Core errors -> generic faults. */

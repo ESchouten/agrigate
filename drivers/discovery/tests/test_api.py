@@ -115,6 +115,84 @@ def test_image_version_is_remembered():
 
 
 
+def session(robot, memory=""):
+    """A session of the C API itself (core/clean_c.h) with a simulated robot on its link."""
+    from agrigate import core
+    def write(frame):
+        try:
+            robot.write(frame).send(None)
+        except StopIteration:
+            pass
+    s = core.CoreSession(write, "4321", memory)
+    robot.on = s.feed
+    return s
+
+
+def steps(s):
+    from agrigate import core
+    out = []
+    while step := core.text(core.lib().clean_next_step, s._s):
+        out.append(step)
+    return out
+
+
+def test_the_driver_its_links_and_its_steps():
+    from agrigate import core
+    d = next(d for d in core.drivers() if d["id"] == "discovery")
+    assert d["contracts"] == ["clean"] and [l["kind"] for l in d["links"]] == ["ble-serial", "bt-serial"]
+    assert d["links"][0]["rx"] and d["links"][1]["addressPrefix"] == "00:12:ff"
+    s = session(FakeRobot(planning=True), '{"image":"444953303031385434"}')
+    try:
+        assert s.connect() == core.OK and steps(s) == ["Linked", "Granted", "ScreenReady"]
+        assert s.start_route("C") == core.OK
+        assert steps(s) == ["PlanningOff", "Menu", "Selected", "StartPressed", "Answered"]
+        st = s.status()
+        assert st["driving"] and st["planning"] is None and "own" in st and st["progress"] is None
+        assert s.start_route("A") == core.BUSY and "busy" in s.last_error()
+        assert core.lib().clean_input(s._s, b"Nothing", 0) == core.UNEXPECTED   # not one of this robot's keys
+    finally:
+        s.close()
+
+
+def test_what_the_robot_is_owed_is_kept_and_paid_back():
+    import json, time
+    from agrigate import core
+    robot = FakeRobot(planning=True)
+    s = session(robot, '{"image":"444953303031385434"}')
+    assert s.connect() == core.OK and s.press("StartStop") == core.OK   # the schedule off by hand on the panel
+    owed = json.loads(s.memory())
+    assert owed["owedPlanning"] is True and abs(owed["owedAt"] - time.time() * 1000) < 60_000 and not robot.planning
+    s.link_down(); s.close()   # the link drops before the session could put it back
+    for memory, paid in ((json.dumps({**owed, "owedAt": owed["owedAt"] - 7 * 3600 * 1000}), False), (json.dumps(owed), True)):
+        s = session(robot, memory)   # 7 hours later it is forgotten: someone may have meant it
+        assert s.connect() == core.OK and robot.planning is paid
+        assert json.loads(s.memory()) == {"image": "444953303031385434"}
+        s.link_down(); s.close()
+
+
+def test_a_held_key_and_a_cancelled_route():
+    import threading, time
+    from agrigate import core
+    robot = FakeRobot(mode="manual", planning=False)
+    s = session(robot)
+    try:
+        assert s.connect() == core.OK
+        threading.Timer(0.5, lambda: core.lib().clean_release(s._s)).start()
+        t = time.monotonic()
+        assert s._do(core.lib().clean_input(s._s, b"StartStop", 1)) == core.OK and 0.4 < time.monotonic() - t < 3
+    finally:
+        s.close()
+    robot = FakeRobot(planning=True, slow=True)
+    s = session(robot, '{"image":"444953303031385434"}')
+    try:
+        assert s.connect() == core.OK
+        threading.Timer(0.3, s.cancel).start()
+        assert s.start_route("B") == core.CANCELLED and "cancel" in s.last_error()
+        assert robot.mode == "home" and robot.planning is True
+    finally:
+        s.close()
+
+
 def test_bluetooth_that_fails_twice_is_tried_again():
     tries = []
     def factory(address, on_data):

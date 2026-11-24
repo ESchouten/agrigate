@@ -214,7 +214,7 @@ void readCow(Session& s) {
 }  // namespace
 
 extern const Driver t4c = [] {
-  Driver d{"t4c", "T4C", {"http", "http", 6969}};
+  Driver d{"t4c", "T4C", {{"http", "http", 6969}}};
   d.login = login;
   d.milk = readMilk;
   d.cow = readCow;

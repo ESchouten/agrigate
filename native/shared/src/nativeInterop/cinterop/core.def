@@ -1,4 +1,4 @@
-headers = clean_c.h
+headers = session_c.h clean_c.h discovery_c.h
 package = com.eschouten.agrigate.clean.core.c
 staticLibraries = libcore.a
 linkerOpts = -lc++

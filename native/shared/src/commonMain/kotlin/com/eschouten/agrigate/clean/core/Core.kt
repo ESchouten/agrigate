@@ -1,31 +1,41 @@
-// The robot driver's C API (core/clean_c.h), seen from Kotlin. All robot logic lives in the
-// driver; this file only turns its callbacks into suspend functions.
+// A manure robot's session in the core (core/session_c.h, core/clean_c.h), seen from Kotlin. All
+// robot logic lives in the driver; this file moves the session's bytes and turns its commands
+// into suspend functions.
 package com.eschouten.agrigate.clean.core
 
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.concurrent.Volatile
 
-/** Result codes of the core (clean_c.h). */
-enum class CoreResult { Ok, ConnectFailed, PinRejected, NoScreen, Busy, Unexpected, StartedNoAnswer, Cancelled, InProgress;
-
-  val code: Int get() = if (this == InProgress) 100 else ordinal
+/** How a command ended (session_c.h, clean_c.h). */
+enum class CoreResult(val code: Int) {
+  Ok(0), ConnectFailed(1), PinRejected(2), Unexpected(3), Busy(10), StartedNoAnswer(11), Cancelled(12), InProgress(100);
 
   companion object {
-    fun of(code: Int): CoreResult = if (code == 100) InProgress else entries.getOrElse(code) { Unexpected }
+    fun of(code: Int): CoreResult = entries.firstOrNull { it.code == code } ?: Unexpected
   }
 }
 
-/** Progress while a command runs (clean_c.h CLEAN_STEP_*). */
+/** Progress while a command runs: the Discovery driver's steps, by its names for them. */
 enum class CoreStep {
   Linked, // Bluetooth link open
   Granted, // PIN accepted
@@ -40,10 +50,8 @@ enum class CoreStep {
   Syncing, // the robot sends its image set (first connection), again per part: CoreStatus.syncPercent
 }
 
-/** Panel keys (docs/PROTOCOL.md). */
-enum class RobotKey(val code: Int) {
-  Back(1), Soft2(2), Soft1(4), Up(8), Prog(16), Down(32), Soft3(64), Enter(128), StartStop(256)
-}
+/** The Discovery's panel keys: its driver's inputs, by its names for them. */
+enum class RobotKey { Back, Soft2, Soft1, Up, Prog, Down, Soft3, Enter, StartStop }
 
 /** The manual control screen's motors and direction; null = not known. */
 data class ManualState(val left: Boolean?, val right: Boolean?, val forward: Boolean?)
@@ -81,103 +89,117 @@ data class CoreStatus(
   companion object {
     fun fromJson(json: String): CoreStatus {
       val d = runCatching { Json.parseToJsonElement(json).jsonObject }.getOrNull() ?: return CoreStatus()
-      fun s(k: String) = d[k]?.jsonPrimitive?.content ?: ""
-      fun i(k: String) = d[k]?.jsonPrimitive?.intOrNull
-      fun b(k: String) = d[k]?.jsonPrimitive?.booleanOrNull
+      val own = d["own"] as? JsonObject ?: JsonObject(emptyMap())
+      fun s(k: String, o: JsonObject = d) = (o[k] as? JsonPrimitive)?.content ?: ""
+      fun i(k: String) = (d[k] as? JsonPrimitive)?.intOrNull
+      fun b(k: String) = (d[k] as? JsonPrimitive)?.booleanOrNull
       return CoreStatus(
-        planning = when (i("planning")) { 1 -> true; 0 -> false; else -> null },
-        nextRide = s("nextRide"), route = s("route"), action = s("action"),
-        batteryMv = i("batteryMv")?.takeIf { it >= 0 },
-        busy = b("busy") ?: true, driving = b("driving") ?: false, stopQuestion = b("stopQuestion") ?: false,
-        screen = s("screen"), highlighted = s("highlighted"), language = s("language"),
-        syncPercent = i("sync")?.takeIf { it >= 0 },
+        planning = b("planning"),
+        nextRide = s("nextRun"), route = s("route"), action = s("activity"),
+        batteryMv = i("batteryMv"),
+        busy = b("busy") ?: true, driving = b("driving") ?: false, stopQuestion = b("finishQuestion") ?: false,
+        screen = s("screen", own), highlighted = s("highlighted", own), language = s("language", own),
+        syncPercent = i("progress"),
         cancellable = b("cancellable") ?: false,
-        manual = (d["manual"] as? JsonObject)?.let { m ->
+        manual = (own["manual"] as? JsonObject)?.let { m ->
           fun f(k: String) = when (m[k]?.jsonPrimitive?.intOrNull) { 1 -> true; 0 -> false; else -> null }
           ManualState(f("left"), f("right"), f("forward"))
         },
-        charger = (d["charger"] as? JsonObject)?.let { c ->
-          fun s(k: String) = c[k]?.jsonPrimitive?.content ?: ""
-          ChargerState(c["left"]?.jsonPrimitive?.intOrNull == 1, c["right"]?.jsonPrimitive?.intOrNull == 1, s("volt"), s("amp"))
+        charger = (own["charger"] as? JsonObject)?.let { c ->
+          ChargerState(c["left"]?.jsonPrimitive?.intOrNull == 1, c["right"]?.jsonPrimitive?.intOrNull == 1, s("volt", c), s("amp", c))
         },
       )
     }
   }
 }
 
-/** Callbacks from the core's own thread. They must not block. */
-internal interface CoreCallbacks {
-  fun onWrite(frame: ByteArray)
-  fun onDone(command: Int, result: Int)
-  fun onProgress(step: Int)
-}
-
-/** One clean_session, per platform: JNI (Android, desktop) or cinterop (iOS). */
+/** One session in the core, per platform: JNI (Android, desktop) or cinterop (iOS). Every call
+ *  may come from any thread, but [wait] and [outgoing]: those are the one loop's that moves the
+ *  bytes. */
 internal interface CoreNative {
-  fun feed(data: ByteArray)
+  fun incoming(data: ByteArray)
+  /** The next bytes to write to the robot, null when there are none. */
+  fun outgoing(): ByteArray?
   fun linkDown()
+  /** Blocks until the session has something new (bytes, a result, a step), at most [ms]. */
+  fun wait(ms: Int)
+  /** The running command's result, [CoreResult.InProgress] until it is done. */
+  fun result(): Int
   fun connect(): Int
   fun startRoute(letter: Char, dryRun: Boolean): Int
   fun setPlanning(on: Boolean): Int
   fun stopRoute(): Int
   fun answerStop(finish: Boolean): Int
   fun readRoutes(): Int
-  fun routesJson(): String
-  fun press(key: Int): Int
-  fun hold(key: Int): Int
-  fun unhold()
-  fun cancel()
   fun finish(): Int
-  fun setOwedPlanning(owed: Int)
-  fun owedPlanning(): Int
+  fun input(name: String, hold: Boolean): Int
+  fun release()
+  fun cancel()
   fun statusJson(): String
+  fun routesJson(): String
+  /** The next step the running command took, "" when there is none. */
+  fun nextStep(): String
+  fun memory(): String
   fun lastError(): String
-  /** 9 bytes of image version, then 1 if the robot sent a new one. */
-  fun imageVersion(): ByteArray
-  fun free()
+  fun close()
 }
 
-internal expect fun newCoreNative(pin: String, imageVersion: ByteArray?, language: String, callbacks: CoreCallbacks): CoreNative
+/** A session with [driver] (session_open); null for a driver that is not in this build. */
+internal expect fun openCoreNative(driver: String, pin: String, memory: String, language: String): CoreNative?
 
-internal expect fun nativeResultText(code: Int, language: String): String
+/** The drivers in this build (session_drivers_json). */
+internal expect fun nativeDriversJson(): String
 
-/** The PIN as the core sends it (for the fake robots in tests). */
+/** The PIN as the Discovery driver sends it (for the fake robots in tests). */
 internal expect fun nativeEncryptPin(pin: String): ByteArray
 
-/** How the driver's robots are reached (clean_links_json): a JSON array, preferred first. */
-internal expect fun nativeLinksJson(): String
+/** Where a coroutine may block in [CoreNative.wait]. */
+internal expect val waitingDispatcher: CoroutineDispatcher
 
-/** The result in words, "nl" or "en". */
-internal fun coreResultText(result: CoreResult, language: String): String = nativeResultText(result.code, language)
+/** The manure robot driver in this build: {"id", "links": how its robots are reached, ...}. */
+internal val cleanDriver: JsonObject? by lazy {
+  Json.parseToJsonElement(nativeDriversJson()).jsonArray.map { it.jsonObject }
+    .firstOrNull { d -> d["contracts"]?.jsonArray.orEmpty().any { it.jsonPrimitive.content == "clean" } }
+}
 
-/** One connection's worth of robot logic in the core. Commands run one at a time. */
+/** One connection's worth of robot logic in the core. Commands run one at a time.
+ *  [memory]: what [memory] gave last time for this robot. */
 class CoreSession(
-  onWrite: (ByteArray) -> Unit,
+  private val onWrite: (ByteArray) -> Unit,
   pin: String? = null,
-  imageVersion: ByteArray? = null,
-  onStep: ((CoreStep) -> Unit)? = null,
+  memory: String = "",
+  private val onStep: ((CoreStep) -> Unit)? = null,
   language: String = "nl",
 ) {
   @Volatile private var pending: CompletableDeferred<CoreResult>? = null
-  @Volatile private var native: CoreNative? = null
+  @Volatile private var native: CoreNative? =
+    openCoreNative(cleanDriver?.get("id")?.jsonPrimitive?.content ?: "", pin ?: "", memory, language)
+  private val starting = Mutex()
+  private val pump: Job? = native?.let { n -> CoroutineScope(waitingDispatcher).launch { move(n) } }
 
-  init {
-    native = newCoreNative(pin ?: "", imageVersion?.takeIf { it.size == 9 }, language, object : CoreCallbacks {
-      override fun onWrite(frame: ByteArray) = onWrite(frame)
-      override fun onDone(command: Int, result: Int) {
-        val p = pending
-        pending = null
-        p?.complete(CoreResult.of(result))
+  /** The session's exchange (session_c.h): its bytes to the robot, its steps and results to
+   *  whoever waits for them. A command's result is read before its last bytes are taken, so
+   *  whoever gets the result knows those bytes went out through [onWrite]. */
+  private suspend fun move(n: CoreNative) {
+    while (currentCoroutineContext().isActive) {
+      n.wait(250)
+      val (waiting, result) = starting.withLock { pending to n.result() }
+      while (true) onWrite(n.outgoing() ?: break)
+      while (true) {
+        val step = n.nextStep()
+        if (step.isEmpty()) break
+        CoreStep.entries.firstOrNull { it.name == step }?.let { onStep?.invoke(it) }
       }
-      override fun onProgress(step: Int) {
-        if (onStep != null && step in 1..CoreStep.entries.size) onStep(CoreStep.entries[step - 1])
+      if (waiting != null && result != CoreResult.InProgress.code) {
+        starting.withLock { if (pending === waiting) pending = null }
+        waiting.complete(CoreResult.of(result))
       }
-    })
+    }
   }
 
   /** Bytes from the robot (TX notifications). */
   fun feed(data: ByteArray) {
-    if (data.isNotEmpty()) native?.feed(data)
+    if (data.isNotEmpty()) native?.incoming(data)
   }
 
   fun linkDown() { native?.linkDown() }
@@ -194,18 +216,18 @@ class CoreSession(
   fun routes(): Map<String, String> = native?.let { n ->
     runCatching { Json.parseToJsonElement(n.routesJson()).jsonObject.mapValues { it.value.jsonPrimitive.content } }.getOrNull()
   } ?: emptyMap()
-  suspend fun press(key: Int) = command { it.press(key) }
+  suspend fun press(key: RobotKey) = command { it.input(key.name, false) }
 
   /** Holds [key] down until [up] completes, this is cancelled or the link drops; returns when the
    *  key is up again. Released only after the hold reached the core, so a quick tap cannot slip
    *  in before it and leave the key held. */
-  suspend fun hold(key: Int, up: Deferred<*>) = command(whileRunning = {
+  suspend fun hold(key: RobotKey, up: Deferred<*>) = command(whileRunning = {
     try {
       up.await()
     } finally {
-      native?.unhold()
+      native?.release()
     }
-  }) { it.hold(key) }
+  }) { it.input(key.name, true) }
 
   suspend fun finish() = command { it.finish() }
 
@@ -213,27 +235,23 @@ class CoreSession(
    *  [CoreResult.Cancelled], the robot back as it was. Any thread; does not wait. */
   fun cancel() { native?.cancel() }
 
-  /** Planning owed after a dropped link: 1 / 0, -1 = none (see clean_c.h). Hand a remembered
-   *  value to the next session before [connect]; read it after each command and keep it. */
-  var owedPlanning: Int
-    get() = native?.owedPlanning() ?: -1
-    set(v) { native?.setOwedPlanning(v) }
+  /** What the driver wants kept for this robot until the next session (clean_c.h): read it
+   *  after each command and hand it to the next session. */
+  fun memory(): String = native?.memory() ?: ""
 
   /** Starts a command and waits for it; [whileRunning] runs once it reached the core and is
    *  cancelled when the command is done. */
   private suspend fun command(whileRunning: (suspend () -> Unit)? = null, start: (CoreNative) -> Int): CoreResult {
     val n = native ?: return CoreResult.ConnectFailed
-    if (pending != null) return CoreResult.InProgress
     val d = CompletableDeferred<CoreResult>()
-    pending = d
-    val r = start(n)
-    if (r != 0) {
-      pending = null
-      return CoreResult.of(r)
+    val started = starting.withLock {
+      if (pending != null) return CoreResult.InProgress
+      start(n).also { if (it == 0) pending = d }
     }
-    // The core completes [d] on its own thread. Resume on Default, never on that thread: a
+    if (started != 0) return CoreResult.of(started)
+    // [d] is completed where the session's bytes are moved. Resume on Default, never there: a
     // caller without a dispatcher (Swift, a UI test) would otherwise run on and could close
-    // the session from the core's thread (it joins itself and aborts).
+    // the session from the loop it then waits for.
     return withContext(Dispatchers.Default) {
       val w = whileRunning?.let { launch { it() } }
       try {
@@ -245,19 +263,17 @@ class CoreSession(
   }
 
   fun status(): CoreStatus = native?.let { CoreStatus.fromJson(it.statusJson()) } ?: CoreStatus()
+
+  /** What went wrong with the last command, in the session's language. */
   fun lastError(): String = native?.lastError() ?: ""
 
-  /** The 9-byte image version, and whether the robot sent a new one this time. */
-  fun imageVersion(): Pair<ByteArray, Boolean> {
-    val v = native?.imageVersion() ?: return ByteArray(9) to false
-    return v.copyOf(9) to (v[9].toInt() == 1)
-  }
-
-  /** Stops the core's thread (waits for a running command). Safe to call twice. */
-  fun close() {
+  /** Ends the session (waits for a running command). Safe to call twice. */
+  suspend fun close() {
     val n = native ?: return
     native = null
-    n.free()
+    n.linkDown()   // also wakes the loop
+    pump?.cancelAndJoin()
+    n.close()
     pending?.complete(CoreResult.ConnectFailed)
     pending = null
   }

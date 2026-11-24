@@ -1,12 +1,12 @@
 /* A session with one source on the farm: the farm's management server, a robot, a feeding
- * station. What a source knows is read through the contracts on top of this header (milk_c.h,
- * cow_c.h, identity_c.h): the same calls and the same JSON whatever the source is and however
- * it is reached. Manure robots are reached directly: clean_c.h.
+ * station. What a source knows and does goes through the contracts on top of this header
+ * (milk_c.h, cow_c.h, identity_c.h, clean_c.h): the same calls and the same JSON whatever the
+ * source is and however it is reached.
  *
  * This header is the other side: how a host keeps a session going. The driver (drivers/<name>/)
- * decides what to say and understands the answers; moving the bytes is the host's job, as
- * Bluetooth is in clean_c.h. So the same driver runs in the apps, in Python and on a
- * microcontroller. No threads and no callbacks: one call at a time per session.
+ * decides what to say and understands the answers; moving the bytes is the host's job. So the
+ * same driver runs in the apps, in Python and on a microcontroller. No callbacks, and one call
+ * at a time per session (but for a serial link, below).
  *
  *   s = session_open("<driver>", "192.168.1.10", user, password)
  *   session_tick(s, now_ms)             the time, before every read
@@ -30,6 +30,16 @@
  *           A read then asks nothing: it is done at once. Before closing: session_stop(s) and
  *           send what session_outgoing gives. What a driver sends is no more than the source
  *           needs to keep telling (a registration), never a command.
+ *   "ble-serial", "bt-serial"   a stream of bytes both ways over Bluetooth, to a robot that is
+ *           spoken with key by key. The host opens the link (the link's details, below) and then
+ *           writes what session_outgoing gives, each as one write, and hands in what arrives:
+ *             all the time:           session_wait(s, 250)
+ *                                     while ((n = session_outgoing(s, buf, size)) > 0) write buf[0..n)
+ *             on bytes from the robot:  session_incoming(s, data, len, now_ms)
+ *             the link dropped:       session_link_down(s)
+ *           Such a session keeps its own time on a thread of its own, so these calls and a
+ *           contract's may come from different threads, and session_wait is how a host waits
+ *           for it without asking again and again.
  * now_ms: milliseconds since 1970-01-01 UTC; the times in the JSON are the same. */
 #ifndef SESSION_C_H
 #define SESSION_C_H
@@ -59,9 +69,16 @@ enum {
 };
 
 /* The drivers in this build: a JSON array of
- *   {"id", "name" (what the source is), "contracts": ["milk", "cow", "identity"],
- *    "link": {"kind": "http", "scheme": "http", "port": 80} or {"kind": "udp", "port": 6000}}
- * scheme and port are the defaults for an address without them. Copies into buf (NUL-terminated,
+ *   {"id", "name" (what the source is), "contracts": ["milk", "cow", "identity", "clean"],
+ *    "links": [...]}   how it is reached, the preferred first (the messages are the same over each):
+ *      {"kind": "http", "scheme": "http", "port": 80} or {"kind": "udp", "port": 6000}:
+ *        scheme and port are the defaults for an address without them
+ *      {"kind": "ble-serial", "service", "rx", "tx" (UUIDs), "addressPrefix"}: write to rx
+ *        without response, notifications from tx; the robots' addresses start with
+ *        addressPrefix (lower case, "" = any)
+ *      {"kind": "bt-serial", "service" (the RFCOMM service's UUID), "addressPrefix"}: classic
+ *        Bluetooth
+ * A host implements each kind once and uses the kinds it can. Copies into buf (NUL-terminated,
  * cut to size) and returns the full length, as every *_json call does. */
 SESSION_API int32_t session_drivers_json(char* buf, int32_t size);
 
@@ -79,17 +96,23 @@ SESSION_API int32_t session_request_json(session* s, char* buf, int32_t size);
 /* The answer to that request. */
 SESSION_API void session_response(session* s, int32_t status, const char* body, int32_t len);
 
-/* "udp": the next datagram to send to the source: its length, 0 when there is none. It is taken
- * off the queue once it fits in buf. */
+/* "udp", serial: the next datagram (or bytes) to send to the source: its length, 0 when there is
+ * none. It is taken off the queue once it fits in buf. */
 SESSION_API int32_t session_outgoing(session* s, uint8_t* buf, int32_t size);
-/* A datagram that came from the source's address. */
+/* A datagram that came from the source's address; bytes that came over a serial link. */
 SESSION_API void session_incoming(session* s, const uint8_t* data, int32_t len, int64_t now_ms);
+/* Serial: the link dropped. What runs ends soon; open a new session on a new link. */
+SESSION_API void session_link_down(session* s);
+/* Serial: returns when the session has something new for the host since the last wait (bytes
+ * to write, a command done, a step, another status), or after ms. At once on other links. */
+SESSION_API void session_wait(session* s, int32_t ms);
 /* Leave: session_outgoing then gives the goodbye (if the driver has one). */
 SESSION_API void session_stop(session* s);
 
-/* How the last read went. */
+/* How the last read or command went. */
 SESSION_API int32_t session_result(session* s);
-/* What went wrong, in English; also what a read that ended SESSION_OK had to leave out. */
+/* What went wrong, in English (a robot: clean_set_language); also what a read that ended
+ * SESSION_OK had to leave out. */
 SESSION_API int32_t session_last_error(session* s, char* buf, int32_t size);
 
 #ifdef __cplusplus

@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.concurrent.Volatile
+import com.eschouten.agrigate.clean.texts.tr
 
 /** The link to the robot: bytes to it and bytes from it. Each platform provides one per kind
  *  of link the drivers ask for (link/LinkSpec.kt). */
@@ -43,19 +44,18 @@ class PinRejected(result: CoreResult, message: String) : RobotException(result, 
 class Robot(
   val link: RobotLink,
   val pin: String? = null,
-  /** 9 bytes remembered from last time; skips the robot's ~75 s image download. */
-  var imageVersion: ByteArray? = null,
+  /** What [onMemory] gave last time for this robot: it skips the ~75 s of a first connection
+   *  and tells what an earlier session still owed the robot after its link dropped. */
+  memory: String = "",
   /** Optional progress callback (connect, PIN ok, route menu, Start, ...). */
   val onStep: ((CoreStep) -> Unit)? = null,
   /** Language of error messages: "nl" or "en". */
   val language: String = "nl",
-  /** Planning an earlier session still owed after its link dropped (1 / 0, -1 none). */
-  owedPlanning: Int = -1,
-  /** The owed planning changed (1 / 0 / -1): keep it with the robot for the next session. */
-  val onOwed: ((Int) -> Unit)? = null,
+  /** The driver has something else to keep for this robot (clean_c.h): store it with the
+   *  robot for the next session. */
+  val onMemory: ((String) -> Unit)? = null,
 ) {
-  /** See clean_c.h: what the robot must be put back to if this link drops now. */
-  var owedPlanning: Int = owedPlanning
+  var memory: String = memory
     private set
 
   private var core: CoreSession? = null
@@ -74,20 +74,16 @@ class Robot(
     core?.cancel()
   }
 
-  /** Set after [connect] when the robot reported a new image version: store it. */
-  var newImageVersion: ByteArray? = null
-    private set
-
   suspend fun connect() {
     cancelled = false
     link.connect()
     if (cancelled) {
       link.disconnect()
-      throw RobotException(CoreResult.Cancelled, coreResultText(CoreResult.Cancelled, language))
+      throw RobotException(CoreResult.Cancelled, tr.cancelledBody)
     }
     val s = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     val out = Channel<ByteArray>(Channel.UNLIMITED)
-    val c = CoreSession(onWrite = { out.trySend(it) }, pin = pin, imageVersion = imageVersion, onStep = onStep, language = language)
+    val c = CoreSession(onWrite = { out.trySend(it) }, pin = pin, memory = memory, onStep = onStep, language = language)
     core = c
     scope = s
     writes = out
@@ -105,14 +101,8 @@ class Robot(
         }
       }
     }
-    c.owedPlanning = owedPlanning
     val r = if (cancelled) CoreResult.Cancelled else c.connect()
-    noteOwed()
-    val (version, changed) = c.imageVersion()
-    if (changed) {
-      newImageVersion = version
-      imageVersion = version
-    }
+    noteMemory()
     if (r != CoreResult.Ok) {
       val e = error(r)
       disconnect()
@@ -136,18 +126,18 @@ class Robot(
     run { it.readRoutes() }
     return core?.routes() ?: emptyMap()
   }
-  suspend fun press(key: RobotKey) = run { it.press(key.code) }
+  suspend fun press(key: RobotKey) = run { it.press(key) }
 
   /** [key] held down as on the robot's own panel until [up] completes: in manual control the
    *  robot drives while Start/Stop is held. Returns after the key went up. */
-  suspend fun hold(key: RobotKey, up: Deferred<*>) = run { it.hold(key.code, up) }
+  suspend fun hold(key: RobotKey, up: Deferred<*>) = run { it.hold(key, up) }
 
   /** Leaves the robot as it was found: back to the home screen from a safe menu and the
    *  planning as it was at connect (unless [setPlanning] changed it on purpose). */
   suspend fun disconnect() {
     val c = core
     if (c != null) withTimeoutOrNull(30_000) { c.finish() }
-    noteOwed()
+    noteMemory()
     writes?.close()
     withTimeoutOrNull(1_000) { writer?.join() } // let the last frames (e.g. Back) go out
     c?.close()
@@ -160,22 +150,22 @@ class Robot(
   }
 
   private suspend fun run(command: suspend (CoreSession) -> CoreResult) {
-    val c = core ?: throw RobotException(CoreResult.ConnectFailed, coreResultText(CoreResult.ConnectFailed, language))
+    val c = core ?: throw RobotException(CoreResult.ConnectFailed, tr.notConnected)
     cancelled = false
     val r = command(c)
-    noteOwed()
+    noteMemory()
     if (r != CoreResult.Ok) throw error(r)
   }
 
-  private fun noteOwed() {
-    val v = core?.owedPlanning ?: return
-    if (v == owedPlanning) return
-    owedPlanning = v
-    onOwed?.invoke(v)
+  private fun noteMemory() {
+    val m = core?.memory() ?: return
+    if (m == memory) return
+    memory = m
+    onMemory?.invoke(m)
   }
 
   private fun error(r: CoreResult): RobotException {
-    val why = "${coreResultText(r, language)}: ${core?.lastError() ?: ""}".trim().trimEnd(':')
+    val why = if (r == CoreResult.InProgress) tr.busy else core?.lastError() ?: ""
     return when (r) {
       CoreResult.Busy -> RobotBusy(r, why)
       CoreResult.PinRejected -> PinRejected(r, why)

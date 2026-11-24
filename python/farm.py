@@ -55,9 +55,10 @@ def main() -> int:
     a = ap.parse_args()
     if not a.address:
         for d in drivers():
-            print(f"{d['id']:12} {d['name']:12} {', '.join(d['contracts']):12} ({d['link']['kind']}, port {d['link']['port']})")
+            link = d["links"][0]
+            print(f"{d['id']:12} {d['name']:12} {', '.join(d['contracts']):12} ({link['kind']}" + (f", port {link['port']})" if "port" in link else ")"))
         return 0
-    asks = next((d["link"]["kind"] == "http" for d in drivers() if d["id"] == a.driver), False)
+    asks = next((d["links"][0]["kind"] == "http" for d in drivers() if d["id"] == a.driver), False)
     password = (os.environ.get("FARM_PASSWORD") or getpass.getpass("Password: " if a.user else "Licence key: ")) if asks else ""
     recording = [] if a.record else None
     try:
