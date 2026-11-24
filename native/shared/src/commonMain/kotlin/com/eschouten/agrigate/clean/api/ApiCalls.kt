@@ -31,7 +31,9 @@ class ApiCalls(private val c: RobotController, private val scope: CoroutineScope
   private var lockedUntil = 0L
 
   /** HTTP status and JSON body. [authorization]: that header. */
-  suspend fun handle(method: String, path: String, authorization: String?): Pair<Int, String> {
+  suspend fun handle(method: String, given: String, authorization: String?): Pair<Int, String> {
+    // The robot's calls are under /api/clean/; an app from before 1.6.224 asks under /api/.
+    val path = if (given.startsWith("/api/clean/")) "/api/" + given.removePrefix("/api/clean/") else given
     // Cancel goes past the one call at a time: it is for the call that runs now.
     if (method == "POST" && path == "/api/cancel") {
       val gate = pins.withLock { check(bearer(authorization)) }
