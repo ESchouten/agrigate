@@ -44,7 +44,7 @@ kotlin {
 
 compose.desktop {
   application {
-    mainClass = "nl.eschouten.scraper.app.MainKt"
+    mainClass = "com.eschouten.agrigate.clean.app.MainKt"
     nativeDistributions {
       packageName = "Agrigate Clean"   // Linux: the package agrigate-clean
       // beyond what is found by itself: the web API (api/ApiServer), updates (app/DesktopUpdates)

@@ -11,7 +11,7 @@ except ImportError:
     m = types.ModuleType("bleak"); m.BleakClient = m.BleakScanner = object; sys.modules["bleak"] = m
 
 from agrigate.build_core import LIBNAME, build
-os.environ.setdefault("SCRAPER_CORE_LIB", str(build(Path(tempfile.mkdtemp()) / LIBNAME)))
+os.environ.setdefault("AGRIGATE_CORE_LIB", str(build(Path(tempfile.mkdtemp()) / LIBNAME)))
 
 from agrigate.farm import Farm, FarmError, drivers  # noqa: for the tests
 

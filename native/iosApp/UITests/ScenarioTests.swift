@@ -21,7 +21,7 @@ final class ScenarioTests: XCTestCase {
   private func launch(_ words: String, lang: String = "en") {
     TextsKt.useLanguage(choice: lang)
     app = XCUIApplication()
-    app.launchEnvironment["SCRAPER_DEMO"] = "\(words) ui=\(lang) delay=15 scan=200"
+    app.launchEnvironment["AGRIGATE_DEMO"] = "\(words) ui=\(lang) delay=15 scan=200"
     app.launch()
   }
 

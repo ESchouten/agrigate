@@ -9,7 +9,7 @@ The configuration (JSON):
      "token": "",
      "robots": [{"name": "Robot 1", "driver": "lfw", "address": "10.4.1.101"}, ...],
      "server": {"driver": "t4c", "address": "10.4.1.1:6969", "user": "", "password": ""},
-     "herdRefreshSeconds": 300}
+     "cowRefreshSeconds": 300}
 "token": what every request carries (Authorization: Bearer <token>); without one only this
 computer itself is answered. "server" is optional (without it only the live part); its password
 is the user's, or the farm's licence key with an empty user where the server takes one. Token and
@@ -38,7 +38,7 @@ HERD_FIELDS = ("lifeNumber", "workNumber", "production", "reproduction", "lactat
 
 
 class FarmService:
-    """The robots' listeners, the herd (read again every herdRefreshSeconds) and the events of all
+    """The robots' listeners, the herd (read again every cowRefreshSeconds) and the events of all
     robots in one row with its own numbering. Thread-safe; the HTTP handler only reads from it."""
 
     def __init__(self, config: dict, listener=Listener, farm=Farm):
@@ -65,7 +65,7 @@ class FarmService:
 
     # ---- the herd
     def _herd_loop(self):
-        every = max(30, int(self.config.get("herdRefreshSeconds", 300)))
+        every = max(30, int(self.config.get("cowRefreshSeconds", 300)))
         while not self._stop.is_set():
             self.refresh_herd()
             self._stop.wait(every)
@@ -141,7 +141,7 @@ class FarmService:
         with self._lock:
             return {"service": "agrigate farm", "version": VERSION, "time": now_ms(),
                     "robots": len(robots), "robotsConnected": sum(1 for r in robots if r["connected"]),
-                    "herd": None if not self.config.get("server") else
+                    "cow": None if not self.config.get("server") else
                     {"animals": len(self._herd), "updated": self._herd_at or None, "error": self._herd_error},
                     "lastEvent": self._seq}
 
@@ -160,7 +160,7 @@ def allowed(token: str, authorization: str, client: str) -> bool:
 
 def handler(service: FarmService):
     class Handler(BaseHTTPRequestHandler):
-        server_version = "scraper-control-farm"
+        server_version = "agrigate-farm"
 
         def log_message(self, *args):   # quiet: a camera system polls often
             pass

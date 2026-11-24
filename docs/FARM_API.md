@@ -31,7 +31,7 @@ FARM_SERVER_TOKEN=<token> FARM_SERVER_PASSWORD=<licence key> python farm_server.
     {"name": "Robot 2", "driver": "lfw", "address": "10.4.1.102"}
   ],
   "server": {"driver": "t4c", "address": "10.4.1.1:6969", "user": ""},
-  "herdRefreshSeconds": 300
+  "cowRefreshSeconds": 300
 }
 ```
 
@@ -130,10 +130,10 @@ the last good read stay. `/api/animals/<key>` gives one animal, or 404.
 
 ```json
 {"service": "agrigate farm", "version": 1, "time": 1795437727482, "robots": 2,
- "robotsConnected": 2, "herd": {"animals": 92, "updated": 1795437721591, "error": ""}, "lastEvent": 0}
+ "robotsConnected": 2, "cow": {"animals": 92, "updated": 1795437721591, "error": ""}, "lastEvent": 0}
 ```
 
-`herd` is `null` without a server.
+`cow` is `null` without a server.
 
 ## What each driver gives
 

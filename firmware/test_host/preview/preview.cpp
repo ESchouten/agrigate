@@ -14,7 +14,7 @@ EspT ESP;
 UpdateT Update;
 MDNSResponder MDNS;
 WebServer::WebServer(int) {}
-void WiFiT::macAddress(uint8_t* m) {   // the name on the screen: scraper-control-1a2b
+void WiFiT::macAddress(uint8_t* m) {   // the name on the screen: agrigate-clean-1a2b
   const uint8_t mac[6] = {0x24, 0x0a, 0xc4, 0x00, 0x1a, 0x2b};
   for (int i = 0; i < 6; i++) m[i] = mac[i];
 }

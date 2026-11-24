@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-  namespace = "nl.eschouten.scraper"
+  namespace = "com.eschouten.agrigate.clean"
   compileSdk { version = release(rootProject.extra["androidCompileSdk"] as Int) { minorApiLevel = 0 } }
   ndkVersion = "27.3.13750724" // the one on GitHub's Ubuntu runners: no NDK download in ci
   defaultConfig {
@@ -28,16 +28,16 @@ android {
   buildFeatures { compose = true }
   // Release builds (the release workflow): signed with the project's own key, so every
   // version installs over the previous one (Obtainium, a downloaded APK). The keystore comes
-  // from the environment: SCRAPER_KEYSTORE (path) and SCRAPER_KEYSTORE_PASSWORD (the store's and
+  // from the environment: AGRIGATE_KEYSTORE (path) and AGRIGATE_KEYSTORE_PASSWORD (the store's and
   // the key's). Without them a release build is unsigned.
-  val keystore = System.getenv("SCRAPER_KEYSTORE")?.let { file(it) }?.takeIf { it.isFile }
+  val keystore = System.getenv("AGRIGATE_KEYSTORE")?.let { file(it) }?.takeIf { it.isFile }
   if (keystore != null) {
     signingConfigs {
       create("release") {
         storeFile = keystore
-        storePassword = System.getenv("SCRAPER_KEYSTORE_PASSWORD")
+        storePassword = System.getenv("AGRIGATE_KEYSTORE_PASSWORD")
         keyAlias = "scraper-control"
-        keyPassword = System.getenv("SCRAPER_KEYSTORE_PASSWORD")
+        keyPassword = System.getenv("AGRIGATE_KEYSTORE_PASSWORD")
       }
     }
   }

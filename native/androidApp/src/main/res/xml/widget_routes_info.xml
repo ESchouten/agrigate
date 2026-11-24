@@ -5,7 +5,7 @@
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:initialLayout="@layout/widget_routes"
     android:previewLayout="@layout/widget_routes"
-    android:configure="nl.eschouten.scraper.WidgetConfigureActivity"
+    android:configure="com.eschouten.agrigate.clean.WidgetConfigureActivity"
     android:widgetFeatures="reconfigurable|configuration_optional"
     android:minWidth="250dp"
     android:minHeight="110dp"

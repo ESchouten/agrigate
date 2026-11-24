@@ -1,0 +1,19 @@
+// The web page reaches no robot itself: the computer that serves it does (api/ApiSession).
+package com.eschouten.agrigate.clean.link
+
+import com.juul.kable.Peripheral
+import com.juul.kable.PlatformScanner
+import com.juul.kable.Scanner
+import com.eschouten.agrigate.clean.core.RobotLink
+
+actual fun bluetoothProblem(): BluetoothProblem? = BluetoothProblem.Unsupported
+
+internal actual fun peripheralById(id: String): Peripheral? = null
+
+internal actual fun robotScanner(): PlatformScanner = Scanner()
+
+internal actual suspend fun afterConnect(p: Peripheral) {}
+
+internal actual suspend fun findClassicRobots(spec: LinkSpec.BtSerial): List<FoundRobot> = emptyList()
+
+internal actual fun btSerialLink(spec: LinkSpec.BtSerial, id: String): RobotLink? = null

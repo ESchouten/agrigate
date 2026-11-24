@@ -114,7 +114,7 @@ jobs:
         working-directory: native
         run: |
           ./gradlew :composeApp:createDistributable --console=plain
-          SCRAPER_DEMO="setup=done api=on" xvfb-run -a "composeApp/build/compose/binaries/main/app/Agrigate Clean/bin/Agrigate Clean" > web-app.log 2>&1 &
+          AGRIGATE_DEMO="setup=done api=on" xvfb-run -a "composeApp/build/compose/binaries/main/app/Agrigate Clean/bin/Agrigate Clean" > web-app.log 2>&1 &
           trap 'pkill -f "Agrigate Clean"; tail -40 "$GITHUB_WORKSPACE/native/web-app.log"' EXIT
           cd scenarios && npm i --no-save playwright@1 > /dev/null && npx playwright install --with-deps chromium > /dev/null
           node web.mjs
@@ -123,7 +123,7 @@ jobs:
         run: ./gradlew :androidApp:assembleDebug --console=plain
       - uses: actions/upload-artifact@v7
         with:
-          name: scraper-control-native
+          name: agrigate-clean-native
           path: |
             native/androidApp/build/outputs/apk/debug/*.apk
             native/composeApp/build/compose/jars/*.jar
@@ -167,7 +167,7 @@ jobs:
         run: ./gradlew :composeApp:velopack --console=plain
       - uses: actions/upload-artifact@v7
         with:
-          name: scraper-control-windows
+          name: agrigate-clean-windows
           path: native/composeApp/build/velopack/*Setup.exe
           if-no-files-found: error
 

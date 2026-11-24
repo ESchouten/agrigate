@@ -7,7 +7,7 @@ How a robot is recognised while scanning (no connection needed), from the driver
 On Linux/Windows bleak reports real MACs; on macOS it reports a per-Mac UUID,
 so there only the service/name checks work.
 
-The last address that worked is remembered in ~/.config/scraper-control/last.json,
+The last address that worked is remembered in ~/.config/agrigate-clean/last.json,
 so the next connect skips the scan. If that address stops working we scan again.
 """
 from __future__ import annotations
@@ -20,7 +20,7 @@ from pathlib import Path
 from .transport import LINK, SERVICE
 
 PREFIX = LINK["addressPrefix"].upper()
-CACHE = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "scraper-control" / "last.json"
+CACHE = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "agrigate-clean" / "last.json"
 
 
 @dataclass

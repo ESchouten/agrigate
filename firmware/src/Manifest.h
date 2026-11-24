@@ -1,7 +1,7 @@
 // The update manifest of a release (update.ini), no hardware code (tested on a PC). One
 // block per board, so every kind of device finds its own file in the same release:
 //   [m5stack-core]
-//   file=scraper-control-m5stack-core-1.7.0.bin
+//   file=agrigate-clean-m5stack-core-1.7.0.bin
 //   version=1.7.0  build=412  size=2145195  sha256=<64 hex>  sig=<DER hex>   (one per line)
 // sig is ECDSA P-256 over SHA-256 of signedMessage(): made by firmware/sign_release.py with
 // the release key, checked on the M5 with the public key in ReleaseKey.h. The M5 installs

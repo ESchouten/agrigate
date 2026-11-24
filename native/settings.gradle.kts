@@ -1,7 +1,7 @@
 // Agrigate Clean, native apps: shared Kotlin logic + Compose (Android, desktop) + SwiftUI (iOS).
 // Android parts are only configured when an Android SDK is present (ANDROID_HOME), so the
 // shared module and the desktop app also build on a machine without one.
-rootProject.name = "scraper-control"
+rootProject.name = "agrigate-clean"
 
 val hasAndroid = listOf("ANDROID_HOME", "ANDROID_SDK_ROOT").any { v ->
   System.getenv(v)?.let { File(it).isDirectory } == true

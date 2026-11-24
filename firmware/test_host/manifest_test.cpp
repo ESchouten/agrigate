@@ -18,12 +18,12 @@ int main(int argc, char** argv) {
       "# Agrigate Clean updates\n"
       "[other-board]\nfile=other.bin\nversion=9.9.9\nbuild=999\nsize=10\n"
       "sha256=0000000000000000000000000000000000000000000000000000000000000000\nsig=30\n"
-      "[m5stack-core]\r\nfile=scraper-control-m5stack-core-0.7.0.bin\r\nversion=0.7.0\nbuild=412\nsize=2145195\n"
+      "[m5stack-core]\r\nfile=agrigate-clean-m5stack-core-0.7.0.bin\r\nversion=0.7.0\nbuild=412\nsize=2145195\n"
       "sha256=c34ff75f3ac6de788e2984b5f1cd9be223f472fcb41e75bf3d2868940177a850\nsig=3045022100a9\n";
   Manifest m = parseManifest(text, "m5stack-core");
   assert(m.complete());
   assert(m.board == "m5stack-core" && m.version == "0.7.0" && m.build == 412 && m.size == 2145195);
-  assert(m.file == "scraper-control-m5stack-core-0.7.0.bin");   // its own block, not the other board's
+  assert(m.file == "agrigate-clean-m5stack-core-0.7.0.bin");   // its own block, not the other board's
   assert(signedMessage(m) == "scraper-knop|m5stack-core|0.7.0|412|2145195|c34ff75f3ac6de788e2984b5f1cd9be223f472fcb41e75bf3d2868940177a850");
   assert(isUpdate(m, "m5stack-core", 411));
   assert(!isUpdate(m, "m5stack-core", 412));     // same build: nothing to do

@@ -82,8 +82,8 @@ delay=<ms per answer>  scan=<ms>  setup=done (skip onboarding)  ui=nl|en (app)
 routes=ABC  names=A:Voergang,B:Stal+2
 ```
 
-Desktop: `--demo "<words>"` or `SCRAPER_DEMO`. Android: `adb shell am start -n
-com.eschouten.agrigate.clean/nl.eschouten.scraper.MainActivity --es demo "setup=done"`. iOS: environment `SCRAPER_DEMO`
+Desktop: `--demo "<words>"` or `AGRIGATE_DEMO`. Android: `adb shell am start -n
+com.eschouten.agrigate.clean/.MainActivity --es demo "setup=done"`. iOS: environment `AGRIGATE_DEMO`
 or launch argument `-demo "<words>"`. The demo PIN is 4321.
 
 ## Widgets

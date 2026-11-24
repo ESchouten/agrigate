@@ -44,9 +44,9 @@ targets:
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
         NSLocalNetworkUsageDescription: Om de robot te bedienen via een ander apparaat in je netwerk.
-        CFBundleURLTypes:   # scraper-control://add?... from the QR code of the buttons or a computer
+        CFBundleURLTypes:   # agrigate-clean://add?... from the QR code of the buttons or a computer
           - CFBundleURLName: com.eschouten.agrigate.clean.add
-            CFBundleURLSchemes: [scraper-control]
+            CFBundleURLSchemes: [agrigate-clean]
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.eschouten.agrigate.clean

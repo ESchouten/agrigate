@@ -87,7 +87,7 @@ def get(base, path, status=200, token=None):
 def test_status():
     base, service, httpd = start()
     st = get(base, "/api/status")
-    assert (st["robots"], st["robotsConnected"], st["herd"]["animals"], st["herd"]["error"], st["lastEvent"]) == (2, 2, 2, "", 0)
+    assert (st["robots"], st["robotsConnected"], st["cow"]["animals"], st["cow"]["error"], st["lastEvent"]) == (2, 2, 2, "", 0)
     httpd.shutdown()
 
 
@@ -147,7 +147,7 @@ def test_a_cow_the_herd_does_not_know():
 def test_without_a_server_only_live():
     base, service, httpd = start(server=False)
     FakeListener.made[0].arrive("15", "DINA 1", "1000015")
-    assert get(base, "/api/status")["herd"] is None
+    assert get(base, "/api/status")["cow"] is None
     assert get(base, "/api/robots")["robots"][0]["animal"]["name"] == "DINA 1"
     httpd.shutdown()
 
@@ -156,7 +156,7 @@ def test_the_server_not_answering_keeps_the_live_part():
     FakeFarm.fail = True
     try:
         base, service, httpd = start()
-        assert get(base, "/api/status")["herd"]["error"] == "no answer from the server"
+        assert get(base, "/api/status")["cow"]["error"] == "no answer from the server"
         FakeListener.made[0].arrive("15", "DINA 1", "1000015")
         assert get(base, "/api/events")["events"][0]["name"] == "DINA 1"
         httpd.shutdown()

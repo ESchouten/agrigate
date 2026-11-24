@@ -85,7 +85,7 @@ jstring text(JNIEnv* e, clean_session* s, int32_t (*fn)(clean_session*, char*, i
 
 }  // namespace
 
-#define JNI_FN(name) JNIEXPORT JNICALL Java_nl_eschouten_scraper_core_CoreJni_##name
+#define JNI_FN(name) JNIEXPORT JNICALL Java_com_eschouten_agrigate_clean_core_CoreJni_##name
 
 extern "C" {
 

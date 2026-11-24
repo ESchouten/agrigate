@@ -4,7 +4,7 @@ The core holds all robot logic (screens, route steps, safety rules); this module
 moves bytes between it and a Bluetooth link. The same core runs on the M5Stack and in
 the apps.
 
-The library is $SCRAPER_CORE_LIB, or the one next to this file, which is built on first
+The library is $AGRIGATE_CORE_LIB, or the one next to this file, which is built on first
 use and after a change (needs a C++17 compiler). Or build it yourself:  python -m agrigate.build_core
 """
 from __future__ import annotations
@@ -25,7 +25,7 @@ HERE = Path(__file__).resolve().parent
 
 def library_path() -> Path:
     from .build_core import LIBNAME, build, sources
-    env = os.environ.get("SCRAPER_CORE_LIB")
+    env = os.environ.get("AGRIGATE_CORE_LIB")
     if env and Path(env).exists():
         return Path(env)
     p = HERE / LIBNAME

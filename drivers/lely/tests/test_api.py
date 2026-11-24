@@ -15,7 +15,7 @@ from agrigate import Robot, RobotBusy, api
 from fake_robot import FakeRobot
 
 from agrigate.build_core import LIBNAME, build
-os.environ["SCRAPER_CORE_LIB"] = str(build(Path(tempfile.mkdtemp()) / LIBNAME))
+os.environ["AGRIGATE_CORE_LIB"] = str(build(Path(tempfile.mkdtemp()) / LIBNAME))
 
 ADDR = "00:12:FF:A0:80:01"
 

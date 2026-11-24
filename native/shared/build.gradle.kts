@@ -22,11 +22,11 @@ val generateVersion by tasks.registering {
   inputs.property("build", appBuild)
   outputs.dir(versionDir)
   doLast {
-    val f = versionDir.get().asFile.resolve("nl/eschouten/scraper/AppVersion.kt")
+    val f = versionDir.get().asFile.resolve("com/eschouten/agrigate/clean/AppVersion.kt")
     f.parentFile.mkdirs()
     f.writeText(
       "// Generated from gradle.properties (scraper.version) + the build number. Do not edit.\n" +
-        "package nl.eschouten.scraper\n\n" +
+        "package com.eschouten.agrigate.clean\n\n" +
         "object AppVersion {\n  const val NAME = \"$appVersion\"\n  const val BUILD = $appBuild\n}\n",
     )
   }
@@ -73,7 +73,7 @@ kotlin {
       kotlin.srcDir("src/jniMain/kotlin")
       dependencies {
         implementation("io.ktor:ktor-client-cio:$ktor")
-        implementation("org.jmdns:jmdns:3.6.5")   // the desktop's web API as scraper-control-1a2b.local
+        implementation("org.jmdns:jmdns:3.6.5")   // the desktop's web API as agrigate-clean-1a2b.local
         implementation("com.google.zxing:core:3.5.4")   // its QR code for a phone's camera
       }
     }

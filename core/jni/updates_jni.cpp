@@ -28,7 +28,7 @@ std::string lastError(const char* what) {
 extern "C" {
 
 // First thing in main: Velopack's install, update and uninstall hooks run here and exit.
-JNIEXPORT void JNICALL Java_nl_eschouten_scraper_app_DesktopUpdates_nativeAppRun(JNIEnv* e, jclass, jobjectArray args) {
+JNIEXPORT void JNICALL Java_com_eschouten_agrigate_clean_app_DesktopUpdates_nativeAppRun(JNIEnv* e, jclass, jobjectArray args) {
   std::vector<std::string> keep;
   jsize n = args ? e->GetArrayLength(args) : 0;
   for (jsize i = 0; i < n; i++) keep.push_back(str(e, (jstring)e->GetObjectArrayElement(args, i)));
@@ -39,7 +39,7 @@ JNIEXPORT void JNICALL Java_nl_eschouten_scraper_app_DesktopUpdates_nativeAppRun
 }
 
 // The installed version ("" when not installed by Velopack, e.g. run from a build).
-JNIEXPORT jstring JNICALL Java_nl_eschouten_scraper_app_DesktopUpdates_nativeInstalledVersion(JNIEnv* e, jclass) {
+JNIEXPORT jstring JNICALL Java_com_eschouten_agrigate_clean_app_DesktopUpdates_nativeInstalledVersion(JNIEnv* e, jclass) {
   vpkc_update_manager_t* m = nullptr;
   std::string v;
   // a manager needs a source; this one is never read, only the installed copy is looked at
@@ -54,7 +54,7 @@ JNIEXPORT jstring JNICALL Java_nl_eschouten_scraper_app_DesktopUpdates_nativeIns
 
 // dir: a folder with a verified feed (releases.<channel>.json) and its package. Prepares the
 // update to be applied once this process exits, then restarts the app. "" on success, else why.
-JNIEXPORT jstring JNICALL Java_nl_eschouten_scraper_app_DesktopUpdates_nativeApply(JNIEnv* e, jclass, jstring dir) {
+JNIEXPORT jstring JNICALL Java_com_eschouten_agrigate_clean_app_DesktopUpdates_nativeApply(JNIEnv* e, jclass, jstring dir) {
   std::string path = str(e, dir), err;
   vpkc_update_source_t* src = vpkc_new_source_file(path.c_str());
   vpkc_update_manager_t* m = nullptr;

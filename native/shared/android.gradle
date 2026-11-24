@@ -5,7 +5,7 @@ apply plugin: 'com.android.kotlin.multiplatform.library'
 
 kotlin {
   androidLibrary {
-    namespace = 'nl.eschouten.scraper.shared'
+    namespace = 'com.eschouten.agrigate.clean.shared'
     compileSdk { version = release(rootProject.ext.androidCompileSdk) { minorApiLevel = 0 } }
     minSdk = rootProject.ext.androidMinSdk
   }
