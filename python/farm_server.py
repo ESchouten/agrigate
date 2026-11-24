@@ -1,4 +1,4 @@
-"""The farm service: live animal per robot and the herd over HTTP (docs/FARM_API.md).
+"""The farm service: what the farm's sources know, over HTTP (docs/farm/API.md).
 
     python farm_server.py farm_server.json
 
@@ -16,8 +16,7 @@ def main():
     with open(sys.argv[1], encoding="utf-8") as f:
         config = json.load(f)
     httpd, service = serve(config)
-    print(f"farm service on http://{httpd.server_address[0]}:{httpd.server_port}  ({len(service.robots)} robots"
-          + (", herd from " + config["server"]["address"] if config.get("server") else "")
+    print(f"farm service on http://{httpd.server_address[0]}:{httpd.server_port}  ({len(service.sources)} sources"
           + ("" if service.token else ", no token: this computer only") + ")", flush=True)
     try:
         httpd.serve_forever()

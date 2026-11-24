@@ -37,7 +37,7 @@ targets:
     dependencies:
       - target: CleanWidgets
     # merged with the keys below (GENERATE_INFOPLIST_FILE): plain http to a device on the own
-    # network, for a robot through another device's web API (docs/API.md)
+    # network, for a robot through another device's web API (docs/clean/API.md)
     info:
       path: AgrigateClean/Info.plist
       properties:

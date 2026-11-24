@@ -1,4 +1,4 @@
-// The serving side of the web API (docs/API.md), for any host: which call a request is, who
+// The serving side of the web API (docs/clean/API.md), for any host: which call a request is, who
 // may make it, and the answer, all through the app's RobotController (the robot in use). The
 // desktop serves it over HTTP (ApiServer); the buttons have their own (firmware/src/Api.h).
 // An app also answers the calls for a type's own screen (the panel): its connection to the robot

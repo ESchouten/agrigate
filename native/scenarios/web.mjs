@@ -1,4 +1,4 @@
-// The web API (docs/API.md) and the web page of the PACKAGED desktop app with its demo robot
+// The web API (docs/clean/API.md) and the web page of the PACKAGED desktop app with its demo robot
 // (PIN 4321), on localhost:8080. The packaged app has its own trimmed Java and carries the page
 // in its resources, so this also catches a module or a file it lacks. The page runs in a
 // phone-sized headless Chrome: a dry run, the panel, a key held by a finger, and a tab closed

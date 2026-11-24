@@ -11,7 +11,7 @@ Two ways, by what the user gives:
 - **No user name, the farm's licence key as password** (what most farms have): every request
   carries the header `licensekey: <key>`, no login request. The header name must go out exactly
   so, in lower case: a real server answers `500 "Object reference not set to an instance of an
-  object."` to `Licensekey` (what Python's urllib makes of it; `agrigate.farm` sends the
+  object."` to `Licensekey` (what Python's urllib makes of it; `agrigate.session` sends the
   driver's headers as written).
 - **A user name and password** of the server's web pages: `POST /t4capi/login/secure`,
   `data.accessToken.token` as `Authorization: Bearer`, with the user's `userid`, `herdid`, language

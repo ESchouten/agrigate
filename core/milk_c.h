@@ -1,9 +1,10 @@
-/* The milking robot API in C, the same for every driver that knows milking robots, on a
- * session of robot_c.h. It only reads: nothing here changes anything on the farm.
+/* Milk: the milking robots and how they are doing, the same for every driver that serves
+ * "milk", on a session of session_c.h. It only reads: nothing here changes anything on the farm.
  *
- * milk_read asks the server for its milking robots; when the requests are done
- * (robot_c.h), milk_json gives what it read:
- *   {"robots": [{
+ * milk_read brings the session up to date; when the read is done (session_c.h), milk_json gives
+ * what the source knows:
+ *   {"updated": when that was read (null: not yet, or the session was given no time),
+ *    "robots": [{
  *     "id", "name", "group" (barn or group, "" if none),
  *     "state": "idle" | "milking" | "cleaning" | "alarm" | "emergency" | "assistance" (waits
  *              for a person) | "paused" | "offline" | "unknown",
@@ -17,16 +18,16 @@
 #ifndef MILK_C_H
 #define MILK_C_H
 
-#include "robot_c.h"
+#include "session_c.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/* Start a read. Returns ROBOT_OK (started: now the requests), ROBOT_UNSUPPORTED or
- * ROBOT_IN_PROGRESS. */
-ROBOT_API int32_t milk_read(robot_session* s);
-ROBOT_API int32_t milk_json(robot_session* s, char* buf, int32_t size);
+/* Start a read. Returns SESSION_OK (started: now the link's exchange), SESSION_UNSUPPORTED or
+ * SESSION_IN_PROGRESS. */
+SESSION_API int32_t milk_read(session* s);
+SESSION_API int32_t milk_json(session* s, char* buf, int32_t size);
 
 #ifdef __cplusplus
 }

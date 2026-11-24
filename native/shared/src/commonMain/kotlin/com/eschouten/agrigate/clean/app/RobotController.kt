@@ -61,7 +61,7 @@ data class ControllerState(
   val onboarded: Boolean = false,
   val widgetTipSeen: Boolean = false,
   val language: String = "",
-  /** Desktop: serve the web API (docs/API.md) on [apiPort]. */
+  /** Desktop: serve the web API (docs/clean/API.md) on [apiPort]. */
   val apiOn: Boolean = false,
   val apiPort: Int = Settings.API_PORT,
   /** A stopped route asks "finish it?": show [com.eschouten.agrigate.clean.ui.finishQuestion] and

@@ -465,7 +465,7 @@ class Tr(val code: String) {
   val remove: String get() = t("Verwijderen", "Remove")
   val removeRobot: String get() = t("Robot verwijderen", "Remove robot")
 
-  // ---- the web API (docs/API.md): a robot through another device, and the desktop serving it ----
+  // ---- the web API (docs/clean/API.md): a robot through another device, and the desktop serving it ----
   val connection: String get() = t("Verbinding", "Connection")
   val viaBluetooth: String get() = t("Rechtstreeks via Bluetooth", "Directly over Bluetooth")
   fun viaDevice(address: String): String = t("Via $address", "Through $address")

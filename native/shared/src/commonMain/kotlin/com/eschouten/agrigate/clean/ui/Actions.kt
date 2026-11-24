@@ -56,7 +56,7 @@ object Actions {
   /** A robot through another device's web API ("" = Bluetooth from here). */
   suspend fun setVia(c: RobotController, uid: String, via: String) = update(c, uid) { it.copy(via = via.trim()) }
 
-  /** A link from a QR code on the buttons or a computer with the web API (docs/API.md):
+  /** A link from a QR code on the buttons or a computer with the web API (docs/clean/API.md):
    *  agrigate-clean://add?via=<address>&pin=<PIN>. Adds that robot (or updates the one already
    *  through that address), makes it the robot in use and ends the first setup. False when it
    *  is not such a link. */

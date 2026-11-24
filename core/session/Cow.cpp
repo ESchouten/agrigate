@@ -5,9 +5,9 @@
 #include <cstdio>
 #include <cstdlib>
 
-#include "Robot.h"
+#include "Session.h"
 
-namespace robot {
+namespace agrigate {
 namespace cow {
 namespace {
 
@@ -55,7 +55,7 @@ std::string day(const std::string& when) {
 }
 
 std::string Herd::json() const {
-  std::string o = "{\"animals\":[";
+  std::string o = "{\"updated\":" + timeJson(updated) + ",\"animals\":[";
   for (size_t i = 0; i < animals.size(); i++) {
     Animal a = animals[i];   // the events oldest first, whatever order the server gave them in
     std::stable_sort(a.inseminations.begin(), a.inseminations.end(), [](const Insemination& x, const Insemination& y) { return x.date < y.date; });
@@ -80,18 +80,18 @@ std::string Herd::json() const {
 }
 
 }  // namespace cow
-}  // namespace robot
+}  // namespace agrigate
 
 extern "C" {
 
-int32_t cow_read(robot_session* s) {
-  if (!s->driver.cow) return ROBOT_UNSUPPORTED;
-  return s->read([](robot::Session& session) {
-    session.cow = {};
+int32_t cow_read(session* s) {
+  if (!s->driver.cow) return SESSION_UNSUPPORTED;
+  return s->read([](agrigate::Session& session) {
+    session.cow.animals.clear();
     session.driver.cow(session);
-  });
+  }, &s->cow.updated);
 }
 
-int32_t cow_json(robot_session* s, char* buf, int32_t size) { return robot::copyOut(s->cow.json(), buf, size); }
+int32_t cow_json(session* s, char* buf, int32_t size) { return agrigate::copyOut(s->cow.json(), buf, size); }
 
 }  // extern "C"

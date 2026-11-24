@@ -10,7 +10,7 @@
   <!-- a failed start from a home-screen widget is shown as a notification -->
   <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
   <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
-  <!-- a robot through another device's web API (docs/API.md): plain http on the own network -->
+  <!-- a robot through another device's web API (docs/clean/API.md): plain http on the own network -->
   <uses-permission android:name="android.permission.INTERNET" />
 
   <application
@@ -30,7 +30,7 @@
         <action android:name="android.intent.action.MAIN" />
         <category android:name="android.intent.category.LAUNCHER" />
       </intent-filter>
-      <!-- the QR code on the buttons or a computer with the web API (docs/API.md), opened by the camera -->
+      <!-- the QR code on the buttons or a computer with the web API (docs/clean/API.md), opened by the camera -->
       <intent-filter>
         <action android:name="android.intent.action.VIEW" />
         <category android:name="android.intent.category.DEFAULT" />

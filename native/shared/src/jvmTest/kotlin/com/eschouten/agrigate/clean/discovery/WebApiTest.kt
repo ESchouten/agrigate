@@ -1,4 +1,4 @@
-// The web API (docs/API.md) end to end: the desktop's server with the simulated robot behind it,
+// The web API (docs/clean/API.md) end to end: the desktop's server with the simulated robot behind it,
 // and an app whose robot goes "via" that server (api/ApiSession), as from a phone.
 package com.eschouten.agrigate.clean.discovery
 

@@ -1,4 +1,4 @@
-// The desktop app serves the web API (docs/API.md) for the robot in use, when Settings > Web page
+// The desktop app serves the web API (docs/clean/API.md) for the robot in use, when Settings > Web page
 // and API is on: the JDK's own HTTP server, and http://agrigate-clean-1a2b.local:<port> by mDNS
 // (JmDNS), because many networks do not resolve a computer's own name. The name is fixed per
 // computer (the end of its network address), so two devices never swap names (Erik 2026-11-16).

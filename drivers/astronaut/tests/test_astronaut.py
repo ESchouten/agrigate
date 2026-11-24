@@ -1,14 +1,16 @@
-"""Offline tests: the LFW live driver through its C API (core/live_c.h), fed with datagrams as
-a robot's proxy sends them (the format was read on two Astronaut A4s). Run:
+"""Offline tests: the Astronaut driver through the C API (core/session_c.h, identity_c.h), fed
+with datagrams as a robot's proxy sends them (the format was read on two Astronaut A4s), and once
+through the Python API with a robot made up on this computer. Run:
 python3 drivers/astronaut/tests/test_astronaut.py"""
-import ctypes, json, os, struct, sys
+import ctypes, json, os, socket, struct, sys, threading, time
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
-from farm_test import run  # noqa: builds the library and points the Python API at it
+from farm_test import Session, drivers, run  # noqa: builds the library and points the Python API at it
 from agrigate.core import text
-from agrigate.live import _lib, drivers
+from agrigate.session import OK, UNREACHABLE, _lib
 
 T0 = 1_795_430_000_000   # ms
+ADDRESS = "10.4.1.101"
 
 
 def message(mid, data, sender=3, dest=1):
@@ -19,37 +21,40 @@ def cow(responder, number, name):
     return message(0x116, struct.pack("<II", responder, number) + name.encode("utf-16-le") + b"\0\0")
 
 
-class Robot:
-    def __init__(self):
-        self.L = _lib()
-        self.s = self.L.live_open(b"astronaut", b"10.4.1.101")
-
-    def tick(self, t):
-        self.L.live_tick(self.s, t)
-        return self.out()
-
-    def out(self):
-        sent, buf = [], ctypes.create_string_buffer(256)
-        while (n := self.L.live_outgoing(self.s, buf, len(buf))) > 0:
-            sent.append(buf.raw[:n])
-        return sent
-
-    def hear(self, datagram, t):
-        self.L.live_incoming(self.s, datagram, len(datagram), t)
-
-    def state(self, t):
-        return json.loads(text(self.L.live_json, self.s, t))
-
-    def events(self, after=0):
-        return json.loads(text(self.L.live_events_json, self.s, after))
-
-
 def registration(on):
     return struct.pack("<IH", 0xD157, 1 if on else 0) + b"agrigate".ljust(22, b"\0")
 
 
+class Robot:
+    def __init__(self):
+        self.L = _lib()
+        self.s = self.L.session_open(b"astronaut", ADDRESS.encode(), b"", b"")
+
+    def tick(self, t):
+        self.L.session_tick(self.s, t)
+        return self.out()
+
+    def out(self):
+        sent, buf = [], ctypes.create_string_buffer(256)
+        while (n := self.L.session_outgoing(self.s, buf, len(buf))) > 0:
+            sent.append(buf.raw[:n])
+        return sent
+
+    def hear(self, datagram, t):
+        self.L.session_incoming(self.s, datagram, len(datagram), t)
+
+    def read(self, t):
+        """(result, the identity JSON) at time t."""
+        self.L.session_tick(self.s, t)
+        assert self.L.identity_read(self.s) == OK
+        return self.L.session_result(self.s), json.loads(text(self.L.identity_json, self.s))
+
+    def events(self, after=0):
+        return json.loads(text(self.L.identity_events_json, self.s, after))
+
+
 def test_listed():
-    assert {"id": "astronaut", "name": "Astronaut", "link": {"kind": "udp", "port": 6000}} in drivers()
+    assert {"id": "astronaut", "name": "Astronaut", "contracts": ["identity"], "link": {"kind": "udp", "port": 6000}} in drivers()
 
 
 def test_registers_and_renews_every_two_seconds():
@@ -62,27 +67,35 @@ def test_registers_and_renews_every_two_seconds():
 def test_goodbye():
     r = Robot()
     r.tick(T0)
-    r.L.live_stop(r.s)
+    r.L.session_stop(r.s)
     assert r.out() == [registration(False)]
 
 
-def test_a_cow_arrives():
+def test_the_robot_is_a_place_before_it_says_anything():
     r = Robot()
-    assert r.state(T0)["animal"] is None and r.state(T0)["connected"] is False
+    result, identity = r.read(T0)
+    assert result == UNREACHABLE and text(r.L.session_last_error, r.s) == "no message from " + ADDRESS
+    assert identity == {"updated": None, "places": [{"id": ADDRESS, "name": "", "kind": "milkingRobot", "animal": None}]}
+
+
+def test_a_cow_is_identified():
+    r = Robot()
+    r.tick(T0)
     r.hear(cow(1000015, 15, "DINA 1"), T0 + 10)
-    st = r.state(T0 + 20)
-    assert st["connected"] and st["lastMessage"] == T0 + 10
-    assert st["animal"] == {"number": "15", "name": "DINA 1", "responder": "1000015", "since": T0 + 10}
-    assert r.events() == {"events": [{"seq": 1, "time": T0 + 10, "kind": "arrival", "number": "15", "name": "DINA 1", "responder": "1000015"}], "last": 1}
+    result, identity = r.read(T0 + 20)
+    assert result == OK and identity["updated"] == T0 + 10
+    assert identity["places"][0]["animal"] == {"number": "15", "name": "DINA 1", "responder": "1000015", "since": T0 + 10}
+    assert r.events() == {"events": [{"seq": 1, "time": T0 + 10, "kind": "identified", "place": ADDRESS,
+                                      "animal": {"number": "15", "name": "DINA 1", "responder": "1000015"}}], "last": 1}
 
 
 def test_names_beyond_ascii():
     r = Robot()
     r.hear(cow(1000117, 117, "HERMINA Ü 6  "), T0)
-    assert r.state(T0)["animal"]["name"] == "HERMINA Ü 6"
+    assert r.read(T0)[1]["places"][0]["animal"]["name"] == "HERMINA Ü 6"
 
 
-def test_the_same_cow_again_within_five_seconds_is_one_arrival():
+def test_the_same_cow_again_within_five_seconds_is_one_identification():
     r = Robot()
     r.hear(cow(1000015, 15, "DINA 1"), T0)
     r.hear(cow(1000015, 15, "DINA 1"), T0 + 3000)
@@ -90,22 +103,41 @@ def test_the_same_cow_again_within_five_seconds_is_one_arrival():
     r.hear(cow(1000015, 15, "DINA 1"), T0 + 600_000)   # a next visit
     r.hear(cow(1000041, 41, "JANNA 2"), T0 + 600_500)
     ev = r.events(after=1)["events"]
-    assert [e["number"] for e in ev] == ["15", "41"] and r.state(T0 + 600_600)["animal"]["number"] == "41"
+    assert [e["animal"]["number"] for e in ev] == ["15", "41"] and r.read(T0 + 600_600)[1]["places"][0]["animal"]["number"] == "41"
 
 
-def test_other_messages_only_keep_it_connected():
+def test_other_messages_only_say_the_robot_is_there():
     r = Robot()
     r.hear(message(0x13B, bytes([10, 12, 9, 11])), T0)                    # quarter milk speed
     r.hear(cow(0, 0, ""), T0 + 1)                                         # no cow
     r.hear(b"\x57\xd1\x00\x00" + b"\0" * 20, T0 + 2)                     # not a message
     r.hear(cow(1000015, 15, "DINA 1")[:20], T0 + 3)                     # cut off
-    st = r.state(T0 + 5)
-    assert st["animal"] is None and st["connected"] and r.events()["events"] == []
-    assert r.state(T0 + 3 + 10_000)["connected"] is False                # silent for 10 s
+    result, identity = r.read(T0 + 5)
+    assert result == OK and identity["updated"] == T0 + 3 and identity["places"][0]["animal"] is None and r.events()["events"] == []
+    assert r.read(T0 + 3 + 10_000)[0] == UNREACHABLE                     # silent for 10 s
 
 
 def test_unknown_driver():
-    assert _lib().live_open(b"nope", b"10.4.1.101") is None
+    assert _lib().session_open(b"nope", ADDRESS.encode(), b"", b"") is None
+
+
+def test_through_python_with_a_robot_on_this_computer():
+    robot = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    robot.bind(("127.0.0.1", 0))
+    robot.settimeout(5)
+    address = "127.0.0.1:%d" % robot.getsockname()[1]
+    seen = threading.Event()
+    events = []
+    with Session("astronaut", address, on_event=lambda s, e: (events.append(e), seen.set())) as s:
+        said, client = robot.recvfrom(100)
+        assert said == registration(True)
+        robot.sendto(cow(1000015, 15, "DINA 1"), client)
+        assert seen.wait(5) and events[0]["animal"]["name"] == "DINA 1" and events[0]["place"] == address
+        assert s.identity()["places"][0]["animal"]["number"] == "15" and s.latest("identity")[1] == ""
+    deadline = time.time() + 5
+    while (said := robot.recvfrom(100)[0]) != registration(False):   # the goodbye
+        assert time.time() < deadline
+    robot.close()
 
 
 if __name__ == "__main__":

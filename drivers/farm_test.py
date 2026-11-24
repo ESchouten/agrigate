@@ -1,4 +1,4 @@
-"""For the tests of the farm server drivers (drivers/<name>/tests): the Python API on a freshly
+"""For the tests of the drivers for a farm's sources (drivers/<name>/tests): the Python API on a freshly
 built library, and a farm's server on this computer that answers what a test gives it."""
 import json, os, sys, tempfile, threading, types
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -13,7 +13,7 @@ except ImportError:
 from agrigate.build_core import LIBNAME, build
 os.environ.setdefault("AGRIGATE_CORE_LIB", str(build(Path(tempfile.mkdtemp()) / LIBNAME)))
 
-from agrigate.farm import Farm, FarmError, drivers  # noqa: for the tests
+from agrigate.session import Session, SessionError, drivers  # noqa: for the tests
 
 
 class FakeFarm:

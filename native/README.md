@@ -59,7 +59,7 @@ iosApp/run-ui-tests.sh                    # iOS scenarios + screenshots (/tmp/sh
 ## The web page
 
 The desktop app with **Settings > Web page and API** on serves the app itself to browsers on the
-local network, next to its [web API](../docs/API.md) (`shared/.../api/ApiServer.kt`). The page
+local network, next to its [web API](../docs/clean/API.md) (`shared/.../api/ApiServer.kt`). The page
 is the same Compose app built for wasm, with its own `RobotController` in the browser; its one
 robot goes through the computer the page came from (`api/ApiSession.kt`), exactly like a robot
 "through another device" in the apps. Its settings and logbook stay in that browser.

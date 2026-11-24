@@ -3,7 +3,7 @@ the FULLSENSE API description says. Run: python3 drivers/fullsense/tests/test_fu
 import os, sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
-from farm_test import FakeFarm, Farm, FarmError, drivers, run
+from farm_test import FakeFarm, Session, SessionError, drivers, run
 
 LOGIN = "POST /api/Authentication/Authenticate"
 NONE = "00000000-0000-0000-0000-000000000000"
@@ -36,13 +36,13 @@ def server() -> FakeFarm:
 
 
 def read(farm, password="geheim"):
-    with Farm("fullsense", farm.address, "erik", password) as f:
+    with Session("fullsense", farm.address, "erik", password) as f:
         return f.milk()["robots"]
 
 
 def test_driver_is_listed():
     d = next(d for d in drivers() if d["id"] == "fullsense")
-    assert d["kinds"] == ["milk"] and d["link"]["port"] == 12080
+    assert d["contracts"] == ["milk"] and d["link"]["port"] == 12080
 
 
 def test_robots_states_and_alarm():
@@ -90,7 +90,7 @@ def test_only_reads_and_never_the_robots_own_calls():
 def test_wrong_password():
     try:
         read(server(), password="fout")
-    except FarmError as e:
+    except SessionError as e:
         assert e.result == 2
     else:
         assert False
@@ -98,7 +98,7 @@ def test_wrong_password():
 
 def test_a_new_login_when_it_ran_out():
     farm = server()
-    with Farm("fullsense", farm.address, "erik", "geheim") as f:
+    with Session("fullsense", farm.address, "erik", "geheim") as f:
         f.milk()
         farm.token = "login-2"
         assert len(f.milk()["robots"]) == 3 and farm.count(LOGIN) == 2
@@ -107,7 +107,7 @@ def test_a_new_login_when_it_ran_out():
 def test_a_missing_status_is_left_out():
     farm = server()
     del farm.routes["GET /api/MerlinStatus/GetMerlinStatus?merlinStatusId=s-1"]
-    with Farm("fullsense", farm.address, "erik", "geheim") as f:
+    with Session("fullsense", farm.address, "erik", "geheim") as f:
         robots = f.milk()["robots"]
         assert robots[0]["state"] == "unknown" and robots[1]["state"] == "assistance" and "HTTP 404" in f.notes
 

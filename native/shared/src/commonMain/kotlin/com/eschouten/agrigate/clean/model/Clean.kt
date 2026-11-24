@@ -28,7 +28,7 @@ enum class Capability {
 data class FoundRobot(val id: String, val name: String, val signal: Int, val link: String = "")
 
 /** Status in generic terms. Fields a type does not report stay null / empty. Also the web
- *  API's status (docs/API.md). */
+ *  API's status (docs/clean/API.md). */
 @Serializable
 data class CleanStatus(
   val planning: Boolean? = null, // null = unknown right now

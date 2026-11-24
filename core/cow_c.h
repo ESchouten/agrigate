@@ -1,10 +1,12 @@
-/* The herd as the farm's management server knows it, in C, the same for every driver that knows
- * a herd, on a session of robot_c.h. It only reads: nothing here changes anything on the farm.
+/* Cow: the herd as a source knows it (usually the farm's management server), the same for every
+ * driver that serves "cow", on a session of session_c.h. It only reads: nothing here changes
+ * anything on the farm. Where an animal is right now is another contract: identity_c.h.
  *
- * cow_read asks the server for its animals; when the requests are done (robot_c.h), cow_json
- * gives what it read. Dates are "YYYY-MM-DD" (the farm's own day), "" when not known; numbers
+ * cow_read brings the session up to date; when the read is done (session_c.h), cow_json gives
+ * what the source knows. Dates are "YYYY-MM-DD" (the farm's own day), "" when not known; numbers
  * are null when not known:
- *   {"animals": [{
+ *   {"updated": when that was read (null: not yet, or the session was given no time),
+ *    "animals": [{
  *     "id": the server's own id of the animal,
  *     "number": the farm's animal number (cow number on the robot and in the barn),
  *     "name", "lifeNumber" (official ear tag, e.g. "NL 123456789"), "workNumber" ("" if the
@@ -19,20 +21,20 @@
  *              "diy" (by the farmer) | "bull" | "embryo" | "unknown"}]   oldest first,
  *     "pregnancyChecks": [{"date", "result": "pregnant" | "notPregnant" | "unknown"}]   oldest first
  *   }]}
- * How far back inseminations and pregnancy checks go is up to the server (see the driver's API.md). */
+ * How far back inseminations and pregnancy checks go is up to the source (see the driver's API.md). */
 #ifndef COW_C_H
 #define COW_C_H
 
-#include "robot_c.h"
+#include "session_c.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/* Start a read. Returns ROBOT_OK (started: now the requests), ROBOT_UNSUPPORTED or
- * ROBOT_IN_PROGRESS. */
-ROBOT_API int32_t cow_read(robot_session* s);
-ROBOT_API int32_t cow_json(robot_session* s, char* buf, int32_t size);
+/* Start a read. Returns SESSION_OK (started: now the link's exchange), SESSION_UNSUPPORTED or
+ * SESSION_IN_PROGRESS. */
+SESSION_API int32_t cow_read(session* s);
+SESSION_API int32_t cow_json(session* s, char* buf, int32_t size);
 
 #ifdef __cplusplus
 }
