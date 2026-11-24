@@ -1,11 +1,11 @@
 // The T4C farm management server: its milking robots and its herd, read only.
 // Checked against a real server (T4C 4.22, two Astronauts, 92 animals, 2026-11-23); see ../API.md.
-#include "Robot.h"
+#include "Session.h"
 
 #include <map>
 #include <memory>
 
-namespace robot {
+namespace agrigate {
 namespace {
 
 // Two ways in. With a user name: the login of the server's own pages (a token as Bearer).
@@ -13,14 +13,14 @@ namespace {
 // in the header "licensekey" (exactly so: in lower case) without a login of its own.
 void login(Session& s) {
   if (s.user.empty()) {
-    if (s.password.empty()) return s.fail(ROBOT_LOGIN_REJECTED, "no user name and no licence key");
+    if (s.password.empty()) return s.fail(SESSION_LOGIN_REJECTED, "no user name and no licence key");
     s.headers["licensekey"] = s.password;
     return;
   }
   s.post("/t4capi/login/secure", "{\"userName\":" + quote(s.user) + ",\"password\":" + quote(s.password) + "}", [&s](const Json& answer) {
     const Json& user = answer["data"];
     const std::string& token = user["accessToken"]["token"].str();
-    if (token.empty()) return s.fail(ROBOT_LOGIN_REJECTED, answer["serverEror"]["message"].str());
+    if (token.empty()) return s.fail(SESSION_LOGIN_REJECTED, answer["serverEror"]["message"].str());
     s.headers["Authorization"] = "Bearer " + token;
     // who is asking, as the server's own pages send it along
     static const char* const kWho[][2] = {{"userid", "userId"}, {"herdid", "defaultHerdId"}, {"languageid", "languageId"},
@@ -36,7 +36,7 @@ bool refused(Session& s, const Json& answer, const char* what) {
   const Json& e = answer["serverEror"];
   const double code = e["code"].num(200);
   if (e.isNull() || code == 200) return false;
-  s.fail(code == 401 || code == 403 ? ROBOT_LOGIN_REJECTED : ROBOT_UNEXPECTED, std::string(what) + ": " + e["message"].str());
+  s.fail(code == 401 || code == 403 ? SESSION_LOGIN_REJECTED : SESSION_UNEXPECTED, std::string(what) + ": " + e["message"].str());
   return true;
 }
 
@@ -170,7 +170,7 @@ void readCow(Session& s) {
     s.get("/t4capi/v2/herds", [&s, h](const Json& answer) {
       for (const Json& row : answer["data"].items)
         if (h->ucn.empty()) h->ucn = row["ucnNumber"].str();
-      if (h->ucn.empty()) return s.fail(ROBOT_UNEXPECTED, "herds: no UCN number for the events");
+      if (h->ucn.empty()) return s.fail(SESSION_UNEXPECTED, "herds: no UCN number for the events");
       s.get("/t4capi/v2/sires", [&s, h](const Json& answer) {
         for (const Json& sire : answer["data"].items) {
           if (!sire["sireCode"].str().empty()) h->sireByCode[sire["sireCode"].str()] = sire["sireName"].str();
@@ -213,6 +213,12 @@ void readCow(Session& s) {
 
 }  // namespace
 
-extern const Driver t4c = {"t4c", "T4C", "http", 6969, login, readMilk, readCow};
+extern const Driver t4c = [] {
+  Driver d{"t4c", "T4C", {"http", "http", 6969}};
+  d.login = login;
+  d.milk = readMilk;
+  d.cow = readCow;
+  return d;
+}();
 
-}  // namespace robot
+}  // namespace agrigate

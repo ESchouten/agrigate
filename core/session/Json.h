@@ -7,7 +7,7 @@
 #include <utility>
 #include <vector>
 
-namespace robot {
+namespace agrigate {
 
 struct Json {
   enum Type { Null, Bool, Number, String, Array, Object } type = Null;
@@ -33,4 +33,4 @@ void utf8(std::string& out, unsigned codepoint);
 /** [s] as a JSON string, quotes included. */
 std::string quote(const std::string& s);
 
-}  // namespace robot
+}  // namespace agrigate

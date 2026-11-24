@@ -1,5 +1,5 @@
 // The M5's log, no hardware code (tested on a PC): the last few KB of what it prints, for
-// GET /api/log and /api/log/live (docs/API.md). main.cpp keeps it in memory a restart does not
+// GET /api/log and /api/log/live (docs/clean/API.md). main.cpp keeps it in memory a restart does not
 // wipe (RTC), so after a crash the log still shows what led up to it.
 #pragma once
 #include <algorithm>

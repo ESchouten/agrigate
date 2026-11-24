@@ -3,7 +3,7 @@ T4C API description says. Run: python3 drivers/t4c/tests/test_t4c.py"""
 import os, sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
-from farm_test import FakeFarm, Farm, FarmError, closed_address, drivers, run
+from farm_test import FakeFarm, Session, SessionError, closed_address, drivers, run
 
 LOGIN = "POST /t4capi/login/secure"
 
@@ -39,13 +39,13 @@ def server() -> FakeFarm:
 
 
 def read(farm, password="geheim"):
-    with Farm("t4c", farm.address, "erik", password) as f:
+    with Session("t4c", farm.address, "erik", password) as f:
         return f.milk()["robots"]
 
 
 def test_driver_is_listed():
     d = next(d for d in drivers() if d["id"] == "t4c")
-    assert d["kinds"] == ["milk", "cow"] and d["link"] == {"kind": "http", "scheme": "http", "port": 6969}
+    assert d["contracts"] == ["milk", "cow"] and d["link"] == {"kind": "http", "scheme": "http", "port": 6969}
 
 
 def test_robots_alarms_and_figures():
@@ -54,6 +54,13 @@ def test_robots_alarms_and_figures():
     assert one["alarms"] == [{"time": "2026-11-22T14:40:00", "severity": "unknown", "code": "5012", "text": "Melkbeker \"LV\" niet aangesloten"}]
     assert (one["milkKg"], one["milkings"], one["failedMilkings"]) == (1834.5, 162, 4)
     assert (two["group"], two["alarms"], two["milkKg"], two["milkings"], two["failedMilkings"]) == ("", [], None, None, None)
+
+
+def test_a_read_says_when_it_was():
+    import time
+    with Session("t4c", server().address, "erik", "geheim") as f:
+        assert f.latest("milk")[0] == {"updated": None, "robots": []}
+        assert abs(f.milk()["updated"] - time.time() * 1000) < 60_000
 
 
 def test_state_is_unknown_with_the_servers_number():
@@ -77,7 +84,7 @@ def test_requests_carry_the_login():
 def test_wrong_password():
     try:
         read(server(), password="fout")
-    except FarmError as e:
+    except SessionError as e:
         assert e.result == 2 and "Invalid user name" in str(e)
     else:
         assert False
@@ -85,7 +92,7 @@ def test_wrong_password():
 
 def test_one_login_for_many_reads_and_a_new_one_when_it_ran_out():
     farm = server()
-    with Farm("t4c", farm.address, "erik", "geheim") as f:
+    with Session("t4c", farm.address, "erik", "geheim") as f:
         f.milk(); f.milk()
         assert farm.count(LOGIN) == 1
         farm.token = "login-2"   # the server forgot the first
@@ -104,7 +111,7 @@ def test_a_login_the_server_does_not_take_ends_the_read():
     farm.routes[LOGIN] = not_taken
     try:
         read(farm)
-    except FarmError as e:
+    except SessionError as e:
         assert e.result == 2 and farm.count(LOGIN) == 2   # one new login, then it gives up: rejected
     else:
         assert False
@@ -112,9 +119,9 @@ def test_a_login_the_server_does_not_take_ends_the_read():
 
 def test_no_server():
     try:
-        with Farm("t4c", closed_address(), "erik", "geheim", timeout=2) as f:
+        with Session("t4c", closed_address(), "erik", "geheim", timeout=2) as f:
             f.milk()
-    except FarmError as e:
+    except SessionError as e:
         assert e.result == 1
     else:
         assert False
@@ -123,14 +130,14 @@ def test_no_server():
 def test_a_missing_detail_is_left_out():
     farm = server()
     farm.routes["GET /t4capi/astronaut/101/detail"] = (500, "boom")
-    with Farm("t4c", farm.address, "erik", "geheim") as f:
+    with Session("t4c", farm.address, "erik", "geheim") as f:
         one = f.milk()["robots"][0]
         assert one["milkings"] is None and len(one["alarms"]) == 1 and "astronaut/101/detail: HTTP 500" in f.notes
 
 
 def test_a_recording_leaves_the_login_out():
     farm, recording = server(), []
-    with Farm("t4c", farm.address, "erik", "geheim", recording=recording) as f:
+    with Session("t4c", farm.address, "erik", "geheim", recording=recording) as f:
         f.milk()
     assert len(recording) == 6 and recording[1]["answer"]["data"][0]["name"] == "Robot 1"
     assert "login-1" not in str(recording) and "geheim" not in str(recording)
@@ -142,7 +149,7 @@ def test_no_robot_list_fails():
         farm.routes["GET /t4capi/astronaut/overviews"] = wrong
         try:
             read(farm)
-        except FarmError as e:
+        except SessionError as e:
             assert e.result == 3
         else:
             assert False

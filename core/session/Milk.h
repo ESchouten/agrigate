@@ -2,10 +2,11 @@
 // every field is described.
 #pragma once
 
+#include <cstdint>
 #include <string>
 #include <vector>
 
-namespace robot {
+namespace agrigate {
 namespace milk {
 
 namespace state {
@@ -32,9 +33,10 @@ struct Robot {
 };
 
 struct Farm {
+  int64_t updated = 0;
   std::vector<Robot> robots;
   std::string json() const;
 };
 
 }  // namespace milk
-}  // namespace robot
+}  // namespace agrigate

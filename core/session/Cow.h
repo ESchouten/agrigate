@@ -2,10 +2,11 @@
 // described.
 #pragma once
 
+#include <cstdint>
 #include <string>
 #include <vector>
 
-namespace robot {
+namespace agrigate {
 namespace cow {
 
 namespace production {
@@ -41,6 +42,7 @@ struct Animal {
 };
 
 struct Herd {
+  int64_t updated = 0;
   std::vector<Animal> animals;
   std::string json() const;
 };
@@ -51,4 +53,4 @@ struct Herd {
 std::string day(const std::string& when);
 
 }  // namespace cow
-}  // namespace robot
+}  // namespace agrigate

@@ -1,4 +1,4 @@
-// A robot reached through another device's web API (docs/API.md): the buttons or a computer
+// A robot reached through another device's web API (docs/clean/API.md): the buttons or a computer
 // that holds the Bluetooth link. Behind the same CleanSession as a robot over Bluetooth, so
 // the controller, the screens and the widgets do not know the difference. Every command is a
 // whole session on that device (connect, act, disconnect there); connect() reads the robot.

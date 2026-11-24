@@ -3,7 +3,7 @@
     python -m agrigate.build_core          # needs a C++17 compiler (g++/clang++)
 
 In it: one manure robot driver (a folder in drivers/ with a clean_c.cpp: $CLEAN_DRIVER, or the
-only one there) and every driver for a farm's server (core/robot/Drivers.cpp).
+only one there) and every driver for a source on the farm (core/session/Drivers.cpp).
 """
 import os
 import subprocess
@@ -24,9 +24,9 @@ def driver_src() -> Path:
 
 
 def folders() -> list:
-    """The manure robot driver, what the farm server drivers share, and each of those drivers."""
+    """The manure robot driver, what the drivers for a farm's sources share, and each of those drivers."""
     servers = [d for d in sorted((ROOT / "drivers").glob("*/src")) if not (d / "clean_c.cpp").exists()]
-    return [driver_src(), ROOT / "core", ROOT / "core" / "robot", *servers]
+    return [driver_src(), ROOT / "core", ROOT / "core" / "session", *servers]
 
 
 def sources() -> list:

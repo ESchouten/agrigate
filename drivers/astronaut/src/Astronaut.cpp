@@ -1,4 +1,5 @@
-// LFW: which cow is in a milking robot's box, from the robot's own messages (live_c.h).
+// Astronaut milking robots: which cow is in the robot's box, from the robot's own messages (LFW).
+// Serves "identity" (core/identity_c.h): the robot is one place.
 //
 // The robot's own computer runs a proxy on UDP port 6000 that hands every internal LFW message to the clients
 // registered with it (the farm software T4C registers the same way). This driver registers, renews
@@ -7,11 +8,9 @@
 // See ../API.md for the format and what was checked on real robots.
 #include <cstring>
 
-#include "Json.h"
-#include "Live.h"
+#include "Session.h"
 
-namespace robot {
-namespace live {
+namespace agrigate {
 namespace {
 
 constexpr uint32_t kMagicMessage = 0xD156;    // a message the proxy hands on
@@ -49,33 +48,43 @@ std::string text(const std::string& d, size_t from) {
   return o;
 }
 
-void tick(Session& s, int64_t now) {
-  if (now - s.sentAt < kRenewMs) return;
+identity::Place& box(Session& s) { return s.identity.place(s.address, identity::kind::MilkingRobot); }
+
+void tick(Session& s) {
+  box(s);   // the robot is a place from the start, also while it says nothing
+  if (s.now - s.sentAt < kRenewMs) return;
   s.send(registration(true));
-  s.sentAt = now;
+  s.sentAt = s.now;
 }
 
-void incoming(Session& s, const std::string& d, int64_t now) {
+void incoming(Session& s, const std::string& d) {
   // <u32 magic 0xD156> <u16 message> <u16 sender> <u16 destination> <u16 length> data
   if (d.size() < 12 || u32(d, 0) != kMagicMessage) return;
-  s.heard(now);
+  s.heard();
+  s.identity.updated = s.now;
   const uint16_t id = u16(d, 4), length = u16(d, 10);
   if (id != kCowNumberName || length < 12 || d.size() < 12u + length) return;
   const std::string data = d.substr(12, length);
   const uint32_t responder = u32(data, 0), number = u32(data, 4);
-  Animal a;
+  identity::Animal a;
   a.name = text(data, 8);
   if (a.name.empty() || responder == 0 || responder >= 100000000) return;   // not a cow
   a.responder = std::to_string(responder);
   a.number = std::to_string(number);
-  s.arrival(a, now);
+  s.identity.identified(box(s), a, s.now);
 }
 
 void stop(Session& s) { s.send(registration(false)); }
 
 }  // namespace
 
-extern const Driver astronaut = {"astronaut", "Astronaut", 6000, tick, incoming, stop};
+extern const Driver astronaut = [] {
+  Driver d{"astronaut", "Astronaut", {"udp", nullptr, 6000}};
+  d.identity = [](Session&) {};   // the robot tells by itself: nothing to ask
+  d.tick = tick;
+  d.incoming = incoming;
+  d.stop = stop;
+  return d;
+}();
 
-}  // namespace live
-}  // namespace robot
+}  // namespace agrigate

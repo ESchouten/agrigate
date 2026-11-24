@@ -1,7 +1,8 @@
-# Astronaut live driver
+# Astronaut driver
 
-Which cow is in a milking robot's box, from the robot's own messages (`core/live_c.h`). Link: `udp`,
-port 6000 on the robot. The driver is `src/Astronaut.cpp`.
+Which cow is in a milking robot's box, from the robot's own messages. It serves the identity
+contract (`core/identity_c.h`): the robot is one place of the kind `milkingRobot`, with the
+robot's address as its id. Link: `udp`, port 6000 on the robot. The driver is `src/Astronaut.cpp`.
 
 ## How
 
@@ -17,7 +18,7 @@ the same way ("LogService").
 
 One message is read: `0x116` (MSG_REQUEST_COW_NR_NAME), sent when the robot has read a cow's
 responder at the start of a visit: `u32 responder`, `u32 cow number`, the name in UTF-16LE up to a
-NUL. Any other message only counts as "the robot is there" (`connected`).
+NUL. Any other message only counts as "the robot is there".
 
 The driver never sends an LFW message (`0xD156`) itself: what it sends is its registration and
 nothing else, so it cannot change anything on the robot.
@@ -28,14 +29,14 @@ is: this driver is **experimental** until it has run for longer than the check b
 ## Checked on real robots
 
 Two Astronaut A4s (2026-11-23, software Av8.0), five minutes, next to another program reading the
-same proxy: every arrival came within the same second as that program saw it, number, name and
+same proxy: every identification came within the same second as that program saw it, number, name and
 responder alike. Several clients can be registered with one proxy at the same time.
 
 - The robot does not say when a cow leaves: a refused cow walks on without a message. The animal
   stays the robot's current animal until the next one.
 - With a TCS passage (robot 1 leads to robot 2), robot 1 also sends `0x116` for the cows that walk
-  through to robot 2: such a cow arrives at robot 1 and a minute later at robot 2.
-- The same cow twice within 5 s is one arrival.
+  through to robot 2: such a cow is identified at robot 1 and a minute later at robot 2.
+- The same cow twice within 5 s is one identification.
 
 ## Not checked yet
 

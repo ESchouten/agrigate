@@ -1,5 +1,5 @@
 """agrigate: the robots in the barn. Here Agrigate Clean, a manure robot over Bluetooth; milking
-robots and the herd are in agrigate.farm, the cow at each robot in agrigate.live.
+robots, the herd and which animal is where are in agrigate.session.
 
 The robot logic lives in the robot driver (drivers/, C++); this package finds the robot,
 opens the link and exposes the same API as the M5Stack buttons and the apps.

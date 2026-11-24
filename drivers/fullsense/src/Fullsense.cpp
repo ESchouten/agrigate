@@ -1,9 +1,9 @@
 // The FULLSENSE farm management server: its milking robots, read only.
 // Written from the server's own API description; see ../API.md for what a real server still
 // has to confirm.
-#include "Robot.h"
+#include "Session.h"
 
-namespace robot {
+namespace agrigate {
 namespace {
 
 // The server's lists, in its own order: an answer gives the number (or, as some servers are
@@ -110,6 +110,11 @@ void readMilk(Session& s) {
 
 }  // namespace
 
-extern const Driver fullsense = {"fullsense", "FULLSENSE", "http", 12080, login, readMilk};
+extern const Driver fullsense = [] {
+  Driver d{"fullsense", "FULLSENSE", {"http", "http", 12080}};
+  d.login = login;
+  d.milk = readMilk;
+  return d;
+}();
 
-}  // namespace robot
+}  // namespace agrigate

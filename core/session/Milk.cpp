@@ -3,9 +3,9 @@
 
 #include <cstdio>
 
-#include "Robot.h"
+#include "Session.h"
 
-namespace robot {
+namespace agrigate {
 
 namespace milk {
 namespace {
@@ -18,7 +18,7 @@ std::string number(double v) {
 }  // namespace
 
 std::string Farm::json() const {
-  std::string o = "{\"robots\":[";
+  std::string o = "{\"updated\":" + timeJson(updated) + ",\"robots\":[";
   for (size_t i = 0; i < robots.size(); i++) {
     const Robot& r = robots[i];
     o += std::string(i ? "," : "") + "{\"id\":" + quote(r.id) + ",\"name\":" + quote(r.name) + ",\"group\":" + quote(r.group) +
@@ -36,18 +36,18 @@ std::string Farm::json() const {
 }
 
 }  // namespace milk
-}  // namespace robot
+}  // namespace agrigate
 
 extern "C" {
 
-int32_t milk_read(robot_session* s) {
-  if (!s->driver.milk) return ROBOT_UNSUPPORTED;
-  return s->read([](robot::Session& session) {
-    session.milk = {};
+int32_t milk_read(session* s) {
+  if (!s->driver.milk) return SESSION_UNSUPPORTED;
+  return s->read([](agrigate::Session& session) {
+    session.milk.robots.clear();
     session.driver.milk(session);
-  });
+  }, &s->milk.updated);
 }
 
-int32_t milk_json(robot_session* s, char* buf, int32_t size) { return robot::copyOut(s->milk.json(), buf, size); }
+int32_t milk_json(session* s, char* buf, int32_t size) { return agrigate::copyOut(s->milk.json(), buf, size); }
 
 }  // extern "C"

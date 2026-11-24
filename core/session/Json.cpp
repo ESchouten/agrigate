@@ -5,7 +5,7 @@
 #include <cstdlib>
 #include <cstring>
 
-namespace robot {
+namespace agrigate {
 namespace {
 
 const Json kNull;
@@ -151,4 +151,4 @@ std::string quote(const std::string& s) {
   return o + "\"";
 }
 
-}  // namespace robot
+}  // namespace agrigate

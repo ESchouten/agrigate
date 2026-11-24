@@ -4,7 +4,7 @@ The animals here are made up. Run: python3 drivers/t4c/tests/test_t4c_cow.py"""
 import os, sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
-from farm_test import FakeFarm, Farm, FarmError, drivers, run
+from farm_test import FakeFarm, Session, SessionError, drivers, run
 
 KEY = "AAAAA-BBBBB-CCCCC-DDDDD-EEEEE"
 
@@ -56,12 +56,12 @@ def server() -> FakeFarm:
 
 
 def herd(farm, key=KEY):
-    with Farm("t4c", farm.address, "", key) as f:
+    with Session("t4c", farm.address, "", key) as f:
         return {a["number"]: a for a in f.cow()["animals"]}, f.notes
 
 
 def test_the_driver_knows_a_herd():
-    assert next(d for d in drivers() if d["id"] == "t4c")["kinds"] == ["milk", "cow"]
+    assert next(d for d in drivers() if d["id"] == "t4c")["contracts"] == ["milk", "cow"]
 
 
 def test_the_herd():
@@ -98,7 +98,7 @@ def test_licence_key_instead_of_a_login():
 
 
 def test_robots_as_a_real_server_answers():
-    with Farm("t4c", server().address, "", KEY) as f:
+    with Session("t4c", server().address, "", KEY) as f:
         robot = f.milk()["robots"][0]
     assert (robot["id"], robot["name"], robot["group"], robot["raw"], robot["lastVisit"]) == ("101", "Melkrobot 1", "Melkveestal", "0", "2026-11-23T13:24:59")
     assert (robot["milkKg"], robot["milkings"], robot["failedMilkings"]) == (790, 103, 1)
@@ -107,7 +107,7 @@ def test_robots_as_a_real_server_answers():
 def test_a_wrong_key_ends_the_read():
     try:
         herd(server(), key="wrong")
-    except FarmError as e:
+    except SessionError as e:
         assert e.result == 3 and "HTTP 500" in str(e)
     else:
         assert False
@@ -116,7 +116,7 @@ def test_a_wrong_key_ends_the_read():
 def test_no_key_and_no_user():
     try:
         herd(server(), key="")
-    except FarmError as e:
+    except SessionError as e:
         assert e.result == 2
     else:
         assert False
@@ -127,6 +127,43 @@ def test_a_missing_event_list_is_left_out():
     farm.routes["GET /t4capi/integrationglobal/gestations?ucnNumber=12345"] = (500, "")
     animals, notes = herd(farm)
     assert animals["15"]["expectedCalving"] == "" and len(animals["15"]["inseminations"]) == 2 and "gestations" in notes
+
+
+def test_the_farm_service_on_this_server_and_a_robot():
+    """The whole row once: a robot's datagram and the server's herd, out of the service's HTTP API."""
+    import json, socket, struct, threading, time, urllib.request
+    from agrigate.farm_server import serve
+    robot = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    robot.bind(("127.0.0.1", 0))
+    robot.settimeout(5)
+    httpd, service = serve({"listen": "127.0.0.1:0", "sources": [
+        {"name": "Robot 1", "driver": "astronaut", "address": "127.0.0.1:%d" % robot.getsockname()[1]},
+        {"driver": "t4c", "address": server().address, "password": KEY}]})
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+
+    def get(path):
+        with urllib.request.urlopen("http://127.0.0.1:%d%s" % (httpd.server_port, path), timeout=10) as r:
+            return json.loads(r.read())
+    try:
+        deadline = time.time() + 10
+        while not get("/api/cow/animals")["animals"]:   # the first read of the herd
+            assert time.time() < deadline
+            time.sleep(0.05)
+        _, client = robot.recvfrom(100)   # its registration
+        name = "DINA 1".encode("utf-16-le") + b"\0\0"
+        robot.sendto(struct.pack("<IHHHHII", 0xD156, 0x116, 3, 1, 8 + len(name), 1000015, 15) + name, client)
+        event, = get("/api/identity/events?after=0&wait=5")["events"]
+        assert event["place"]["name"] == "Robot 1" and event["place"]["kind"] == "milkingRobot"
+        assert (event["animal"]["number"], event["animal"]["lifeNumber"], event["animal"]["reproduction"]) == ("15", "NL 100000001", "pregnant")
+        place, = get("/api/identity/places")["places"]
+        assert place["connected"] and place["animal"]["name"] == "DINA 1"
+        assert next(a for a in get("/api/cow/animals")["animals"] if a["number"] == "15")["at"]["place"] == "Robot 1"
+        assert get("/api/milk/robots")["robots"][0]["name"] == "Melkrobot 1"
+        assert all(c["error"] == "" for s in get("/api/status")["sources"] for c in s["contracts"].values())
+    finally:
+        httpd.shutdown()
+        service.close()
+        robot.close()
 
 
 if __name__ == "__main__":

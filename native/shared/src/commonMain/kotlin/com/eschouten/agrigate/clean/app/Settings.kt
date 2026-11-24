@@ -34,7 +34,7 @@ data class RobotProfile(
   val robotName: String = "", // advertised name; helps on iOS/macOS
   val label: String = "", // own name, e.g. "Stal 2"
   val pin: String = "",
-  /** Reached through another device's web API (docs/API.md): the buttons or a computer that
+  /** Reached through another device's web API (docs/clean/API.md): the buttons or a computer that
    *  holds the Bluetooth link, e.g. "agrigate-clean-1a2b.local". "" = Bluetooth from here. */
   val via: String = "",
   val routes: String = "ABCD", // which route slots to show, e.g. "ABC"
@@ -67,7 +67,7 @@ class Settings(
   var onboarded: Boolean = false,
   var widgetTipSeen: Boolean = false, // dismissed the "add the widget" tip
   var language: String = "", // "" = as the phone, or "nl" / "en"
-  var apiOn: Boolean = false, // desktop: serve the web API (docs/API.md)
+  var apiOn: Boolean = false, // desktop: serve the web API (docs/clean/API.md)
   var apiPort: Int = API_PORT,
 ) {
   var robots: List<RobotProfile> = robots

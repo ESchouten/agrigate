@@ -1,4 +1,4 @@
-// The buttons' side of the web API (docs/API.md), no hardware code (tested on a PC): which
+// The buttons' side of the web API (docs/clean/API.md), no hardware code (tested on a PC): which
 // call a request is, who may make it, and the answer's body.
 #pragma once
 #include <cstdint>
