@@ -4,7 +4,7 @@ package com.eschouten.agrigate.clean.app
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import com.eschouten.agrigate.clean.model.ScraperModel
+import com.eschouten.agrigate.clean.model.CleanModel
 import com.eschouten.agrigate.clean.model.defaultModelId
 import com.eschouten.agrigate.clean.model.modelFor
 import com.eschouten.agrigate.clean.texts.tr
@@ -28,7 +28,7 @@ data class RobotSnapshot(
 @Serializable
 data class RobotProfile(
   val uid: String = newUid(), // stable id inside the app (widgets refer to it)
-  val model: String = defaultModelId, // ScraperModel.id
+  val model: String = defaultModelId, // CleanModel.id
   val robotId: String? = null, // address: MAC (Android/Windows/Linux) or UUID (iOS/macOS)
   val link: String = "", // how it was found (link/LinkSpec kind); "" = the driver's preferred
   val robotName: String = "", // advertised name; helps on iOS/macOS
@@ -40,10 +40,10 @@ data class RobotProfile(
   val routes: String = "ABCD", // which route slots to show, e.g. "ABC"
   val routeNames: Map<String, String> = emptyMap(), // "A" -> "Voergang"
   val routeParts: Map<String, String> = emptyMap(), // "C" -> "1 2 3": what the route is on the robot (read)
-  val extra: Map<String, String> = emptyMap(), // whatever the scraper type wants to remember
+  val extra: Map<String, String> = emptyMap(), // whatever the robot type wants to remember
   val snapshot: RobotSnapshot? = null,
 ) {
-  val type: ScraperModel get() = modelFor(model)
+  val type: CleanModel get() = modelFor(model)
 
   val displayName: String
     get() = when {

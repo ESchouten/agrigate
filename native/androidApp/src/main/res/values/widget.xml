@@ -65,5 +65,5 @@
     <item name="android:layout_marginTop">3dp</item>
     <item name="android:textSize">11.5sp</item>
   </style>
-  <style name="Theme.Scraper.Dialog" parent="@android:style/Theme.DeviceDefault.Light.Dialog.NoActionBar" />
+  <style name="Theme.Clean.Dialog" parent="@android:style/Theme.DeviceDefault.Light.Dialog.NoActionBar" />
 </resources>

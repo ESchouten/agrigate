@@ -52,7 +52,7 @@ python3 ../tools/secrets.py               # optional: the build secrets (a real 
 ./gradlew :composeApp:run --args="--demo" # desktop app with the demo robot
 ./gradlew :composeApp:jvmTest             # scenarios + screenshots (build/screenshots/<lang>)
 ./gradlew :androidApp:assembleDebug       # Android APK
-cd iosApp && xcodegen && open ScraperControl.xcodeproj   # iOS app
+cd iosApp && xcodegen && open AgrigateClean.xcodeproj   # iOS app
 iosApp/run-ui-tests.sh                    # iOS scenarios + screenshots (/tmp/shots/<lang>)
 ```
 
@@ -72,7 +72,7 @@ cd scenarios && node web.mjs                      # the web API and the page in 
 
 ## The demo robot
 
-Each driver can bring an in-app robot (`ScraperModel.installDemo`): the real driver talks to
+Each driver can bring an in-app robot (`CleanModel.installDemo`): the real driver talks to
 it as to a robot, so the whole app works without Bluetooth. Start it with words
 (`app/AppStart.kt`):
 

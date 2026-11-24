@@ -10,7 +10,7 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 set(CLEAN_DRIVER "" CACHE STRING "robot driver (a folder in drivers/)")
 if(CLEAN_DRIVER STREQUAL "")
-  file(GLOB FOUND ${CMAKE_CURRENT_LIST_DIR}/../drivers/*/src/clean_c.cpp)   # the scraper drivers
+  file(GLOB FOUND ${CMAKE_CURRENT_LIST_DIR}/../drivers/*/src/clean_c.cpp)   # the manure robot drivers
   list(LENGTH FOUND N)
   if(NOT N EQUAL 1)
     message(FATAL_ERROR "set CLEAN_DRIVER to a folder in drivers/")

@@ -1,6 +1,6 @@
 """Where the buttons' robot driver is, for builds on a computer: read from platformio.ini.
 
-A driver folder has src/ with its code and ScraperDriver.h (what the buttons use of it).
+A driver folder has src/ with its code and CleanDriver.h (what the buttons use of it).
 """
 import glob
 import os

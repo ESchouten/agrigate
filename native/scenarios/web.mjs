@@ -37,8 +37,8 @@ const browser = await chromium.launch()
 const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'nl-NL', isMobile: true, hasTouch: true })
 // a phone that was here before: its PIN is in the browser
 await ctx.addInitScript(() => {
-  localStorage.setItem('scraper.robots', '[{"uid":"page","pin":"4321"}]')
-  localStorage.setItem('scraper.onboarded', 'true')
+  localStorage.setItem('clean.robots', '[{"uid":"page","pin":"4321"}]')
+  localStorage.setItem('clean.onboarded', 'true')
 })
 const p = await ctx.newPage()
 p.on('pageerror', e => seen.push(`pageerror ${e}`))

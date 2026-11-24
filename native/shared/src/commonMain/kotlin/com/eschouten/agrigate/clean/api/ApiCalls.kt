@@ -20,7 +20,7 @@ import com.eschouten.agrigate.clean.app.Outcome
 import com.eschouten.agrigate.clean.app.Problem
 import com.eschouten.agrigate.clean.app.RobotController
 import com.eschouten.agrigate.clean.app.Settings
-import com.eschouten.agrigate.clean.model.ScraperFault
+import com.eschouten.agrigate.clean.model.CleanFault
 import com.eschouten.agrigate.clean.texts.tr
 import kotlin.concurrent.Volatile
 
@@ -143,13 +143,13 @@ class ApiCalls(private val c: RobotController, private val scope: CoroutineScope
   }
 
   private fun faultOf(p: Problem) = when (p) {
-    Problem.BluetoothOff -> ScraperFault.BluetoothOff
-    Problem.NotFound -> ScraperFault.NotFound
-    Problem.PinRejected -> ScraperFault.AuthRejected
-    Problem.Busy -> ScraperFault.Busy
-    Problem.NoAnswer -> ScraperFault.NoConfirmation
-    Problem.Cancelled -> ScraperFault.Cancelled
-    Problem.None, Problem.Failed -> ScraperFault.Failed
+    Problem.BluetoothOff -> CleanFault.BluetoothOff
+    Problem.NotFound -> CleanFault.NotFound
+    Problem.PinRejected -> CleanFault.AuthRejected
+    Problem.Busy -> CleanFault.Busy
+    Problem.NoAnswer -> CleanFault.NoConfirmation
+    Problem.Cancelled -> CleanFault.Cancelled
+    Problem.None, Problem.Failed -> CleanFault.Failed
   }
 }
 

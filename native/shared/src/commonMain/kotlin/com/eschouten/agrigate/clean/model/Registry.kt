@@ -1,11 +1,11 @@
-// Every scraper type the apps support. To add one: implement ScraperModel and ScraperSession
-// (see Scraper.kt) and list it here. The first one is the default.
+// Every robot type the apps support. To add one: implement CleanModel and CleanSession
+// (see Clean.kt) and list it here. The first one is the default.
 package com.eschouten.agrigate.clean.model
 
-import com.eschouten.agrigate.clean.lely.LelyDiscovery
+import com.eschouten.agrigate.clean.discovery.Discovery
 
-val scraperModels: List<ScraperModel> = listOf(LelyDiscovery)
+val cleanModels: List<CleanModel> = listOf(Discovery)
 
-val defaultModelId: String get() = scraperModels.first().id
+val defaultModelId: String get() = cleanModels.first().id
 
-fun modelFor(id: String): ScraperModel = scraperModels.firstOrNull { it.id == id } ?: scraperModels.first()
+fun modelFor(id: String): CleanModel = cleanModels.firstOrNull { it.id == id } ?: cleanModels.first()

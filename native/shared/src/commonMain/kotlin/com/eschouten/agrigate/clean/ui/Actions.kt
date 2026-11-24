@@ -5,7 +5,7 @@ package com.eschouten.agrigate.clean.ui
 import io.ktor.http.Url
 import com.eschouten.agrigate.clean.app.RobotController
 import com.eschouten.agrigate.clean.app.RobotProfile
-import com.eschouten.agrigate.clean.model.FoundScraper
+import com.eschouten.agrigate.clean.model.FoundRobot
 import com.eschouten.agrigate.clean.texts.tr
 
 object Actions {
@@ -93,7 +93,7 @@ object Actions {
   suspend fun showRoute(c: RobotController, uid: String, route: String, shown: Boolean) = update(c, uid) { it.withRoute(route, shown) }
 
   /** The device picker in a robot's settings. */
-  suspend fun chooseDevice(c: RobotController, uid: String, f: FoundScraper) = update(c, uid) { it.withDevice(f) }
+  suspend fun chooseDevice(c: RobotController, uid: String, f: FoundRobot) = update(c, uid) { it.withDevice(f) }
 
   fun clearLogbook(c: RobotController) = c.clearHistory()
 }

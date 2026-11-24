@@ -43,7 +43,7 @@ class MainActivity : ComponentActivity(), AppHost {
   override fun onCreate(savedInstanceState: Bundle?) {
     enableEdgeToEdge()
     super.onCreate(savedInstanceState)
-    val controller = (application as ScraperApp).controller(intent.getStringExtra("demo"))
+    val controller = (application as CleanApp).controller(intent.getStringExtra("demo"))
     onBackPressedDispatcher.addCallback(
       this,
       object : OnBackPressedCallback(true) {
@@ -64,7 +64,7 @@ class MainActivity : ComponentActivity(), AppHost {
   /** A agrigate-clean://add link (a QR code scanned by the camera): add that robot. */
   private fun open(intent: Intent?) {
     val link = intent?.data?.toString() ?: return
-    val controller = (application as ScraperApp).controller(null)
+    val controller = (application as CleanApp).controller(null)
     lifecycleScope.launch { if (Actions.openLink(controller, link)) nav.home() }
   }
 

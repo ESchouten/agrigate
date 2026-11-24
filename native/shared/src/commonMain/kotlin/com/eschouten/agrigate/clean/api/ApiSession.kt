@@ -1,5 +1,5 @@
 // A robot reached through another device's web API (docs/API.md): the buttons or a computer
-// that holds the Bluetooth link. Behind the same ScraperSession as a robot over Bluetooth, so
+// that holds the Bluetooth link. Behind the same CleanSession as a robot over Bluetooth, so
 // the controller, the screens and the widgets do not know the difference. Every command is a
 // whole session on that device (connect, act, disconnect there); connect() reads the robot.
 // For a type's own screen (the panel) the device keeps its connection open for as long as this
@@ -30,20 +30,20 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlin.concurrent.Volatile
 import com.eschouten.agrigate.clean.app.RobotProfile
-import com.eschouten.agrigate.clean.model.ScraperException
-import com.eschouten.agrigate.clean.model.ScraperFault
-import com.eschouten.agrigate.clean.model.ScraperSession
-import com.eschouten.agrigate.clean.model.ScraperStatus
+import com.eschouten.agrigate.clean.model.CleanException
+import com.eschouten.agrigate.clean.model.CleanFault
+import com.eschouten.agrigate.clean.model.CleanSession
+import com.eschouten.agrigate.clean.model.CleanStatus
 import com.eschouten.agrigate.clean.texts.tr
 
 /** Every answer of the web API. [age]: seconds since [status] was read. */
 @Serializable
 data class ApiAnswer(
   val ok: Boolean,
-  val fault: ScraperFault? = null,
+  val fault: CleanFault? = null,
   val message: String = "",
   val age: Long? = null,
-  val status: ScraperStatus? = null,
+  val status: CleanStatus? = null,
 )
 
 internal val apiJson = Json { ignoreUnknownKeys = true; encodeDefaults = true; explicitNulls = true }
@@ -68,9 +68,9 @@ private val client by lazy {
   }
 }
 
-class ApiSession(private val p: RobotProfile) : ScraperSession {
+class ApiSession(private val p: RobotProfile) : CleanSession {
   private val base = apiBase(p.via)
-  private var status = ScraperStatus()
+  private var status = CleanStatus()
   private var changes = 0
   private val closed = CompletableDeferred<Unit>()
   private val scope = CoroutineScope(Dispatchers.Default)
@@ -146,19 +146,19 @@ class ApiSession(private val p: RobotProfile) : ScraperSession {
     } catch (e: CancellationException) {
       throw e
     } catch (e: Exception) {
-      throw ScraperException(ScraperFault.NotFound, tr.deviceUnreachable(p.via))
+      throw CleanException(CleanFault.NotFound, tr.deviceUnreachable(p.via))
     }
     when (res.status.value) {
-      401 -> throw ScraperException(ScraperFault.AuthRejected, tr.pinRefused)
-      429 -> throw ScraperException(ScraperFault.AuthRejected, tr.tooManyTries)
-      404 -> throw ScraperException(ScraperFault.Failed, tr.notSupported)
+      401 -> throw CleanException(CleanFault.AuthRejected, tr.pinRefused)
+      429 -> throw CleanException(CleanFault.AuthRejected, tr.tooManyTries)
+      404 -> throw CleanException(CleanFault.Failed, tr.notSupported)
     }
     val a = runCatching { apiJson.decodeFromString<ApiAnswer>(res.bodyAsText()) }.getOrNull()
-      ?: throw ScraperException(ScraperFault.Failed, tr.deviceUnreachable(p.via))
+      ?: throw CleanException(CleanFault.Failed, tr.deviceUnreachable(p.via))
     a.status?.takeIf { it != status }?.let {
       status = it
       changes++
     }
-    if (!a.ok) throw ScraperException(a.fault ?: ScraperFault.Failed, a.message)
+    if (!a.ok) throw CleanException(a.fault ?: CleanFault.Failed, a.message)
   }
 }

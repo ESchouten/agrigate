@@ -2,7 +2,7 @@
 #pragma once
 #include <functional>
 #include <vector>
-#include "ScraperDriver.h"
+#include "CleanDriver.h"
 struct FoundRobot { std::string address, name; int rssi; bool classic; };
 struct BtLink: driver::Transport { static std::vector<FoundRobot> scanAll(uint32_t ms = 5000); static void release(); static void start(); static std::function<void()> makeRoom; static std::function<void(const char*)> log; BtLink(std::string, bool = false);
  bool connect() override; bool write(const driver::Bytes&) override; void disconnect() override; void pump(uint32_t) override; uint32_t now() override;

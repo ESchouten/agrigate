@@ -12,8 +12,8 @@ import com.eschouten.agrigate.clean.app.ControllerState
 import com.eschouten.agrigate.clean.app.RobotProfile
 import com.eschouten.agrigate.clean.app.Settings
 import com.eschouten.agrigate.clean.model.Capability
-import com.eschouten.agrigate.clean.model.FoundScraper
-import com.eschouten.agrigate.clean.model.ScraperModel
+import com.eschouten.agrigate.clean.model.FoundRobot
+import com.eschouten.agrigate.clean.model.CleanModel
 import com.eschouten.agrigate.clean.texts.appLanguages
 import com.eschouten.agrigate.clean.texts.tr
 
@@ -191,7 +191,7 @@ fun RobotProfile.withRouteName(r: String, name: String): RobotProfile =
 data class ScanState(
   val scanning: Boolean = false,
   val scanned: Boolean = false,
-  val found: List<FoundScraper> = emptyList(),
+  val found: List<FoundRobot> = emptyList(),
   val selectedId: String? = null,
   val name: String = "",
   val error: String? = null,
@@ -213,7 +213,7 @@ data class ScanView(
 )
 
 class ScanFlow(
-  private val model: ScraperModel,
+  private val model: CleanModel,
   /** Robots that are already added. */
   private val exclude: Set<String?> = emptySet(),
   selectedId: String? = null,
@@ -237,7 +237,7 @@ class ScanFlow(
   }
 
   /** Scan; one robot found and none chosen yet: it is chosen. */
-  suspend fun scan(): List<FoundScraper> {
+  suspend fun scan(): List<FoundRobot> {
     _state.value = _state.value.copy(scanning = true, error = null)
     return try {
       val n = _state.value.name.trim()
@@ -252,7 +252,7 @@ class ScanFlow(
     }
   }
 
-  val selected: FoundScraper? get() = _state.value.let { st -> st.found.firstOrNull { it.id == st.selectedId } }
+  val selected: FoundRobot? get() = _state.value.let { st -> st.found.firstOrNull { it.id == st.selectedId } }
 
   fun view(st: ScanState = _state.value) = ScanView(
     scanning = st.scanning,
@@ -297,5 +297,5 @@ fun deviceScan(s: ControllerState, uid: String, platform: Platform): ScanFlow? {
 }
 
 /** Save the chosen device on a robot (the device picker in robot settings). */
-fun RobotProfile.withDevice(f: FoundScraper): RobotProfile =
+fun RobotProfile.withDevice(f: FoundRobot): RobotProfile =
   if (f.id == robotId) this else copy(robotId = f.id, robotName = f.name, link = f.link, snapshot = null)

@@ -10,9 +10,9 @@
 #include <cstdlib>
 #include <string>
 
-#include "LelyRobot.h"
+#include "DiscoveryRobot.h"
 
-using namespace lely;
+using namespace discovery;
 
 class PipeTransport : public Transport {
  public:

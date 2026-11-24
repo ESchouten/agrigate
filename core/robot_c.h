@@ -2,7 +2,7 @@
  * over HTTP on the farm network. This is what every kind of robot shares there: the drivers
  * (drivers/<name>/, one per server software), a session with one server and the HTTP exchange.
  * What a kind of robot can do is in its own header on top of this one (milk_c.h); a next
- * kind adds its header the same way. Manure scrapers are reached directly: clean_c.h.
+ * kind adds its header the same way. Manure robots are reached directly: clean_c.h.
  *
  * The driver decides what to ask and understands the answers; the HTTP itself is the host's
  * job, as Bluetooth is in clean_c.h. So the same driver runs in the apps, in Python and on a

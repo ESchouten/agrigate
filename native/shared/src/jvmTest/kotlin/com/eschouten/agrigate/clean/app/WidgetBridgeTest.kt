@@ -3,14 +3,14 @@ package com.eschouten.agrigate.clean.app
 
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.TimeZone
-import com.eschouten.agrigate.clean.lely.LelyDiscovery
+import com.eschouten.agrigate.clean.discovery.Discovery
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
-import com.eschouten.agrigate.clean.lely.Simulator
-import com.eschouten.agrigate.clean.lely.SimulatorLink
-import com.eschouten.agrigate.clean.lely.LinkProvider
-import com.eschouten.agrigate.clean.model.scraperModels
+import com.eschouten.agrigate.clean.discovery.Simulator
+import com.eschouten.agrigate.clean.discovery.SimulatorLink
+import com.eschouten.agrigate.clean.discovery.LinkProvider
+import com.eschouten.agrigate.clean.model.cleanModels
 import com.eschouten.agrigate.clean.texts.tr
 import com.eschouten.agrigate.clean.texts.useLanguage
 import com.eschouten.agrigate.clean.ui.Fmt
@@ -23,9 +23,9 @@ import kotlin.test.assertTrue
 
 class WidgetBridgeTest {
   @AfterTest fun reset() {
-    scraperModels.forEach { it.uninstallDemo() }
+    cleanModels.forEach { it.uninstallDemo() }
     Widgets.report = null
-    LelyDiscovery.linkProvider = null
+    Discovery.linkProvider = null
     useLanguage("nl")
   }
 
@@ -33,7 +33,7 @@ class WidgetBridgeTest {
   private val links = mutableListOf<SimulatorLink>()
 
   private fun simulated(vararg args: String): MemoryStore {
-    LelyDiscovery.linkProvider = LinkProvider(
+    Discovery.linkProvider = LinkProvider(
       link = { id -> SimulatorLink(args = args.toList(), id = id).also { links += it } },
       robots = Simulator.robots,
       scanDelayMs = 10,

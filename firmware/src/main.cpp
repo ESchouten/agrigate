@@ -38,7 +38,7 @@
 #include "Manifest.h"
 #include "PinEditor.h"
 #include "ReleaseKey.h"
-#include "ScraperDriver.h"   // the robot driver (platformio.ini)
+#include "CleanDriver.h"   // the robot driver (platformio.ini)
 #include "BtLink.h"
 #include "TextEditor.h"
 #include "Texts.h"
@@ -1543,7 +1543,7 @@ static void handleApi() {
     resultUntil = (millis() + kResultMs) | 1;
     lastActive = millis();
   }
-  // the fault in the apps' terms (ScraperFault), the message in the M5's language
+  // the fault in the apps' terms (CleanFault), the message in the M5's language
   const char* fault = r == Result::Ok                ? ""
                       : r == Result::ConnectFailed   ? "NotFound"
                       : r == Result::PinRejected     ? "AuthRejected"

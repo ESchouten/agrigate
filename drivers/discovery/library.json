@@ -1,5 +1,5 @@
 {
-  "name": "ScraperDriver",
+  "name": "CleanDriver",
   "description": "Lely Discovery driver: protocol, screens and the safety rules behind the robot API",
   "frameworks": "*",
   "platforms": "*",

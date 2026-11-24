@@ -31,7 +31,7 @@ permissions:
   actions: read # the ci run of this commit
 
 jobs:
-  version: # 1.6.120: scraper.version + the build number (commit count + scraper.buildBase)
+  version: # 1.6.120: agrigate.version + the build number (commit count + agrigate.buildBase)
     runs-on: ubuntu-latest
     outputs:
       build: ${{ steps.v.outputs.build }}
@@ -42,9 +42,9 @@ jobs:
           fetch-depth: 0
       - id: v
         run: |
-          BUILD=$(( $(git rev-list --count HEAD) + $(sed -n 's/^scraper.buildBase=//p' native/gradle.properties) ))
+          BUILD=$(( $(git rev-list --count HEAD) + $(sed -n 's/^agrigate.buildBase=//p' native/gradle.properties) ))
           echo "build=$BUILD" >> "$GITHUB_OUTPUT"
-          echo "version=$(sed -n 's/^scraper.version=//p' native/gradle.properties).$BUILD" >> "$GITHUB_OUTPUT"
+          echo "version=$(sed -n 's/^agrigate.version=//p' native/gradle.properties).$BUILD" >> "$GITHUB_OUTPUT"
       - name: Tested? (a release only builds; workflow ci has tested this commit)
         env:
           GH_TOKEN: ${{ github.token }}

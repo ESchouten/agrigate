@@ -13,9 +13,9 @@
 #include <string>
 #include <thread>
 
-#include "LelyRobot.h"
+#include "DiscoveryRobot.h"
 
-using namespace lely;
+using namespace discovery;
 
 namespace {
 

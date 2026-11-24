@@ -41,7 +41,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.InternalComposeUiApi
 import androidx.compose.ui.LocalSystemTheme
 import androidx.compose.ui.SystemTheme
-import com.eschouten.agrigate.clean.model.scraperModels
+import com.eschouten.agrigate.clean.model.cleanModels
 import com.eschouten.agrigate.clean.texts.tr
 import com.eschouten.agrigate.clean.ui.Platform
 import java.io.File
@@ -67,7 +67,7 @@ private val SHOTS = System.getenv("AGRIGATE_SHOTS") ?: "build/screenshots"
 
 @OptIn(InternalComposeUiApi::class)
 class ScenarioTest {
-  @AfterTest fun reset() = scraperModels.forEach { it.uninstallDemo() }
+  @AfterTest fun reset() = cleanModels.forEach { it.uninstallDemo() }
 
   /** The app with the demo robot, at phone size (412 x 892 dp, 2x). */
   private fun scenario(words: String, lang: String = "en", block: ComposeUiTest.(RobotController) -> Unit) =

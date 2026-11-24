@@ -1,6 +1,6 @@
 // How every app starts (Android, desktop, iOS, and their UI tests): the settings from the
-// platform's store, or the demo robot. The demo is the scraper type's in-app robot
-// (ScraperModel.installDemo): the app works exactly as with a robot, without Bluetooth.
+// platform's store, or the demo robot. The demo is the robot type's in-app robot
+// (CleanModel.installDemo): the app works exactly as with a robot, without Bluetooth.
 //
 // Demo words (launch argument "--demo <words>" / environment AGRIGATE_DEMO):
 //   planning=on|off  mode=home|menu|manual|driving|question|abort  lang=nl|en (robot)
@@ -10,7 +10,7 @@
 // The UI tests of both apps start the same way, with the same words.
 package com.eschouten.agrigate.clean.app
 
-import com.eschouten.agrigate.clean.model.scraperModels
+import com.eschouten.agrigate.clean.model.cleanModels
 import com.eschouten.agrigate.clean.texts.useLanguage
 
 object AppStart {
@@ -18,13 +18,13 @@ object AppStart {
   fun controller(store: Store, demo: String? = null, viaWidget: Boolean = false): RobotController {
     if (demo == null) return RobotController(Settings.load(store), store, viaWidget)
     val kv = words(demo)
-    scraperModels.forEach { it.installDemo(kv) }
+    cleanModels.forEach { it.installDemo(kv) }
     val mem = MemoryStore()
     val settings = Settings.load(mem)
     kv["ui"]?.let { settings.language = it }
     settings.apiOn = kv["api"] == "on"
     if (kv["setup"] == "done") {
-      val r = scraperModels.first().demoRobots.first()
+      val r = cleanModels.first().demoRobots.first()
       settings.updateRobot {
         it.copy(
           robotId = r.id, robotName = r.name, pin = "4321",

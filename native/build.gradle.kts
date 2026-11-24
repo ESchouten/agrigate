@@ -19,11 +19,11 @@ buildscript {
 }
 
 // One version for every app (the M5 too, firmware/version.py): MAJOR.MINOR from
-// gradle.properties + the build number (commit count + scraper.buildBase): 1.6.120.
+// gradle.properties + the build number (commit count + agrigate.buildBase): 1.6.120.
 val appBuild = (providers.exec { commandLine("git", "rev-list", "--count", "HEAD"); isIgnoreExitValue = true }
-  .standardOutput.asText.get().trim().toIntOrNull() ?: 0) + providers.gradleProperty("scraper.buildBase").get().toInt()
+  .standardOutput.asText.get().trim().toIntOrNull() ?: 0) + providers.gradleProperty("agrigate.buildBase").get().toInt()
 extra["appBuild"] = appBuild
-extra["appVersion"] = "${providers.gradleProperty("scraper.version").get()}.$appBuild"
+extra["appVersion"] = "${providers.gradleProperty("agrigate.version").get()}.$appBuild"
 // Android: the same SDK levels for the app and both libraries (*/android.gradle)
 extra["androidCompileSdk"] = 37
 extra["androidMinSdk"] = 24

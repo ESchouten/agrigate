@@ -14,10 +14,10 @@
   <uses-permission android:name="android.permission.INTERNET" />
 
   <application
-      android:name=".ScraperApp"
+      android:name=".CleanApp"
       android:label="Agrigate Clean"
       android:icon="@mipmap/ic_launcher"
-      android:theme="@style/Theme.Scraper"
+      android:theme="@style/Theme.Clean"
       android:enableOnBackInvokedCallback="true"
       android:usesCleartextTraffic="true">
     <activity
@@ -51,7 +51,7 @@
         android:name=".WidgetConfigureActivity"
         android:exported="true"
         android:excludeFromRecents="true"
-        android:theme="@style/Theme.Scraper.Dialog">
+        android:theme="@style/Theme.Clean.Dialog">
       <intent-filter><action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" /></intent-filter>
     </activity>
   </application>

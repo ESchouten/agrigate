@@ -6,9 +6,9 @@
 #include <sstream>
 #include <string>
 
-#include "LelyProtocol.h"
+#include "DiscoveryProtocol.h"
 
-using namespace lely;
+using namespace discovery;
 
 static void report(const Screen& s, const std::string& block) {
   if (block.empty()) return;

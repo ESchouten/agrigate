@@ -2,7 +2,7 @@
 
 Three things are kept apart, so that a new robot only adds what is new about it.
 
-- **A kind of robot** is what you can do with it, the same for every make: a manure scraper
+- **A kind of robot** is what you can do with it, the same for every make: a manure robot
   drives routes and has a schedule, a milking robot has a state, alarms and figures. Each kind
   has one API in `core/`, and every app, the buttons and Python use only that.
 - **A driver** (`drivers/<name>/`) is everything about one make: its protocol, its screens or

@@ -10,12 +10,12 @@ sys.path.insert(0, HERE)
 from fake_robot import FakeRobot, encrypt_pin
 
 SRC = os.path.join(DRIVER, "src")
-BIN = os.path.join(tempfile.gettempdir(), "lely_host_test")
+BIN = os.path.join(tempfile.gettempdir(), "discovery_host_test")
 
 
 def build():
     subprocess.check_call(["g++", "-std=c++17", "-O1", "-Wall", "-I", SRC,
-                           os.path.join(SRC, "LelyProtocol.cpp"), os.path.join(SRC, "LelyRobot.cpp"), os.path.join(SRC, "LelyPin.cpp"),
+                           os.path.join(SRC, "DiscoveryProtocol.cpp"), os.path.join(SRC, "DiscoveryRobot.cpp"), os.path.join(SRC, "DiscoveryPin.cpp"),
                            os.path.join(HERE, "host_main.cpp"), "-o", BIN])
 
 
@@ -68,7 +68,7 @@ def replay():
     """Real screens from the robot (Dutch and English, 2026-11-05) through the core's Screen."""
     exe = os.path.join(tempfile.mkdtemp(), "replay")
     subprocess.check_call(["g++", "-std=c++17", "-Wall", "-I", SRC, os.path.join(HERE, "replay.cpp"),
-                           os.path.join(SRC, "LelyProtocol.cpp"), "-o", exe])
+                           os.path.join(SRC, "DiscoveryProtocol.cpp"), "-o", exe])
     with open(os.path.join(HERE, "captures", "2026-11-05-handbediening-en-talen.txt")) as f:
         out = subprocess.run([exe], stdin=f, capture_output=True, text=True, check=True).stdout.split("\n")
     out = [l for l in out if l]

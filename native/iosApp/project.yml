@@ -1,8 +1,8 @@
 # The iOS app (SwiftUI) on top of the shared Kotlin module. Generate the Xcode project with
 #   brew install xcodegen && cd native/iosApp && xcodegen
-# then open ScraperControl.xcodeproj. The build runs Gradle for the Shared framework and
+# then open AgrigateClean.xcodeproj. The build runs Gradle for the Shared framework and
 # set-version.sh for the version (1.6.<build>). UI tests: ./run-ui-tests.sh
-name: ScraperControl
+name: AgrigateClean
 options:
   bundleIdPrefix: com.eschouten.agrigate
   deploymentTarget:
@@ -29,17 +29,17 @@ targetTemplates:
         script: |
           "$SRCROOT/set-version.sh"
 targets:
-  ScraperControl:
+  AgrigateClean:
     type: application
     platform: iOS
     templates: [SharedModule]
-    sources: [ScraperControl, Intents]
+    sources: [AgrigateClean, Intents]
     dependencies:
-      - target: ScraperWidgets
+      - target: CleanWidgets
     # merged with the keys below (GENERATE_INFOPLIST_FILE): plain http to a device on the own
     # network, for a robot through another device's web API (docs/API.md)
     info:
-      path: ScraperControl/Info.plist
+      path: AgrigateClean/Info.plist
       properties:
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
@@ -55,14 +55,14 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription: Om de robot te bedienen via Bluetooth.
-        CODE_SIGN_ENTITLEMENTS: ScraperControl/App.entitlements
+        CODE_SIGN_ENTITLEMENTS: AgrigateClean/App.entitlements
         ENABLE_USER_SCRIPT_SANDBOXING: NO
-  ScraperWidgets:
+  CleanWidgets:
     type: app-extension
     platform: iOS
     templates: [SharedModule]
     deploymentTarget: "17.0"
-    sources: [Widgets, Intents, ScraperControl/Theme.swift]   # the app's colours and route badge
+    sources: [Widgets, Intents, AgrigateClean/Theme.swift]   # the app's colours and route badge
     info:
       path: Widgets/Info.plist
       properties:
@@ -77,23 +77,23 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.eschouten.agrigate.clean.widgets
         CODE_SIGN_ENTITLEMENTS: Widgets/Widgets.entitlements
-  ScraperControlUITests:
+  AgrigateCleanUITests:
     type: bundle.ui-testing
     platform: iOS
     sources: [UITests]
     dependencies:
-      - target: ScraperControl
+      - target: AgrigateClean
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
         PRODUCT_BUNDLE_IDENTIFIER: com.eschouten.agrigate.clean.uitests
-        TEST_TARGET_NAME: ScraperControl
+        TEST_TARGET_NAME: AgrigateClean
 schemes:
-  ScraperControl:
+  AgrigateClean:
     build:
       targets:
-        ScraperControl: all
-        ScraperControlUITests: [test]
+        AgrigateClean: all
+        AgrigateCleanUITests: [test]
     test:
-      targets: [ScraperControlUITests]
+      targets: [AgrigateCleanUITests]
       gatherCoverageData: false
