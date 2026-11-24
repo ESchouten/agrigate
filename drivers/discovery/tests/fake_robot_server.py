@@ -1,6 +1,6 @@
 """The simulated robot over stdin/stdout, for tests in other languages (the Kotlin tests and the desktop simulator).
 
-    python3 drivers/lely/tests/fake_robot_server.py [--mode home|menu|driving] [--planning on|off] [--version HEX] [--lang nl|en]
+    python3 drivers/discovery/tests/fake_robot_server.py [--mode home|menu|driving] [--planning on|off] [--version HEX] [--lang nl|en]
 
 stdin:  u16-LE length + bytes   (what the client writes to RX)
 stdout: u16-LE length + bytes   (notifications from TX)

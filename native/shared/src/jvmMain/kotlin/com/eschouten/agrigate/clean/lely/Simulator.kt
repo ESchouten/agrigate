@@ -1,6 +1,6 @@
-// Desktop development and tests: the simulated robot (drivers/lely/tests/fake_robot_server.py)
+// Desktop development and tests: the simulated robot (drivers/discovery/tests/fake_robot_server.py)
 // instead of Bluetooth, so the whole app (with the real C++ core) runs without a robot.
-//   AGRIGATE_SIMULATOR=../drivers/lely/tests/fake_robot_server.py ./gradlew :composeApp:run
+//   AGRIGATE_SIMULATOR=../drivers/discovery/tests/fake_robot_server.py ./gradlew :composeApp:run
 //   AGRIGATE_SIMULATOR_ARGS="--planning off"   (optional)
 // The tests get the script in SIMULATOR_SCRIPT (build.gradle.kts). The simulator's PIN is 4321.
 package com.eschouten.agrigate.clean.lely

@@ -1,7 +1,7 @@
-# LFW live driver
+# Astronaut live driver
 
 Which cow is in a milking robot's box, from the robot's own messages (`core/live_c.h`). Link: `udp`,
-port 6000 on the robot. The driver is `src/Lfw.cpp`.
+port 6000 on the robot. The driver is `src/Astronaut.cpp`.
 
 ## How
 

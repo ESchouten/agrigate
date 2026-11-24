@@ -7,7 +7,7 @@
  * to send and is handed what came back from the robot's address. Like robot_c.h and clean_c.h
  * there are no threads and no callbacks, so the same driver runs in the apps, in Python and on a
  * microcontroller:
- *   s = live_open("lfw", "10.4.1.101")
+ *   s = live_open("astronaut", "10.4.1.101")
  *   every ~100 ms:  live_tick(s, now_ms)
  *                   while ((n = live_outgoing(s, buf, size)) > 0) send buf[0..n) to address:port
  *   on a datagram from the robot:  live_incoming(s, data, len, now_ms)

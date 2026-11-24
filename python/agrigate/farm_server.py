@@ -7,7 +7,7 @@ network, such as a camera system that wants to know which cow it sees (docs/FARM
 The configuration (JSON):
     {"listen": "0.0.0.0:8099",
      "token": "",
-     "robots": [{"name": "Robot 1", "driver": "lfw", "address": "10.4.1.101"}, ...],
+     "robots": [{"name": "Robot 1", "driver": "astronaut", "address": "10.4.1.101"}, ...],
      "server": {"driver": "t4c", "address": "10.4.1.1:6969", "user": "", "password": ""},
      "cowRefreshSeconds": 300}
 "token": what every request carries (Authorization: Bearer <token>); without one only this

@@ -62,7 +62,7 @@ class FakeFarm:
 def start(server=True, token=""):
     FakeListener.made = []
     config = {"listen": "127.0.0.1:0", "token": token,
-              "robots": [{"name": "Robot 1", "driver": "lfw", "address": "10.4.1.101"}, {"name": "Robot 2", "driver": "lfw", "address": "10.4.1.102"}]}
+              "robots": [{"name": "Robot 1", "driver": "astronaut", "address": "10.4.1.101"}, {"name": "Robot 2", "driver": "astronaut", "address": "10.4.1.102"}]}
     if server:
         config["server"] = {"driver": "t4c", "address": "10.4.1.1:6969", "user": "", "password": "key"}
     httpd, service = serve(config, listener=FakeListener, farm=FakeFarm)
@@ -96,7 +96,7 @@ def test_robots_with_the_herd_added():
     assert [r["animal"] for r in get(base, "/api/robots")["robots"]] == [None, None]
     FakeListener.made[1].arrive("15", "DINA 1", "1000015")
     robot = get(base, "/api/robots")["robots"][1]
-    assert (robot["name"], robot["address"], robot["driver"]) == ("Robot 2", "10.4.1.102", "lfw")
+    assert (robot["name"], robot["address"], robot["driver"]) == ("Robot 2", "10.4.1.102", "astronaut")
     a = robot["animal"]
     assert (a["number"], a["name"], a["responder"], a["lifeNumber"], a["reproduction"], a["daysInMilk"], a["expectedCalving"]) == (
         "15", "DINA 1", "1000015", "NL 100000001", "pregnant", 162, "2027-06-24")
