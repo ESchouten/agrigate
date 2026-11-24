@@ -21,7 +21,7 @@ import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
 
 object Simulator {
-  val robots = listOf(FoundRobot("00:12:FF:51:4D:00", "Simulator", -48), FoundRobot("00:12:FF:51:4D:01", "Simulator", -71))
+  val robots = listOf(FoundDevice("00:12:FF:51:4D:00", "Simulator", -48), FoundDevice("00:12:FF:51:4D:01", "Simulator", -71))
 
   /** The desktop app's simulator (AGRIGATE_SIMULATOR), or null. */
   fun provider(script: String? = System.getenv("AGRIGATE_SIMULATOR")?.takeIf { it.isNotBlank() }, args: List<String> = envArgs(), frameDelayMs: Long = 40, scanDelayMs: Long = 2_000): LinkProvider? {

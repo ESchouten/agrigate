@@ -320,7 +320,7 @@ class FakeRobotLink(
 
 /** The fake robot for every Lely robot: the apps' demo mode, scenarios and screenshots. */
 object Demo {
-  val robots = listOf(FoundRobot("00:12:FF:51:4D:00", "Demo", -48), FoundRobot("00:12:FF:51:4D:01", "Demo 2", -71))
+  val robots = listOf(FoundDevice("00:12:FF:51:4D:00", "Demo", -48), FoundDevice("00:12:FF:51:4D:01", "Demo 2", -71))
 
   /** The last link made, to read what the robot saw. */
   var last: FakeRobotLink? = null

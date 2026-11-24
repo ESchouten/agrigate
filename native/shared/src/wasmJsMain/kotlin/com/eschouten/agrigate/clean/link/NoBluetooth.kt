@@ -14,6 +14,6 @@ internal actual fun robotScanner(): PlatformScanner = Scanner()
 
 internal actual suspend fun afterConnect(p: Peripheral) {}
 
-internal actual suspend fun findClassicRobots(spec: LinkSpec.BtSerial): List<FoundRobot> = emptyList()
+internal actual suspend fun findClassicRobots(spec: LinkSpec.BtSerial): List<FoundDevice> = emptyList()
 
 internal actual fun btSerialLink(spec: LinkSpec.BtSerial, id: String): RobotLink? = null

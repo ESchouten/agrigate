@@ -25,7 +25,7 @@ import com.eschouten.agrigate.clean.texts.tr
 /** Replaces Bluetooth with a simulated robot (desktop development, tests): see Simulator. */
 class LinkProvider(
   val link: (id: String) -> RobotLink,
-  val robots: List<FoundRobot>,
+  val robots: List<FoundDevice>,
   val scanDelayMs: Long = 2_000,
 )
 

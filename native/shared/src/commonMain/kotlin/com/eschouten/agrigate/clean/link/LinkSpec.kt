@@ -44,7 +44,7 @@ sealed class LinkSpec {
 val driverLinks: List<LinkSpec> by lazy { LinkSpec.parseList(nativeLinksJson()) }
 
 /** Classic Bluetooth robots nearby (by [spec]'s address prefix); empty where the platform has none. */
-internal expect suspend fun findClassicRobots(spec: LinkSpec.BtSerial): List<FoundRobot>
+internal expect suspend fun findClassicRobots(spec: LinkSpec.BtSerial): List<FoundDevice>
 
 /** A classic Bluetooth link to [id]; null where the platform has none. */
 internal expect fun btSerialLink(spec: LinkSpec.BtSerial, id: String): RobotLink?
@@ -53,7 +53,7 @@ internal expect fun btSerialLink(spec: LinkSpec.BtSerial, id: String): RobotLink
  *  finds any is the answer. So a robot that speaks more than one goes over the preferred, and a
  *  classic search (which spoils a BLE scan running next to it) only runs when BLE found none.
  *  [name]: the advertised name, if known. */
-suspend fun scanRobots(name: String? = null): List<FoundRobot> {
+suspend fun scanRobots(name: String? = null): List<FoundDevice> {
   for (spec in driverLinks) {
     val found = when (spec) {
       is LinkSpec.BleSerial -> findRobots(spec, name)

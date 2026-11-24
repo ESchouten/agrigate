@@ -31,12 +31,12 @@ internal object DesktopBt {
 /** How long a search listens for classic devices, like Android. */
 private const val DISCOVERY_MS = 8_000
 
-internal actual suspend fun findClassicRobots(spec: LinkSpec.BtSerial): List<FoundRobot> {
+internal actual suspend fun findClassicRobots(spec: LinkSpec.BtSerial): List<FoundDevice> {
   if (!DesktopBt.supported) return emptyList()
   val json = withContext(Dispatchers.IO) { DesktopBt.nativeBtFind(spec.addressPrefix, DISCOVERY_MS) }
   return Json.parseToJsonElement(json).jsonArray.map {
     val o = it.jsonObject
-    FoundRobot(o["address"]!!.jsonPrimitive.content, o["name"]!!.jsonPrimitive.content, o["rssi"]!!.jsonPrimitive.int, spec.kind)
+    FoundDevice(o["address"]!!.jsonPrimitive.content, o["name"]!!.jsonPrimitive.content, o["rssi"]!!.jsonPrimitive.int, spec.kind)
   }
 }
 

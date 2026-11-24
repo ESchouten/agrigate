@@ -24,7 +24,7 @@ import com.eschouten.agrigate.clean.core.RobotLink
 
 
 /** A robot found nearby, over link [kind] (LinkSpec.kind; "" = the driver's preferred). */
-data class FoundRobot(val id: String, val name: String, val rssi: Int, val kind: String = "")
+data class FoundDevice(val id: String, val name: String, val rssi: Int, val kind: String = "")
 
 /** Why Bluetooth cannot be used right now. */
 enum class BluetoothProblem { Off, Denied, Unsupported }
@@ -50,13 +50,13 @@ private fun LinkSpec.BleSerial.matches(a: Advertisement, name: String?): Boolean
 
 /** Scan for robots of [spec] for [timeoutMs]; strongest signal first. [name]: the robot's
  *  advertised name; needed on iOS/macOS. */
-suspend fun findRobots(spec: LinkSpec.BleSerial, name: String? = null, timeoutMs: Long = 5_000): List<FoundRobot> {
-  val found = mutableMapOf<String, FoundRobot>()
+suspend fun findRobots(spec: LinkSpec.BleSerial, name: String? = null, timeoutMs: Long = 5_000): List<FoundDevice> {
+  val found = mutableMapOf<String, FoundDevice>()
   withTimeoutOrNull(timeoutMs) {
     robotScanner().advertisements.collect { a ->
       if (spec.matches(a, name)) {
         val id = a.identifier.toString()
-        found[id] = FoundRobot(id, a.name ?: a.peripheralName ?: "", a.rssi, spec.kind)
+        found[id] = FoundDevice(id, a.name ?: a.peripheralName ?: "", a.rssi, spec.kind)
       }
     }
   }
