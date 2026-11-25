@@ -49,8 +49,9 @@ Ten requests and one more per 150 animals:
 
 "Keep open" is a pregnancy check result in T4C; when a heat is entered afterwards, T4C sets the
 animal's status back to open (7, open cycling), while the `do-not-breeds` event stays. The driver
-gives `doNotBreedDate` and the reproduction `doNotBreed` when that event is after the animal's last
-calving and last insemination (and she is not pregnant); `reproductionRaw` keeps T4C's own status.
+gives the date of the last such event; the herd API (`core/cow_c.h`) counts it when it is after the
+animal's last calving and last insemination, and then says `doNotBreed` for an animal that is not
+pregnant. `reproductionRaw` keeps T4C's own status.
 
 The `integrationglobal` lists are the ICAR Animal Data Exchange format; without dates they give the
 whole history (on the server checked: 983 inseminations since 2013 in 0.8 s). Their times are a

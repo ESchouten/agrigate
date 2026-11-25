@@ -11,13 +11,6 @@ namespace agrigate {
 namespace cow {
 namespace {
 
-std::string number(double v) {
-  if (v < 0) return "null";
-  char b[32];
-  snprintf(b, sizeof b, "%.10g", v);
-  return b;
-}
-
 // days since 1970-01-01 and back (Howard Hinnant's civil calendar), for the day after a UTC evening
 long daysFrom(int y, unsigned m, unsigned d) {
   y -= m <= 2;
@@ -61,6 +54,9 @@ std::string Herd::json() const {
     std::stable_sort(a.inseminations.begin(), a.inseminations.end(), [](const Insemination& x, const Insemination& y) { return x.date < y.date; });
     std::stable_sort(a.pregnancyChecks.begin(), a.pregnancyChecks.end(), [](const PregnancyCheck& x, const PregnancyCheck& y) { return x.date < y.date; });
     std::stable_sort(a.heats.begin(), a.heats.end(), [](const Heat& x, const Heat& y) { return x.date < y.date; });
+    // "Do not breed" holds until a calving or an insemination after it, whatever status the server kept
+    if (a.doNotBreedDate < a.calvingDate || (!a.inseminations.empty() && a.doNotBreedDate < a.inseminations.back().date)) a.doNotBreedDate.clear();
+    if (!a.doNotBreedDate.empty() && a.reproduction != std::string(reproduction::Pregnant)) a.reproduction = reproduction::DoNotBreed;
     o += std::string(i ? "," : "") + "{\"id\":" + quote(a.id) + ",\"number\":" + quote(a.number) + ",\"name\":" + quote(a.name) +
          ",\"lifeNumber\":" + quote(a.lifeNumber) + ",\"workNumber\":" + quote(a.workNumber) + ",\"responder\":" + quote(a.responder) +
          ",\"birthDate\":" + quote(a.birthDate) + ",\"group\":" + quote(a.group) + ",\"production\":" + quote(a.production) +

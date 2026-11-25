@@ -4,6 +4,7 @@
 
 In it: every driver (drivers/<name>/src) with what they share (core/session).
 """
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -31,7 +32,9 @@ def build(out: Path = HERE / LIBNAME) -> Path:
     if sys.platform == "win32":   # MinGW: its runtime inside the DLL, so Python finds no missing libstdc++/libgcc
         flags += ["-static"]
     includes = [arg for d in folders() for arg in ("-I", str(d))]
-    subprocess.check_call([cxx, *flags, *includes, *(str(f) for f in sources() if f.suffix == ".cpp"), "-o", str(out)])
+    part = out.with_name(f"{out.name}.{os.getpid()}")   # whole or not at all: another process may be loading or building it
+    subprocess.check_call([cxx, *flags, *includes, *(str(f) for f in sources() if f.suffix == ".cpp"), "-o", str(part)])
+    os.replace(part, out)
     return out
 
 

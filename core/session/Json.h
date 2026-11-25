@@ -33,4 +33,7 @@ void utf8(std::string& out, unsigned codepoint);
 /** [s] as a JSON string, quotes included. */
 std::string quote(const std::string& s);
 
+/** [v] as a JSON number; null for a figure that is not known (below 0). */
+std::string number(double v);
+
 }  // namespace agrigate

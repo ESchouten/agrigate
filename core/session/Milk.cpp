@@ -1,21 +1,11 @@
 // The milking robot API (core/milk_c.h) on a session.
 #include "milk_c.h"
 
-#include <cstdio>
-
 #include "Session.h"
 
 namespace agrigate {
 
 namespace milk {
-namespace {
-std::string number(double v) {
-  if (v < 0) return "null";
-  char b[32];
-  snprintf(b, sizeof b, "%.10g", v);
-  return b;
-}
-}  // namespace
 
 std::string Farm::json() const {
   std::string o = "{\"updated\":" + timeJson(updated) + ",\"robots\":[";

@@ -227,24 +227,13 @@ void readCow(Session& s) {
             if (d > x->dryOffDate) x->dryOffDate = d;
           }
       }, true);
-      // "Do not breed" (T4C: "keep open"): T4C sets the status back to open after a heat, the event stays.
-      // It counts when it is after the last calving and after the last insemination (asked last, so those are in).
+      // T4C calls it "keep open", and sets the status back to open after a heat while the event stays
       s.get("/t4capi/integrationglobal/do-not-breeds" + farm, [&s, h](const Json& answer) {
         for (const Json& e : answer["data"].items)
           if (cow::Animal* x = animal(s, *h, e["animal"])) {
             const std::string d = cow::day(e["eventDateTime"].str());
             if (d > x->doNotBreedDate) x->doNotBreedDate = d;
           }
-        for (cow::Animal& x : s.cow.animals) {
-          if (x.doNotBreedDate.empty()) continue;
-          std::string lastIns;
-          for (const cow::Insemination& n : x.inseminations) lastIns = std::max(lastIns, n.date);
-          if (x.doNotBreedDate < x.calvingDate || x.doNotBreedDate < lastIns) {
-            x.doNotBreedDate.clear();   // from before: no longer so
-            continue;
-          }
-          if (x.reproduction != std::string(cow::reproduction::Pregnant)) x.reproduction = cow::reproduction::DoNotBreed;
-        }
       }, true);
     });
   });
