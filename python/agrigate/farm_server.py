@@ -36,7 +36,8 @@ VERSION = 2
 EVENTS_KEPT = 1000
 WAIT_MAX = 60
 # what an identified animal carries from the herd, next to what the source said
-HERD_FIELDS = ("lifeNumber", "workNumber", "production", "reproduction", "lactation", "daysInMilk", "pregnantDays", "expectedCalving")
+HERD_FIELDS = ("lifeNumber", "workNumber", "production", "reproduction", "lactation", "daysInMilk", "pregnantDays", "expectedCalving",
+               "daysSinceInsemination", "daysSinceHeat")
 
 
 class FarmService:

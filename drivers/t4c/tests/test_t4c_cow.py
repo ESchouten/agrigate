@@ -30,7 +30,8 @@ def server() -> FakeFarm:
             {"Id": 7, "LifeNumber": "NL 100000002", "Name": "JANNA 2", "UserNumber": 41, "ResponderNumber": "1000041", "BirthDate": "2023-05-15T00:00:00", "Location": "Melkvee 1"},
             {"Id": 9, "LifeNumber": "NL 100000003", "Name": "GLORIA 3", "UserNumber": 3055, "ResponderNumber": "", "BirthDate": "2025-05-18T00:00:00", "Location": "Jongvee"}]),
         "GET /t4capi/Animal/status?animalIds=4&animalIds=7&animalIds=9": answer([
-            {"AnimalId": 4, "ReproductionStatus": "Pregnant", "ReproductionStatusId": 4, "ProductionStatus": "In Lactation", "LactationNumber": 6, "DaysInLactation": 162, "PregnancyDays": 67},
+            {"AnimalId": 4, "ReproductionStatus": "Pregnant", "ReproductionStatusId": 4, "ProductionStatus": "In Lactation", "LactationNumber": 6, "DaysInLactation": 162, "PregnancyDays": 67,
+             "DaysSinceInsemination": 67, "DaysSinceHeat": 88, "NumberOfInseminations": 2},
             {"AnimalId": 7, "ReproductionStatus": "Inseminated", "ReproductionStatusId": 3, "ProductionStatus": "In Lactation", "LactationNumber": 2, "DaysInLactation": 100, "PregnancyDays": 0},
             {"AnimalId": 9, "ReproductionStatus": "Never Inseminated", "ReproductionStatusId": 2, "ProductionStatus": "Young Stock", "LactationNumber": 0, "DaysInLactation": 0, "PregnancyDays": 0}]),
         "GET /t4capi/v2/herds": answer([{"HerdName": "Kudde", "UCNNumber": "12345"}]),
@@ -51,6 +52,14 @@ def server() -> FakeFarm:
         "GET /t4capi/integrationglobal/gestations?ucnNumber=12345": answer([
             {"Animal": icar("NL 100000001"), "ExpectedCalvingDate": "2027-06-23T22:00:00Z"},
             {"Animal": icar("NL 100000002"), "ExpectedCalvingDate": "2026-12-01T23:00:00Z"}]),   # no longer pregnant
+        "GET /t4capi/integrationglobal/heats?ucnNumber=12345": answer([
+            {"HeatDetectionMethod": "Visual", "Certainty": "InHeat", "Animal": icar("NL 100000001"), "EventDateTime": "2026-08-27T09:20:14Z"},
+            {"HeatDetectionMethod": "Activity", "Certainty": "InHeat", "Animal": icar("NL 100000001"), "EventDateTime": "2026-08-06T10:00:00Z"}]),
+        "GET /t4capi/integrationglobal/drying-offs?ucnNumber=12345": answer([
+            {"Animal": icar("NL 100000001"), "EventDateTime": "2025-05-01T10:00:00Z"},
+            {"Animal": icar("NL 100000001"), "EventDateTime": "2026-04-20T10:00:00Z"}]),
+        "GET /t4capi/integrationglobal/do-not-breeds?ucnNumber=12345": answer([
+            {"Animal": icar("NL 100000001"), "EventDateTime": "2025-12-01T23:00:00Z"}]),   # before her last calving: no longer so
     }
     return farm
 
@@ -71,6 +80,8 @@ def test_the_herd():
     assert (cow["name"], cow["lifeNumber"], cow["responder"], cow["birthDate"], cow["group"]) == ("DINA 1", "NL 100000001", "1000015", "2019-01-12", "Melkvee 1")
     assert (cow["production"], cow["reproduction"], cow["reproductionRaw"], cow["lactation"], cow["daysInMilk"]) == ("milking", "pregnant", "Pregnant", 6, 162)
     assert (cow["pregnantDays"], cow["calvingDate"], cow["expectedCalving"], cow["workNumber"]) == (67, "2026-06-14", "2027-06-24", "")
+    assert (cow["daysSinceInsemination"], cow["daysSinceHeat"], cow["inseminationsThisLactation"]) == (67, 88, 2)
+    assert (cow["dryOffDate"], cow["doNotBreedDate"]) == ("2026-04-20", "")
 
 
 def test_events_in_date_order_on_the_farms_day():
@@ -80,6 +91,7 @@ def test_events_in_date_order_on_the_farms_day():
         ("2026-08-28", "GERRIT", "39943", "ai"), ("2026-09-17", "GERRIT", "39943", "ai")]
     assert cow["inseminations"][1]["sireLifeNumber"] == "NL 728457683"
     assert cow["pregnancyChecks"] == [{"date": "2026-11-23", "result": "pregnant"}]
+    assert cow["heats"] == [{"date": "2026-08-06", "method": "activity"}, {"date": "2026-08-27", "method": "visual"}]
 
 
 def test_open_and_young_stock():
@@ -88,6 +100,23 @@ def test_open_and_young_stock():
     assert two["reproduction"] == "inseminated" and two["expectedCalving"] == "" and two["pregnantDays"] is None
     assert two["inseminations"][0]["type"] == "bull" and two["pregnancyChecks"] == [{"date": "2026-01-02", "result": "notPregnant"}]
     assert (young["production"], young["reproduction"], young["daysInMilk"], young["responder"]) == ("young", "open", None, "")
+    assert (two["heats"], two["dryOffDate"], two["daysSinceHeat"]) == ([], "", None)
+
+
+def test_do_not_breed_stays_after_a_heat():
+    """T4C sets "keep open" back to open after a heat is entered; the do-not-breed event says otherwise."""
+    farm = server()
+    farm.routes["GET /t4capi/integrationglobal/do-not-breeds?ucnNumber=12345"] = answer([
+        {"Animal": icar("NL 100000002"), "EventDateTime": "2026-11-19T23:00:00Z"},    # after her insemination of 17 November
+        {"Animal": icar("NL 100000001"), "EventDateTime": "2025-12-01T23:00:00Z"}])
+    animals, notes = herd(farm)
+    two = animals["41"]
+    assert (two["reproduction"], two["reproductionRaw"], two["doNotBreedDate"]) == ("doNotBreed", "Inseminated", "2026-11-20")
+    assert animals["15"]["reproduction"] == "pregnant" and animals["15"]["doNotBreedDate"] == ""
+    farm.routes["GET /t4capi/integrationglobal/do-not-breeds?ucnNumber=12345"] = answer([
+        {"Animal": icar("NL 100000002"), "EventDateTime": "2026-11-10T23:00:00Z"}])   # inseminated again since
+    two = herd(farm)[0]["41"]
+    assert (two["reproduction"], two["doNotBreedDate"]) == ("inseminated", "")
 
 
 def test_licence_key_instead_of_a_login():

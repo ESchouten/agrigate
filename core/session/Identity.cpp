@@ -9,6 +9,11 @@ namespace {
 
 constexpr int64_t kSameMs = 5000;
 constexpr size_t kEventsKept = 200;
+constexpr int64_t kMilkedWithinMs = 60000;   // the animal milked was identified at most this long before or after the start
+constexpr int64_t kSettleMs = 10000;
+constexpr int64_t kRefusedWithinMs = 30000;   // a refusal record comes at most this long after the cow was identified         // a start is told this long after it (or at the next event of the place)
+constexpr size_t kRecentKept = 8;
+constexpr int64_t kSameMilkingMs = 120000;   // a start within this time of the last one is the same milking (a missed visit end otherwise)
 
 std::string animalJson(const Animal& a) {
   return "\"number\":" + quote(a.number) + ",\"name\":" + quote(a.name) + ",\"responder\":" + quote(a.responder);
@@ -25,13 +30,79 @@ Place& Places::place(const std::string& id, const char* kind) {
   return places.back();
 }
 
+void Places::add(const Place& p, const char* kind, const Animal& a, int64_t now) {
+  Event e;
+  e.seq = ++seq_;
+  e.time = now;
+  e.place = p.id;
+  e.animal = a;
+  e.kind = kind;
+  events_.push_back(e);
+  while (events_.size() > kEventsKept) events_.pop_front();
+}
+
 void Places::identified(Place& p, const Animal& a, int64_t now) {
+  if (p.pendingStart && now - p.pendingStart >= kSettleMs) tellStart(p);
   if (p.occupied && p.animal.responder == a.responder && p.animal.number == a.number && now - p.since < kSameMs) return;
   p.occupied = true;
   p.animal = a;
   p.since = now;
-  events_.push_back({++seq_, now, p.id, a});
-  while (events_.size() > kEventsKept) events_.pop_front();
+  p.recent.push_back({now, a});
+  while (p.recent.size() > kRecentKept) p.recent.pop_front();
+  add(p, event::Identified, a, now);
+}
+
+void Places::milkingStarted(Place& p, int64_t now) {
+  if (p.milkingSince && now - p.milkingSince < kSameMilkingMs) return;   // the same milking (the cups again)
+  if (p.pendingStart) tellStart(p);
+  p.milkingSince = now;
+  p.pendingStart = now;   // told by settle() or the next event: an identification may come with it
+}
+
+// The animal milked is the one identified closest in time to the start (within a minute): on a robot
+// the cow in the box is identified at the moment the milking starts, a cow walking past (into the next
+// robot) some time before or after it.
+void Places::tellStart(Place& p) {
+  const int64_t start = p.pendingStart;
+  p.pendingStart = 0;
+  const Animal* best = nullptr;
+  int64_t bestGap = kMilkedWithinMs + 1;
+  for (const auto& r : p.recent) {
+    const int64_t gap = r.first > start ? r.first - start : start - r.first;
+    if (gap <= bestGap) { bestGap = gap; best = &r.second; }   // equal gap: the later one
+  }
+  p.milked = best ? *best : Animal();
+  if (best) {
+    p.occupied = true;
+    p.animal = *best;
+  }
+  add(p, event::MilkingStarted, p.milked, start);
+}
+
+void Places::refused(Place& p, const std::string& responder, int64_t now) {
+  // A refusal record comes some seconds after the cow was identified and without a milking; the same
+  // record also comes at the end of a milking, which is not a refusal.
+  const std::pair<int64_t, Animal>* id = nullptr;
+  for (auto it = p.recent.rbegin(); it != p.recent.rend(); ++it)
+    if (it->second.responder == responder) { id = &*it; break; }
+  if (!id || now - id->first > kRefusedWithinMs) return;
+  const int64_t started = p.pendingStart ? p.pendingStart : p.milkingSince;
+  if (started && started >= id->first - kMilkedWithinMs) return;        // she is (or was just) being milked
+  if (p.lastEnd && p.lastEnd >= id->first) return;                      // the record of a milking that just ended
+  add(p, event::Refused, id->second, now);
+}
+
+void Places::settle(int64_t now) {
+  for (Place& p : places)
+    if (p.pendingStart && now - p.pendingStart >= kSettleMs) tellStart(p);
+}
+
+void Places::visitEnded(Place& p, int64_t now) {
+  if (p.pendingStart) tellStart(p);
+  const bool milking = p.milkingSince != 0;
+  p.milkingSince = 0;
+  p.lastEnd = now;
+  add(p, event::VisitEnded, milking ? p.milked : Animal(), now);
 }
 
 std::string Places::json() const {
@@ -39,7 +110,8 @@ std::string Places::json() const {
   for (size_t i = 0; i < places.size(); i++) {
     const Place& p = places[i];
     o += std::string(i ? "," : "") + "{\"id\":" + quote(p.id) + ",\"name\":" + quote(p.name) + ",\"kind\":" + quote(p.kind) + ",\"animal\":" +
-         (p.occupied ? "{" + animalJson(p.animal) + ",\"since\":" + std::to_string(p.since) + "}" : "null") + "}";
+         (p.occupied ? "{" + animalJson(p.animal) + ",\"since\":" + std::to_string(p.since) + "}" : "null") +
+         ",\"milking\":" + (p.milkingSince ? "true" : "false") + ",\"milkingSince\":" + (p.milkingSince ? std::to_string(p.milkingSince) : "null") + "}";
   }
   return o + "]}";
 }
@@ -50,7 +122,7 @@ std::string Places::eventsJson(int64_t after) const {
   for (const Event& e : events_) {
     if (e.seq <= after) continue;
     o += std::string(first ? "" : ",") + "{\"seq\":" + std::to_string(e.seq) + ",\"time\":" + std::to_string(e.time) +
-         ",\"kind\":\"identified\",\"place\":" + quote(e.place) + ",\"animal\":{" + animalJson(e.animal) + "}}";
+         ",\"kind\":" + quote(e.kind) + ",\"place\":" + quote(e.place) + ",\"animal\":{" + animalJson(e.animal) + "}}";
     first = false;
   }
   return o + "],\"last\":" + std::to_string(seq_) + "}";

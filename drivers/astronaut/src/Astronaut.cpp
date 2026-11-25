@@ -3,8 +3,9 @@
 //
 // The robot's own computer runs a proxy on UDP port 6000 that hands every internal LFW message to the clients
 // registered with it (the farm software T4C registers the same way). This driver registers, renews
-// that every 2 s and reads one message: "cow number and name", which the robot sends when it has
-// read a cow's responder at the start of a visit. It never sends an LFW message itself.
+// that every 2 s and reads three messages: "cow number and name" (the robot has read a cow's
+// responder), "start milking" and "visit end" (the robot lets the cow out). It never sends an LFW
+// message itself.
 // See ../API.md for the format and what was checked on real robots.
 #include <cstring>
 
@@ -16,6 +17,10 @@ namespace {
 constexpr uint32_t kMagicMessage = 0xD156;    // a message the proxy hands on
 constexpr uint32_t kMagicClient = 0xD157;     // a client (de)registering
 constexpr uint16_t kCowNumberName = 0x116;    // MSG_REQUEST_COW_NR_NAME: responder, cow number, name
+constexpr uint16_t kStartMilking = 0x002;     // start milking: the cups go on (data: the teat positions)
+constexpr uint16_t kDbRecord = 0x3F7;        // MSG_DB_COLINFO: a record for the farm software; table 18 = a visit without milking (u32 responder at data[8])
+constexpr uint16_t kRefusalTable = 18;
+constexpr uint16_t kVisitEnd = 0x402;         // data[0] 1: milking done, the cow may leave (~8 s after the cups are off); 0 ~30 s later
 constexpr int64_t kRenewMs = 2000;
 const char kClientName[] = "agrigate";  // how the proxy lists this client (22 bytes at most)
 
@@ -52,18 +57,27 @@ identity::Place& box(Session& s) { return s.identity.place(s.address, identity::
 
 void tick(Session& s) {
   box(s);   // the robot is a place from the start, also while it says nothing
+  s.identity.settle(s.now);
   if (s.now - s.sentAt < kRenewMs) return;
   s.send(registration(true));
   s.sentAt = s.now;
 }
 
 void incoming(Session& s, const std::string& d) {
-  // <u32 magic 0xD156> <u16 message> <u16 sender> <u16 destination> <u16 length> data
+  // <u32 magic 0xD156> <u16 message> <u16 destination> <u16 sender> <u16 length> data
   if (d.size() < 12 || u32(d, 0) != kMagicMessage) return;
   s.heard();
   s.identity.updated = s.now;
   const uint16_t id = u16(d, 4), length = u16(d, 10);
-  if (id != kCowNumberName || length < 12 || d.size() < 12u + length) return;
+  if (d.size() < 12u + length) return;
+  if (id == kStartMilking && length >= 38) return s.identity.milkingStarted(box(s), s.now);
+  if (id == kVisitEnd && length >= 1 && d[12] == 1) return s.identity.visitEnded(box(s), s.now);
+  if (id == kDbRecord && length >= 12 && u16(d, 12 + 6) == kRefusalTable) {
+    const uint32_t responder = u32(d, 12 + 8);
+    if (responder && responder < 100000000) s.identity.refused(box(s), std::to_string(responder), s.now);
+    return;
+  }
+  if (id != kCowNumberName || length < 12) return;
   const std::string data = d.substr(12, length);
   const uint32_t responder = u32(data, 0), number = u32(data, 4);
   identity::Animal a;

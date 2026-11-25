@@ -60,12 +60,16 @@ std::string Herd::json() const {
     Animal a = animals[i];   // the events oldest first, whatever order the server gave them in
     std::stable_sort(a.inseminations.begin(), a.inseminations.end(), [](const Insemination& x, const Insemination& y) { return x.date < y.date; });
     std::stable_sort(a.pregnancyChecks.begin(), a.pregnancyChecks.end(), [](const PregnancyCheck& x, const PregnancyCheck& y) { return x.date < y.date; });
+    std::stable_sort(a.heats.begin(), a.heats.end(), [](const Heat& x, const Heat& y) { return x.date < y.date; });
     o += std::string(i ? "," : "") + "{\"id\":" + quote(a.id) + ",\"number\":" + quote(a.number) + ",\"name\":" + quote(a.name) +
          ",\"lifeNumber\":" + quote(a.lifeNumber) + ",\"workNumber\":" + quote(a.workNumber) + ",\"responder\":" + quote(a.responder) +
          ",\"birthDate\":" + quote(a.birthDate) + ",\"group\":" + quote(a.group) + ",\"production\":" + quote(a.production) +
          ",\"reproduction\":" + quote(a.reproduction) + ",\"reproductionRaw\":" + quote(a.reproductionRaw) +
          ",\"lactation\":" + number(a.lactation) + ",\"daysInMilk\":" + number(a.daysInMilk) + ",\"calvingDate\":" + quote(a.calvingDate) +
-         ",\"pregnantDays\":" + number(a.pregnantDays) + ",\"expectedCalving\":" + quote(a.expectedCalving) + ",\"inseminations\":[";
+         ",\"pregnantDays\":" + number(a.pregnantDays) + ",\"expectedCalving\":" + quote(a.expectedCalving) +
+         ",\"dryOffDate\":" + quote(a.dryOffDate) + ",\"daysSinceInsemination\":" + number(a.daysSinceInsemination) +
+         ",\"daysSinceHeat\":" + number(a.daysSinceHeat) + ",\"inseminationsThisLactation\":" + number(a.inseminationsThisLactation) +
+         ",\"doNotBreedDate\":" + quote(a.doNotBreedDate) + ",\"inseminations\":[";
     for (size_t k = 0; k < a.inseminations.size(); k++) {
       const Insemination& n = a.inseminations[k];
       o += std::string(k ? "," : "") + "{\"date\":" + quote(n.date) + ",\"sireName\":" + quote(n.sireName) + ",\"sireCode\":" + quote(n.sireCode) +
@@ -74,6 +78,9 @@ std::string Herd::json() const {
     o += "],\"pregnancyChecks\":[";
     for (size_t k = 0; k < a.pregnancyChecks.size(); k++)
       o += std::string(k ? "," : "") + "{\"date\":" + quote(a.pregnancyChecks[k].date) + ",\"result\":" + quote(a.pregnancyChecks[k].result) + "}";
+    o += "],\"heats\":[";
+    for (size_t k = 0; k < a.heats.size(); k++)
+      o += std::string(k ? "," : "") + "{\"date\":" + quote(a.heats[k].date) + ",\"method\":" + quote(a.heats[k].method) + "}";
     o += "]}";
   }
   return o + "]}";
