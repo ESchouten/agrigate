@@ -83,8 +83,7 @@ def test_the_robot_is_a_place_before_it_says_anything():
     r = Robot()
     result, identity = r.read(T0)
     assert result == UNREACHABLE and text(r.L.session_last_error, r.s) == "no message from " + ADDRESS
-    assert identity == {"updated": None, "places": [{"id": ADDRESS, "name": "", "kind": "milkingRobot", "animal": None,
-                                                      "milking": False, "milkingSince": None}]}
+    assert identity == {"updated": None, "places": [{"id": ADDRESS, "name": "", "kind": "milkingRobot", "animal": None, "visitSince": None}]}
 
 
 def test_a_cow_is_identified():
@@ -157,14 +156,14 @@ def test_milking_and_visit_end():
     r.hear(start_milking(), T0 + 40000)
     _, identity = r.read(T0 + 41000)
     place = identity["places"][0]
-    assert place["milking"] is True and place["milkingSince"] == T0 + 40000 and place["animal"]["number"] == "15"
+    assert place["visitSince"] == T0 + 40000 and place["animal"]["number"] == "15"
     r.hear(start_milking(), T0 + 41000)          # the same milking (the cups again)
     r.hear(visit_end(1), T0 + 400000)
     r.hear(visit_end(0), T0 + 430000)            # the robot's second word for the same end: not an event
     _, identity = r.read(T0 + 431000)
-    assert identity["places"][0]["milking"] is False and identity["places"][0]["milkingSince"] is None
+    assert identity["places"][0]["visitSince"] is None
     kinds = [(e["kind"], e["animal"]["number"], e["time"]) for e in r.events()["events"]]
-    assert kinds == [("identified", "15", T0 + 1000), ("milkingStarted", "15", T0 + 40000), ("visitEnded", "15", T0 + 400000)]
+    assert kinds == [("identified", "15", T0 + 1000), ("visitStarted", "15", T0 + 40000), ("visitEnded", "15", T0 + 400000)]
 
 
 def test_a_cow_walking_past_does_not_take_the_box():
@@ -187,7 +186,7 @@ def test_a_cow_walking_past_does_not_take_the_box():
     r.hear(visit_end(1), T0 + 1000000)
     _, identity = r.read(T0 + 1001000)
     events = r.events()["events"]
-    started = [e for e in events if e["kind"] == "milkingStarted"]
+    started = [e for e in events if e["kind"] == "visitStarted"]
     assert [e["animal"]["number"] for e in started] == ["15", "77"]
     ended = [e["animal"]["number"] for e in events if e["kind"] == "visitEnded"]
     assert ended == ["15", "77"]   # the cow of that milking, not the passer-by identified since
@@ -199,9 +198,56 @@ def test_milking_without_an_identification():
     r.hear(start_milking(), T0 + 1000)
     r.hear(visit_end(1), T0 + 300000)
     events = r.events()["events"]
-    assert [(e["kind"], e["animal"]) for e in events] == [("milkingStarted", {"number": "", "name": "", "responder": ""}),
+    assert [(e["kind"], e["animal"]) for e in events] == [("visitStarted", {"number": "", "name": "", "responder": ""}),
                                                           ("visitEnded", {"number": "", "name": "", "responder": ""})]
 
+
+
+def kinds(r):
+    return [(e["kind"], e["animal"]["number"]) for e in r.events()["events"]]
+
+
+def test_the_cups_go_on_again_during_a_milking():
+    r = Robot()
+    r.tick(T0)
+    r.hear(cow(1000015, 15, "DINA 1"), T0 + 1000)
+    r.hear(start_milking(), T0 + 1000)
+    r.hear(cow(1000041, 41, "JANNA 2"), T0 + 150000)    # walks past
+    r.hear(start_milking(), T0 + 200000)                # a cup was kicked off: on again
+    r.hear(visit_end(1), T0 + 500000)
+    assert kinds(r) == [("identified", "15"), ("visitStarted", "15"), ("identified", "41"), ("visitEnded", "15")]
+
+
+def test_a_visit_end_lost_on_the_way():
+    r = Robot()
+    r.tick(T0)
+    r.hear(cow(1000015, 15, "DINA 1"), T0 + 1000)
+    r.hear(start_milking(), T0 + 1000)
+    r.hear(visit_end(0), T0 + 430000)                   # its 1 never arrived: the 0 ends the milking
+    assert r.read(T0 + 431000)[1]["places"][0]["visitSince"] is None
+    assert kinds(r) == [("identified", "15"), ("visitStarted", "15"), ("visitEnded", "15")]
+    r.hear(cow(1000077, 77, "RIKA 3"), T0 + 600000)
+    r.hear(start_milking(), T0 + 600000)
+    r.hear(visit_end(1), T0 + 900000)
+    r.hear(cow(1000081, 81, "DINA 8"), T0 + 905000)     # the next cow is quick
+    r.hear(start_milking(), T0 + 905000)
+    r.hear(visit_end(0), T0 + 930000)                   # the 0 of RIKA's end: not the end of DINA's milking
+    assert r.read(T0 + 931000)[1]["places"][0]["visitSince"] == T0 + 905000
+    # neither word arrives: the next cow's start, with her identification, starts a new visit
+    r.hear(cow(1000042, 42, "BOUKJE 4"), T0 + 1500000)
+    r.hear(start_milking(), T0 + 1500500)
+    r.hear(visit_end(1), T0 + 1800000)
+    assert kinds(r)[-3:] == [("identified", "42"), ("visitStarted", "42"), ("visitEnded", "42")]
+
+
+def test_the_place_has_the_cow_in_the_box_with_her_own_time():
+    r = Robot()
+    r.tick(T0)
+    r.hear(cow(1000015, 15, "DINA 1"), T0 + 1000)
+    r.hear(start_milking(), T0 + 1000)
+    r.hear(cow(1000041, 41, "JANNA 2"), T0 + 5000)      # walks past
+    animal = r.read(T0 + 20000)[1]["places"][0]["animal"]
+    assert (animal["number"], animal["since"]) == ("15", T0 + 1000)
 
 
 def refusal_record(responder):

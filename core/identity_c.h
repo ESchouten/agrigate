@@ -12,26 +12,31 @@
  *      "id": the source's own id of the place, "name" ("" if the source has none),
  *      "kind": "milkingRobot" | "feedingStation" | "gate" | "unknown",
  *      "animal": {"number": the farm's animal number, "name", "responder", "since"} or null,
- *      "milking": true while the animal there is being milked (a milking robot that says so), else false,
- *      "milkingSince": when that milking started, null when not milking
+ *      "visitSince": since when the place serves that animal (a milking robot: milks it), null when
+ *                    it does not or the source does not say
  *    }]}
  *   "animal" is the last one identified there: it stays until the next one, as a source does not
- *   always say when an animal leaves (an animal a robot refuses walks on without a word). When a
- *   milking starts, "animal" is the one identified closest in time to the start (within a minute): a
- *   robot that also identifies animals walking past (into a next robot) does not lose the one in its
- *   box. The "milkingStarted" event comes some seconds after the start (its "time" is the start), to
- *   include an identification that arrives with it. A "visitEnded" event carries the animal of that milking.
+ *   always say when an animal leaves. A place may also identify animals that only walk past (a
+ *   robot that leads to the next one): when a visit starts, "animal" is the one identified closest
+ *   in time to that start (within a minute), so the place does not lose the animal it serves.
  *
  * identity_events_json: what happened, for a consumer that follows
- *   {"events": [{"seq", "time", "kind": "identified" | "milkingStarted" | "visitEnded" | "refused", "place": the place's id,
- *                "animal": {"number", "name", "responder"} (for a milking: the animal milked, see above;
- *                           all empty when no animal was identified there)}],
+ *   {"events": [{"seq", "time", "kind": "identified" | "visitStarted" | "visitEnded" | "refused",
+ *                "place": the place's id,
+ *                "animal": {"number", "name", "responder"} (all "" when the place identified none)}],
  *    "last": seq}
- *   with seq > after, oldest first; the session keeps the last 200. The same animal at the same
- *   place again within 5 s is the same identification. "visitEnded": the robot is done with the
- *   animal and lets it out (it may still be in the box for some seconds). "refused": the robot did not
- *   milk the animal (it came before its milking was due) and lets it out; an animal identified without
- *   either (a robot that leads to the next one) walked through. */
+ *   with seq > after, oldest first; the session keeps the last 200.
+ *   "identified": the place read the animal's responder. The same animal at the same place again
+ *     within 5 s is the same identification.
+ *   "visitStarted": the place started serving the animal (a milking robot: the milking started).
+ *     It comes some seconds after the start (its "time" is the start), so that an identification
+ *     arriving with it counts.
+ *   "visitEnded": the place is done with the animal of that visit and lets it out (it may still
+ *     be there for some seconds).
+ *   "refused": the place does not serve the animal and lets it out (a milking robot: it came
+ *     before its milking was due).
+ *   A source that does not say gives "identified" only. An animal identified without a visit and
+ *   without a refusal walked through. */
 #ifndef IDENTITY_C_H
 #define IDENTITY_C_H
 

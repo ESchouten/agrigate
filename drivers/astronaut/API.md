@@ -16,13 +16,13 @@ the same way ("LogService").
 | Unregister | the same with `u16 0` |
 | A message from the proxy | `u32 0xD156`, `u16 message`, `u16 destination`, `u16 sender`, `u16 length`, `length` bytes |
 
-Three messages are read:
+Four messages are read:
 
 | Message | When | Data | Event |
 |---|---|---|---|
 | `0x116` (MSG_REQUEST_COW_NR_NAME) | the robot has read a cow's responder at the start of a visit | `u32 responder`, `u32 cow number`, the name in UTF-16LE up to a NUL | `identified` |
-| `0x002` (start milking) | the cups go on | the teat positions (38 bytes or more) | `milkingStarted` |
-| `0x402` (visit end) | `data[0]` = 1: milking done, the cow may leave (about 8 s after the last cup is off); `data[0]` = 0 about 30 s later | | `visitEnded` (on 1 only) |
+| `0x002` (start milking) | the cups go on | the teat positions (38 bytes or more) | `visitStarted` |
+| `0x402` (visit end) | `data[0]` = 1: milking done, the cow may leave (about 8 s after the last cup is off); `data[0]` = 0 about 30 s later | | `visitEnded` on 1; on 0 only when the 1 never arrived |
 | `0x3F7` (MSG_DB_COLINFO), table 18 | a cow came before her milking was due: the robot records the refusal for the farm software, 6–12 s after identifying her | `u16 table` at data[6] (18), `u32 responder` at data[8] (32 bytes in all) | `refused` |
 
 A cow identified at robot 1 without a milking and without a refusal walked through to robot 2 (a
@@ -36,9 +36,15 @@ are mailboxes inside the robot (e.g. 17 is the robot's screen); the driver does 
 The cow milked is the one identified closest in time to the start of the milking (within a minute),
 not simply the last one identified: see the TCS passage below. On the robots checked, the cow in the
 box is identified at the very moment the cups go on (`0x116` and `0x002` in the same second), a cow
-walking past some seconds before or after. The driver tells `milkingStarted` 10 s after the start
-(with the start as its time) so that an identification arriving with it counts. A second start
-within two minutes is the same milking.
+walking past some seconds before or after. The driver tells `visitStarted` 10 s after the start
+(with the start as its time) so that an identification arriving with it counts.
+
+Two things the recordings did not show, and how the driver takes them:
+
+- A second `0x002` during a milking (the cups go on again) is the same milking, unless another cow
+  is identified within 5 s of it: then the visit end before was lost on the way.
+- A visit end whose 1 is lost (UDP): the 0 that follows about 30 s later ends the milking, so the
+  robot does not stay "milking" until the next cow is done.
 
 The driver never sends an LFW message (`0xD156`) itself: what it sends is its registration and
 nothing else, so it cannot change anything on the robot.
