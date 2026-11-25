@@ -151,4 +151,11 @@ std::string quote(const std::string& s) {
   return o + "\"";
 }
 
+std::string number(double v) {
+  if (v < 0) return "null";
+  char b[32];
+  snprintf(b, sizeof b, "%.10g", v);
+  return b;
+}
+
 }  // namespace agrigate
