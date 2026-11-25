@@ -1,5 +1,5 @@
-"""The buttons' firmware on a computer: PIN and text editors, the signed-update manifest, the web API, and a
-syntax check of main.cpp against stand-in M5/Arduino headers.
+"""The buttons' firmware on a computer: PIN and text editors, the signed-update manifest, the web API, a
+syntax check of main.cpp against stand-in M5/Arduino headers, and every screen drawn once.
 Run: python3 tests/test_firmware.py"""
 import os, subprocess, sys, tempfile
 
@@ -68,7 +68,16 @@ def firmware_syntax():
     print("ok   firmware main.cpp compiles (with stubs)")
 
 
+def screens():
+    """Every screen drawn with the firmware's own LVGL code: the pictures in the docs come from here."""
+    render = os.path.join(ROOT, "firmware", "test_host", "preview", "render.py")
+    with tempfile.TemporaryDirectory() as tmp:
+        out = subprocess.check_output([sys.executable, render, tmp], text=True)
+    check("screens: all drawn, in both languages", "nl-1-home.png" in out and "en-14-wps.png" in out, out)
+
+
 if __name__ == "__main__":
     editors_and_manifest()
     firmware_syntax()
+    screens()
     print("all firmware tests passed")
