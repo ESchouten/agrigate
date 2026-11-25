@@ -31,18 +31,26 @@ as written). An error comes as HTTP 200 with `ServerEror.Code` other than 200: t
 
 ## The herd
 
-Seven requests and one more per 150 animals:
+Ten requests and one more per 150 animals:
 
 | Call | For |
 |---|---|
 | `GET /t4capi/Animals/active` | The animals: `Id`, `UserNumber` (the farm's number), `Name`, `LifeNumber`, `ResponderNumber`, `BirthDate`, `Location` (group) |
-| `GET /t4capi/Animal/status?animalIds=..&animalIds=..` | Per 150 animals: `ReproductionStatusId`/`ReproductionStatus`, `ProductionStatus`, `LactationNumber`, `DaysInLactation`, `PregnancyDays` |
+| `GET /t4capi/Animal/status?animalIds=..&animalIds=..` | Per 150 animals: `ReproductionStatusId`/`ReproductionStatus`, `ProductionStatus`, `LactationNumber`, `DaysInLactation`, `PregnancyDays`, `DaysSinceInsemination`, `DaysSinceHeat`, `NumberOfInseminations` (this lactation) |
 | `GET /t4capi/v2/herds` | `UCNNumber`, the farm's number for the ICAR calls below |
 | `GET /t4capi/v2/sires` | Sire names by AI code (`SireCode`) and life number |
 | `GET /t4capi/integrationglobal/parturitions?ucnNumber=` | Calvings (the last one per animal) |
 | `GET /t4capi/integrationglobal/inseminations?ucnNumber=` | Inseminations: `EventDateTime`, `InseminationType`, `SireIdentifiers` (`eu.bovine`, `nl.aicode`) |
 | `GET /t4capi/integrationglobal/pregnancy-checks?ucnNumber=` | `EventDateTime`, `Result` (`Pregnant`, ...) |
 | `GET /t4capi/integrationglobal/gestations?ucnNumber=` | `ExpectedCalvingDate` |
+| `GET /t4capi/integrationglobal/heats?ucnNumber=` | Heats: `EventDateTime`, `HeatDetectionMethod` (`Visual`, ...) |
+| `GET /t4capi/integrationglobal/drying-offs?ucnNumber=` | Dry-offs (the last one per animal) |
+| `GET /t4capi/integrationglobal/do-not-breeds?ucnNumber=` | "Do not breed": what T4C calls "keep open" |
+
+"Keep open" is a pregnancy check result in T4C; when a heat is entered afterwards, T4C sets the
+animal's status back to open (7, open cycling), while the `do-not-breeds` event stays. The driver
+gives `doNotBreedDate` and the reproduction `doNotBreed` when that event is after the animal's last
+calving and last insemination (and she is not pregnant); `reproductionRaw` keeps T4C's own status.
 
 The `integrationglobal` lists are the ICAR Animal Data Exchange format; without dates they give the
 whole history (on the server checked: 983 inseminations since 2013 in 0.8 s). Their times are a
@@ -58,6 +66,8 @@ T4C keeps no work number.
 
 T4C 4.22, two Astronaut A4s, 92 animals (2026-11-23), with the licence key: the robots (0.6 s) and
 the herd (1.8 s) read as the tests expect (`tests/test_t4c_cow.py` answers in the same shape).
+Heats, dry-offs, do-not-breed and the days since heat and insemination: the same server with 99
+animals (2026-11-25), 2.0 s; the one cow set to "keep open" and then given a heat read as `doNotBreed`.
 
 Still open:
 

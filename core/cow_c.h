@@ -16,7 +16,12 @@
  *     "reproduction": "open" | "inseminated" | "pregnant" | "doNotBreed" | "unknown",
  *     "reproductionRaw": the status as the server gives it (for a word this API has none for),
  *     "lactation": lactation number, "daysInMilk", "calvingDate" (last calving),
- *     "pregnantDays", "expectedCalving",
+ *     "pregnantDays", "expectedCalving", "dryOffDate" (last dry-off),
+ *     "daysSinceInsemination", "daysSinceHeat", "inseminationsThisLactation",
+ *     "doNotBreedDate": when the animal was last set to "do not breed" ("keep open") after its last
+ *              calving and insemination, "" if not; then "reproduction" is "doNotBreed" even when the
+ *              server's own status says otherwise (a server may set it back to open after a heat),
+ *     "heats": [{"date", "method": "visual" | "activity" | "unknown"}]   oldest first,
  *     "inseminations": [{"date", "sireName", "sireCode" (AI code), "sireLifeNumber", "type": "ai" |
  *              "diy" (by the farmer) | "bull" | "embryo" | "unknown"}]   oldest first,
  *     "pregnancyChecks": [{"date", "result": "pregnant" | "notPregnant" | "unknown"}]   oldest first

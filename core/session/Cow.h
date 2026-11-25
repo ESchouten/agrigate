@@ -32,13 +32,19 @@ struct PregnancyCheck {
   std::string date, result = "unknown";
 };
 
+struct Heat {
+  std::string date, method = "unknown";
+};
+
 struct Animal {
   std::string id, number, name, lifeNumber, workNumber, responder, birthDate, group;
   std::string production = production::Unknown, reproduction = reproduction::Unknown, reproductionRaw;
   double lactation = -1, daysInMilk = -1, pregnantDays = -1;   // -1: not known
-  std::string calvingDate, expectedCalving;
+  double daysSinceInsemination = -1, daysSinceHeat = -1, inseminationsThisLactation = -1;
+  std::string calvingDate, expectedCalving, dryOffDate, doNotBreedDate;
   std::vector<Insemination> inseminations;
   std::vector<PregnancyCheck> pregnancyChecks;
+  std::vector<Heat> heats;
 };
 
 struct Herd {

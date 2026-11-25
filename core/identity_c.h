@@ -11,17 +11,25 @@
  *    "places": [{
  *      "id": the source's own id of the place, "name" ("" if the source has none),
  *      "kind": "milkingRobot" | "feedingStation" | "gate" | "unknown",
- *      "animal": {"number": the farm's animal number, "name", "responder", "since"} or null
+ *      "animal": {"number": the farm's animal number, "name", "responder", "since"} or null,
+ *      "milking": true while the animal there is being milked (a milking robot that says so), else false,
+ *      "milkingSince": when that milking started, null when not milking
  *    }]}
  *   "animal" is the last one identified there: it stays until the next one, as a source does not
- *   always say when an animal leaves (an animal a robot refuses walks on without a word).
+ *   always say when an animal leaves (an animal a robot refuses walks on without a word). When a
+ *   milking starts, "animal" is the one identified closest in time to the start (within a minute): a
+ *   robot that also identifies animals walking past (into a next robot) does not lose the one in its
+ *   box. The "milkingStarted" event comes some seconds after the start (its "time" is the start), to
+ *   include an identification that arrives with it. A "visitEnded" event carries the animal of that milking.
  *
  * identity_events_json: what happened, for a consumer that follows
- *   {"events": [{"seq", "time", "kind": "identified", "place": the place's id,
- *                "animal": {"number", "name", "responder"}}],
+ *   {"events": [{"seq", "time", "kind": "identified" | "milkingStarted" | "visitEnded", "place": the place's id,
+ *                "animal": {"number", "name", "responder"} (for a milking: the animal milked, see above;
+ *                           all empty when no animal was identified there)}],
  *    "last": seq}
  *   with seq > after, oldest first; the session keeps the last 200. The same animal at the same
- *   place again within 5 s is the same identification. */
+ *   place again within 5 s is the same identification. "visitEnded": the robot is done with the
+ *   animal and lets it out (it may still be in the box for some seconds). */
 #ifndef IDENTITY_C_H
 #define IDENTITY_C_H
 

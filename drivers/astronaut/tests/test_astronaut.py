@@ -21,6 +21,14 @@ def cow(responder, number, name):
     return message(0x116, struct.pack("<II", responder, number) + name.encode("utf-16-le") + b"\0\0")
 
 
+def start_milking():
+    return message(0x002, bytes(38))   # the teat positions; the driver only needs to know the milking started
+
+
+def visit_end(v=1):
+    return message(0x402, bytes([v, 0, 0, 0]))
+
+
 def registration(on):
     return struct.pack("<IH", 0xD157, 1 if on else 0) + b"agrigate".ljust(22, b"\0")
 
@@ -75,7 +83,8 @@ def test_the_robot_is_a_place_before_it_says_anything():
     r = Robot()
     result, identity = r.read(T0)
     assert result == UNREACHABLE and text(r.L.session_last_error, r.s) == "no message from " + ADDRESS
-    assert identity == {"updated": None, "places": [{"id": ADDRESS, "name": "", "kind": "milkingRobot", "animal": None}]}
+    assert identity == {"updated": None, "places": [{"id": ADDRESS, "name": "", "kind": "milkingRobot", "animal": None,
+                                                      "milking": False, "milkingSince": None}]}
 
 
 def test_a_cow_is_identified():
@@ -138,6 +147,60 @@ def test_through_python_with_a_robot_on_this_computer():
     while (said := robot.recvfrom(100)[0]) != registration(False):   # the goodbye
         assert time.time() < deadline
     robot.close()
+
+
+
+def test_milking_and_visit_end():
+    r = Robot()
+    r.tick(T0)
+    r.hear(cow(1000015, 15, "DINA 1"), T0 + 1000)
+    r.hear(start_milking(), T0 + 40000)
+    _, identity = r.read(T0 + 41000)
+    place = identity["places"][0]
+    assert place["milking"] is True and place["milkingSince"] == T0 + 40000 and place["animal"]["number"] == "15"
+    r.hear(start_milking(), T0 + 41000)          # the same milking (the cups again)
+    r.hear(visit_end(1), T0 + 400000)
+    r.hear(visit_end(0), T0 + 430000)            # the robot's second word for the same end: not an event
+    _, identity = r.read(T0 + 431000)
+    assert identity["places"][0]["milking"] is False and identity["places"][0]["milkingSince"] is None
+    kinds = [(e["kind"], e["animal"]["number"], e["time"]) for e in r.events()["events"]]
+    assert kinds == [("identified", "15", T0 + 1000), ("milkingStarted", "15", T0 + 40000), ("visitEnded", "15", T0 + 400000)]
+
+
+def test_a_cow_walking_past_does_not_take_the_box():
+    """Robot 1 also identifies the cows walking through to robot 2 (a TCS passage): the cow milked
+    is the one identified closest to the start of the milking."""
+    r = Robot()
+    r.tick(T0)
+    r.hear(cow(1000015, 15, "DINA 1"), T0 + 1000)       # into the box
+    r.hear(cow(1000041, 41, "JANNA 2"), T0 + 30000)     # walks past to robot 2
+    r.hear(start_milking(), T0 + 9000)
+    _, identity = r.read(T0 + 31000)
+    assert identity["places"][0]["animal"]["number"] == "15"   # not the passer-by identified after the start
+    r.hear(visit_end(1), T0 + 300000)
+    # as on a real robot: the cow milked is identified at the very moment her milking starts, the one
+    # walking past to the next robot some seconds before (or after) it
+    r.hear(cow(1000041, 41, "JANNA 2"), T0 + 670000)    # walks past
+    r.hear(start_milking(), T0 + 690000)
+    r.hear(cow(1000077, 77, "RIKA 3"), T0 + 690000)     # in the box, identified with the start
+    r.hear(cow(1000042, 42, "BOUKJE 4"), T0 + 720000)   # walks past during the milking
+    r.hear(visit_end(1), T0 + 1000000)
+    _, identity = r.read(T0 + 1001000)
+    events = r.events()["events"]
+    started = [e for e in events if e["kind"] == "milkingStarted"]
+    assert [e["animal"]["number"] for e in started] == ["15", "77"]
+    ended = [e["animal"]["number"] for e in events if e["kind"] == "visitEnded"]
+    assert ended == ["15", "77"]   # the cow of that milking, not the passer-by identified since
+
+
+def test_milking_without_an_identification():
+    r = Robot()
+    r.tick(T0)
+    r.hear(start_milking(), T0 + 1000)
+    r.hear(visit_end(1), T0 + 300000)
+    events = r.events()["events"]
+    assert [(e["kind"], e["animal"]) for e in events] == [("milkingStarted", {"number": "", "name": "", "responder": ""}),
+                                                          ("visitEnded", {"number": "", "name": "", "responder": ""})]
 
 
 if __name__ == "__main__":

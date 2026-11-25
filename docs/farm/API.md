@@ -68,9 +68,10 @@ not known is `null` (numbers) or `""` (text).
 
 ### `GET /api/identity/events?after=<seq>&wait=<seconds>`
 
-The identifications of all places in one row, oldest first, with `seq` > `after`. With `wait` (at
-most 60) the answer waits until there is one, so a client sees a cow the moment she is identified
-with one request open at a time:
+What happened at all places in one row, oldest first, with `seq` > `after`: an animal identified,
+and at a milking robot that says so, a milking started and a visit ended. With `wait` (at most 60)
+the answer waits until there is one, so a client sees a cow the moment she is identified with one
+request open at a time:
 
 ```
 after = 0
@@ -84,10 +85,19 @@ loop:  GET /api/identity/events?after=<after>&wait=30   ->  handle "events", aft
    "animal": {"number": "73", "name": "JANNA 4", "responder": "1000073",
               "lifeNumber": "NL 100000073", "workNumber": "", "production": "milking",
               "reproduction": "pregnant", "lactation": 5, "daysInMilk": 232, "pregnantDays": 77,
-              "expectedCalving": "2027-06-14"}}
+              "expectedCalving": "2027-06-14", "daysSinceInsemination": 77, "daysSinceHeat": 98}},
+  {"seq": 2, "time": 1795437994870, "kind": "milkingStarted",
+   "place": {"id": "10.4.1.102", "name": "Robot 2", "kind": "milkingRobot"},
+   "animal": {"number": "73", "name": "JANNA 4", "...": "the same fields"}},
+  {"seq": 3, "time": 1795438351002, "kind": "visitEnded", "place": {"...": "..."}, "animal": {"number": "73", "...": "..."}}
  ],
- "last": 1}
+ "last": 3}
 ```
+
+- `kind`: `identified` (the place read the animal's responder), `milkingStarted` (the cups go on:
+  the animal is the one identified closest to that moment, so not a cow walking past to the next
+  robot), `visitEnded` (the robot is done and lets the animal out; she may still be in the box
+  for some seconds). A milking robot that does not say when it milks only gives `identified`.
 
 - `place.kind`: `milkingRobot`, `feedingStation`, `gate` or `unknown`. A client that wants only
   one kind filters on it; one that does not care never has to look.
@@ -107,7 +117,8 @@ Every place with the animal identified there last:
    "animal": {"number": "73", "name": "JANNA 4", "responder": "1000073", "since": 1795437955042,
               "lifeNumber": "NL 100000073", "workNumber": "", "production": "milking",
               "reproduction": "pregnant", "lactation": 5, "daysInMilk": 232, "pregnantDays": 77,
-              "expectedCalving": "2027-06-14"}}
+              "expectedCalving": "2027-06-14", "daysSinceInsemination": 77, "daysSinceHeat": 98},
+   "milking": true, "milkingSince": 1795437994870}
 ]}
 ```
 
@@ -116,7 +127,10 @@ Every place with the animal identified there last:
 - `animal` stays until the next one is identified: a place does not always say when an animal
   leaves (a cow a robot refuses walks on without a word). `since` tells how old it is.
 - With a passage from one robot to the next, the first robot also identifies the cows that walk
-  through, so such a cow appears at robot 1 and a minute later at robot 2.
+  through, so such a cow appears at robot 1 and a minute later at robot 2. When robot 1 starts
+  milking, its `animal` is the cow in its box again.
+- `milking`: the animal is being milked right now (from `milkingStarted` to `visitEnded`), with
+  `milkingSince`; `false` and `null` otherwise, and always at a place that does not say so.
 
 ### `GET /api/cow/animals` and `GET /api/cow/animals/<number | responder | life number>`
 
@@ -129,10 +143,12 @@ is the one a place identified last, else `null`.
    "responder": "1000015", "birthDate": "2019-01-12", "group": "Melkvee 1",
    "production": "milking", "reproduction": "pregnant", "reproductionRaw": "Pregnant",
    "lactation": 6, "daysInMilk": 162, "calvingDate": "2026-06-14", "pregnantDays": 67,
-   "expectedCalving": "2027-06-24",
+   "expectedCalving": "2027-06-24", "dryOffDate": "2026-04-20", "daysSinceInsemination": 67,
+   "daysSinceHeat": 88, "inseminationsThisLactation": 2, "doNotBreedDate": "",
    "inseminations": [{"date": "2026-09-17", "sireName": "GERRIT", "sireCode": "39943",
                       "sireLifeNumber": "NL 728457683", "type": "ai"}],
    "pregnancyChecks": [{"date": "2026-11-23", "result": "pregnant"}],
+   "heats": [{"date": "2026-08-27", "method": "visual"}],
    "at": null}
 ]}
 ```
