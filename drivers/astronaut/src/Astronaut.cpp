@@ -3,9 +3,9 @@
 //
 // The robot's own computer runs a proxy on UDP port 6000 that hands every internal LFW message to the clients
 // registered with it (the farm software T4C registers the same way). This driver registers, renews
-// that every 2 s and reads three messages: "cow number and name" (the robot has read a cow's
-// responder), "start milking" and "visit end" (the robot lets the cow out). It never sends an LFW
-// message itself.
+// that every 2 s and reads four messages: "cow number and name" (the robot has read a cow's
+// responder), "start milking", "visit end" (the robot lets the cow out) and the record of a visit
+// without milking (a refusal). It never sends an LFW message itself.
 // See ../API.md for the format and what was checked on real robots.
 #include <cstring>
 
@@ -17,10 +17,11 @@ namespace {
 constexpr uint32_t kMagicMessage = 0xD156;    // a message the proxy hands on
 constexpr uint32_t kMagicClient = 0xD157;     // a client (de)registering
 constexpr uint16_t kCowNumberName = 0x116;    // MSG_REQUEST_COW_NR_NAME: responder, cow number, name
-constexpr uint16_t kStartMilking = 0x002;     // start milking: the cups go on (data: the teat positions)
-constexpr uint16_t kDbRecord = 0x3F7;        // MSG_DB_COLINFO: a record for the farm software; table 18 = a visit without milking (u32 responder at data[8])
-constexpr uint16_t kRefusalTable = 18;
+constexpr uint16_t kStartMilking = 0x002;     // the cups go on (data: the teat positions)
 constexpr uint16_t kVisitEnd = 0x402;         // data[0] 1: milking done, the cow may leave (~8 s after the cups are off); 0 ~30 s later
+constexpr uint16_t kDbRecord = 0x3F7;         // MSG_DB_COLINFO: a record for the farm software: u16 table at data[6], u32 responder at data[8]
+constexpr uint16_t kRefusalTable = 18;        // a visit without milking
+constexpr int64_t kSecondWordMs = 60000;      // a visit end's 0 comes within this time of its 1
 constexpr int64_t kRenewMs = 2000;
 const char kClientName[] = "agrigate";  // how the proxy lists this client (22 bytes at most)
 
@@ -70,11 +71,16 @@ void incoming(Session& s, const std::string& d) {
   s.identity.updated = s.now;
   const uint16_t id = u16(d, 4), length = u16(d, 10);
   if (d.size() < 12u + length) return;
-  if (id == kStartMilking && length >= 38) return s.identity.milkingStarted(box(s), s.now);
-  if (id == kVisitEnd && length >= 1 && d[12] == 1) return s.identity.visitEnded(box(s), s.now);
+  identity::Place& p = box(s);
+  if (id == kStartMilking && length >= 38) return s.identity.visitStarted(p, s.now);
+  if (id == kVisitEnd && length >= 1) {
+    // 1: done, the cow may leave. The 0 that follows only ends a milking whose 1 never arrived.
+    if (d[12] == 1 || (p.visitSince && s.now - p.lastEnd > kSecondWordMs)) s.identity.visitEnded(p, s.now);
+    return;
+  }
   if (id == kDbRecord && length >= 12 && u16(d, 12 + 6) == kRefusalTable) {
     const uint32_t responder = u32(d, 12 + 8);
-    if (responder && responder < 100000000) s.identity.refused(box(s), std::to_string(responder), s.now);
+    if (responder && responder < 100000000) s.identity.refused(p, std::to_string(responder), s.now);
     return;
   }
   if (id != kCowNumberName || length < 12) return;
@@ -85,7 +91,7 @@ void incoming(Session& s, const std::string& d) {
   if (a.name.empty() || responder == 0 || responder >= 100000000) return;   // not a cow
   a.responder = std::to_string(responder);
   a.number = std::to_string(number);
-  s.identity.identified(box(s), a, s.now);
+  s.identity.identified(p, a, s.now);
 }
 
 void stop(Session& s) { s.send(registration(false)); }

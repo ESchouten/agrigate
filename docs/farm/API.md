@@ -69,7 +69,7 @@ not known is `null` (numbers) or `""` (text).
 ### `GET /api/identity/events?after=<seq>&wait=<seconds>`
 
 What happened at all places in one row, oldest first, with `seq` > `after`: an animal identified,
-and at a milking robot that says so, a milking started and a visit ended. With `wait` (at most 60)
+and at a place that says so, a visit started or ended or an animal refused. With `wait` (at most 60)
 the answer waits until there is one, so a client sees a cow the moment she is identified with one
 request open at a time:
 
@@ -86,7 +86,7 @@ loop:  GET /api/identity/events?after=<after>&wait=30   ->  handle "events", aft
               "lifeNumber": "NL 100000073", "workNumber": "", "production": "milking",
               "reproduction": "pregnant", "lactation": 5, "daysInMilk": 232, "pregnantDays": 77,
               "expectedCalving": "2027-06-14", "daysSinceInsemination": 77, "daysSinceHeat": 98}},
-  {"seq": 2, "time": 1795437994870, "kind": "milkingStarted",
+  {"seq": 2, "time": 1795437994870, "kind": "visitStarted",
    "place": {"id": "10.4.1.102", "name": "Robot 2", "kind": "milkingRobot"},
    "animal": {"number": "73", "name": "JANNA 4", "...": "the same fields"}},
   {"seq": 3, "time": 1795438351002, "kind": "visitEnded", "place": {"...": "..."}, "animal": {"number": "73", "...": "..."}}
@@ -94,11 +94,13 @@ loop:  GET /api/identity/events?after=<after>&wait=30   ->  handle "events", aft
  "last": 3}
 ```
 
-- `kind`: `identified` (the place read the animal's responder), `milkingStarted` (the cups go on:
-  the animal is the one identified closest to that moment, so not a cow walking past to the next
-  robot), `visitEnded` (the robot is done and lets the animal out; she may still be in the box
-  for some seconds), `refused` (the robot did not milk her: she came before her milking was due).
-  A milking robot that does not say when it milks only gives `identified`.
+- `kind`: `identified` (the place read the animal's responder), `visitStarted` (the place started
+  serving her; at a milking robot the milking started: the animal is the one identified closest to
+  that moment, so not a cow walking past to the next robot), `visitEnded` (the place is done and
+  lets the animal out; she may still be there for some seconds), `refused` (the place does not
+  serve her; at a milking robot she came before her milking was due). A place that does not say
+  only gives `identified`.
+- `visitStarted` comes about 10 seconds after the start, with the start as its `time`.
 
 - `place.kind`: `milkingRobot`, `feedingStation`, `gate` or `unknown`. A client that wants only
   one kind filters on it; one that does not care never has to look.
@@ -119,7 +121,7 @@ Every place with the animal identified there last:
               "lifeNumber": "NL 100000073", "workNumber": "", "production": "milking",
               "reproduction": "pregnant", "lactation": 5, "daysInMilk": 232, "pregnantDays": 77,
               "expectedCalving": "2027-06-14", "daysSinceInsemination": 77, "daysSinceHeat": 98},
-   "milking": true, "milkingSince": 1795437994870}
+   "visitSince": 1795437994870}
 ]}
 ```
 
@@ -130,8 +132,8 @@ Every place with the animal identified there last:
 - With a passage from one robot to the next, the first robot also identifies the cows that walk
   through, so such a cow appears at robot 1 and a minute later at robot 2. When robot 1 starts
   milking, its `animal` is the cow in its box again.
-- `milking`: the animal is being milked right now (from `milkingStarted` to `visitEnded`), with
-  `milkingSince`; `false` and `null` otherwise, and always at a place that does not say so.
+- `visitSince`: the place serves the animal right now (a robot: milks her), from `visitStarted` to
+  `visitEnded`; `null` otherwise, and always at a place that does not say so.
 
 ### `GET /api/cow/animals` and `GET /api/cow/animals/<number | responder | life number>`
 
