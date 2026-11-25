@@ -19,6 +19,10 @@ void WiFiT::macAddress(uint8_t* m) {   // the name on the screen: agrigate-clean
   for (int i = 0; i < 6; i++) m[i] = mac[i];
 }
 
+int WiFiT::status() { return -1; }   // no wifi: the web API stays off unless a picture says so
+int xSemaphoreTake(SemaphoreHandle_t, uint32_t) { return pdTRUE; }   // the log's lock: one thread on a PC
+int xSemaphoreGive(SemaphoreHandle_t) { return pdTRUE; }
+
 static uint32_t now = 0;
 uint32_t millis() { return now; }
 void delay(uint32_t ms) { now += ms; }
