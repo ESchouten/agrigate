@@ -203,5 +203,22 @@ def test_milking_without_an_identification():
                                                           ("visitEnded", {"number": "", "name": "", "responder": ""})]
 
 
+
+def refusal_record(responder):
+    return message(0x3F7, bytes(6) + struct.pack("<HI", 18, responder) + bytes(18))   # 32 bytes, as on the robots
+
+
+def test_a_refused_cow_and_one_walking_through():
+    r = Robot()
+    r.tick(T0)
+    r.hear(cow(1000081, 81, "DINA 8"), T0 + 1000)
+    r.hear(refusal_record(1000081), T0 + 9000)        # too early: let out without milking
+    r.hear(cow(1000041, 41, "JANNA 2"), T0 + 60000)   # walks through to the next robot: no record
+    r.hear(message(0x3F7, bytes(6) + struct.pack("<HI", 9, 1000041) + bytes(18)), T0 + 61000)   # another table: not a refusal
+    events = r.events()["events"]
+    assert [(e["kind"], e["animal"]["number"], e["animal"]["name"]) for e in events] == [
+        ("identified", "81", "DINA 8"), ("refused", "81", "DINA 8"), ("identified", "41", "JANNA 2")]
+
+
 if __name__ == "__main__":
     run(globals())

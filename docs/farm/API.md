@@ -97,7 +97,8 @@ loop:  GET /api/identity/events?after=<after>&wait=30   ->  handle "events", aft
 - `kind`: `identified` (the place read the animal's responder), `milkingStarted` (the cups go on:
   the animal is the one identified closest to that moment, so not a cow walking past to the next
   robot), `visitEnded` (the robot is done and lets the animal out; she may still be in the box
-  for some seconds). A milking robot that does not say when it milks only gives `identified`.
+  for some seconds), `refused` (the robot did not milk her: she came before her milking was due).
+  A milking robot that does not say when it milks only gives `identified`.
 
 - `place.kind`: `milkingRobot`, `feedingStation`, `gate` or `unknown`. A client that wants only
   one kind filters on it; one that does not care never has to look.

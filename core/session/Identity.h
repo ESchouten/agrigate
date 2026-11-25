@@ -25,6 +25,7 @@ namespace event {
 constexpr const char* Identified = "identified";
 constexpr const char* MilkingStarted = "milkingStarted";
 constexpr const char* VisitEnded = "visitEnded";
+constexpr const char* Refused = "refused";
 }  // namespace event
 
 struct Place {
@@ -34,6 +35,7 @@ struct Place {
   int64_t since = 0;
   int64_t milkingSince = 0;   // 0: not milking
   Animal milked;              // the animal of the milking now (or the last one), for its visit end
+  int64_t lastEnd = 0;        // the last visit end
   int64_t pendingStart = 0;   // a milking start not yet told: waits a moment for an identification just after it
   std::deque<std::pair<int64_t, Animal>> recent;   // the last identifications here (time, animal)
 };
@@ -57,6 +59,8 @@ struct Places {
   void milkingStarted(Place& p, int64_t now);
   /** The robot is done with the animal at [p] and lets it out. */
   void visitEnded(Place& p, int64_t now);
+  /** The robot did not milk the animal with [responder] (it came too early) and lets it out. */
+  void refused(Place& p, const std::string& responder, int64_t now);
   /** Tells a milking start once its moment has passed (call it from the driver's tick). */
   void settle(int64_t now);
 

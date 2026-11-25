@@ -23,13 +23,15 @@
  *   include an identification that arrives with it. A "visitEnded" event carries the animal of that milking.
  *
  * identity_events_json: what happened, for a consumer that follows
- *   {"events": [{"seq", "time", "kind": "identified" | "milkingStarted" | "visitEnded", "place": the place's id,
+ *   {"events": [{"seq", "time", "kind": "identified" | "milkingStarted" | "visitEnded" | "refused", "place": the place's id,
  *                "animal": {"number", "name", "responder"} (for a milking: the animal milked, see above;
  *                           all empty when no animal was identified there)}],
  *    "last": seq}
  *   with seq > after, oldest first; the session keeps the last 200. The same animal at the same
  *   place again within 5 s is the same identification. "visitEnded": the robot is done with the
- *   animal and lets it out (it may still be in the box for some seconds). */
+ *   animal and lets it out (it may still be in the box for some seconds). "refused": the robot did not
+ *   milk the animal (it came before its milking was due) and lets it out; an animal identified without
+ *   either (a robot that leads to the next one) walked through. */
 #ifndef IDENTITY_C_H
 #define IDENTITY_C_H
 

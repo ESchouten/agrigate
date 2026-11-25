@@ -10,7 +10,8 @@ namespace {
 constexpr int64_t kSameMs = 5000;
 constexpr size_t kEventsKept = 200;
 constexpr int64_t kMilkedWithinMs = 60000;   // the animal milked was identified at most this long before or after the start
-constexpr int64_t kSettleMs = 10000;         // a start is told this long after it (or at the next event of the place)
+constexpr int64_t kSettleMs = 10000;
+constexpr int64_t kRefusedWithinMs = 30000;   // a refusal record comes at most this long after the cow was identified         // a start is told this long after it (or at the next event of the place)
 constexpr size_t kRecentKept = 8;
 constexpr int64_t kSameMilkingMs = 120000;   // a start within this time of the last one is the same milking (a missed visit end otherwise)
 
@@ -78,6 +79,19 @@ void Places::tellStart(Place& p) {
   add(p, event::MilkingStarted, p.milked, start);
 }
 
+void Places::refused(Place& p, const std::string& responder, int64_t now) {
+  // A refusal record comes some seconds after the cow was identified and without a milking; the same
+  // record also comes at the end of a milking, which is not a refusal.
+  const std::pair<int64_t, Animal>* id = nullptr;
+  for (auto it = p.recent.rbegin(); it != p.recent.rend(); ++it)
+    if (it->second.responder == responder) { id = &*it; break; }
+  if (!id || now - id->first > kRefusedWithinMs) return;
+  const int64_t started = p.pendingStart ? p.pendingStart : p.milkingSince;
+  if (started && started >= id->first - kMilkedWithinMs) return;        // she is (or was just) being milked
+  if (p.lastEnd && p.lastEnd >= id->first) return;                      // the record of a milking that just ended
+  add(p, event::Refused, id->second, now);
+}
+
 void Places::settle(int64_t now) {
   for (Place& p : places)
     if (p.pendingStart && now - p.pendingStart >= kSettleMs) tellStart(p);
@@ -87,6 +101,7 @@ void Places::visitEnded(Place& p, int64_t now) {
   if (p.pendingStart) tellStart(p);
   const bool milking = p.milkingSince != 0;
   p.milkingSince = 0;
+  p.lastEnd = now;
   add(p, event::VisitEnded, milking ? p.milked : Animal(), now);
 }
 

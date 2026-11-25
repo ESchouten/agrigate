@@ -23,6 +23,12 @@ Three messages are read:
 | `0x116` (MSG_REQUEST_COW_NR_NAME) | the robot has read a cow's responder at the start of a visit | `u32 responder`, `u32 cow number`, the name in UTF-16LE up to a NUL | `identified` |
 | `0x002` (start milking) | the cups go on | the teat positions (38 bytes or more) | `milkingStarted` |
 | `0x402` (visit end) | `data[0]` = 1: milking done, the cow may leave (about 8 s after the last cup is off); `data[0]` = 0 about 30 s later | | `visitEnded` (on 1 only) |
+| `0x3F7` (MSG_DB_COLINFO), table 18 | a cow came before her milking was due: the robot records the refusal for the farm software, 6–12 s after identifying her | `u16 table` at data[6] (18), `u32 responder` at data[8] (32 bytes in all) | `refused` |
+
+A cow identified at robot 1 without a milking and without a refusal walked through to robot 2 (a
+TCS passage). In a 45-minute recording of both robots every identification without a milking at
+robot 2 had its table-18 record with the same responder; at robot 1 so had the cows that stayed, not
+the ones that walked through.
 
 Any other message only counts as "the robot is there". The destination and sender in the header
 are mailboxes inside the robot (e.g. 17 is the robot's screen); the driver does not need them.
