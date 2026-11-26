@@ -20,7 +20,7 @@ Open software for the robots in the barn: one gate to all of them, whatever thei
 | Lely Discovery | Clean: manure robot | Bluetooth LE, or classic Bluetooth on older robots (not on iOS) | [`drivers/discovery`](drivers/discovery) |
 | Lely Astronaut | Milk and Cow: robots and herd, read only | The farm's T4C server on the local network | [`drivers/t4c`](drivers/t4c/API.md) |
 | Lely Astronaut A4 | Cow: which cow is in the box, as it happens (experimental) | The robot itself on the robot network | [`drivers/astronaut`](drivers/astronaut/API.md) |
-| Fullwood M²erlin | Milk: robots, read only | The farm's FULLSENSE server on the local network | [`drivers/fullsense`](drivers/fullsense/API.md) |
+| Fullwood M²erlin | Milk and Cow: robots, which cow is in them, herd, read only | The farm's FULLSENSE server on the local network | [`drivers/fullsense`](drivers/fullsense/API.md) |
 
 The `discovery`, `t4c` and `astronaut` drivers were checked on real farms; the FULLSENSE driver has
 not met a real server yet (see each driver's page).

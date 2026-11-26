@@ -46,8 +46,8 @@ FARM_SERVER_TOKEN=<token> FARM_SERVER_PASSWORD=<licence key> python farm_server.
   server's. For `t4c` leave `user` empty and give the farm's licence key as password, in the file
   (`"password"`) or, better, in the environment as `FARM_SERVER_PASSWORD`. A user name and
   password of the server's web pages work too.
-- `refreshSeconds`: how often a source that has to be asked is asked again (30 at least). A
-  source that tells by itself is always up to date.
+- `refreshSeconds`: how often a source that has to be asked is asked again (30 at least); which
+  animal is where it is asked every 10 s. A source that tells by itself is always up to date.
 - The token is a word of your own choosing that every request has to carry, in the file
   (`"token"`) or in the environment as `FARM_SERVER_TOKEN`. Without a token the service answers
   only the computer it runs on.
@@ -206,7 +206,7 @@ or a gate that identifies animals appears without a change for its clients.
 |---|---|---|---|
 | `astronaut` | number, name, responder; one place per robot | | |
 | `t4c` | | everything above; `workNumber` is empty (T4C has none: in the Netherlands it is usually the last four digits before the check digit of the life number) | everything above; `state` is `unknown` with the server's number in `raw` |
-| `fullsense` | | | not checked on a real server |
+| `fullsense` | number, name, responder; one place per robot, as often as it is asked (not checked on a real server) | no responder, group, sires or expected calving; day counts counted by the driver (not checked on a real server) | the figures of the last 24 hours (not checked on a real server) |
 
 The makes behind the drivers are in the [README](README.md). A new make is a new driver
 ([DRIVERS.md](../DRIVERS.md)); this API stays the same.

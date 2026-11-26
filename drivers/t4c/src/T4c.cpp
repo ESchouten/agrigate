@@ -1,9 +1,6 @@
 // The T4C farm management server: its milking robots and its herd, read only.
 // Checked against a real server (T4C 4.22, two Astronauts, 92 animals, 2026-11-23); see ../API.md.
-#include "Session.h"
-
-#include <map>
-#include <memory>
+#include "Icar.h"
 
 namespace agrigate {
 namespace {
@@ -75,8 +72,8 @@ void readMilk(Session& s) {
   });
 }
 
-// ---- the herd: seven requests and one more per 150 animals (Animals/active, their status, the
-// farm's number, the sires and four lists of events in the ICAR format the server also offers)
+// ---- the herd: Animals/active, their status (one request per 150 animals), the farm's number,
+// the sires and the lists of events in the ICAR format (Icar.h) the server also offers
 
 // T4C's ReproductionStatusId (GET /t4capi/reproductionstatustypes on a real server)
 const char* reproduction(double id) {
@@ -96,50 +93,8 @@ const char* production(const std::string& p) {
   return cow::production::Unknown;
 }
 
-// ICAR (integrationglobal) words
-const char* inseminationType(const std::string& t) {
-  if (t.find("Natural") != std::string::npos || t == "Sire") return "bull";
-  if (t.find("mplant") != std::string::npos || t.find("mbryo") != std::string::npos) return "embryo";
-  if (t.find("nsemination") != std::string::npos || t == "AI") return "ai";
-  return "unknown";
-}
-
-const char* checkResult(const std::string& r) {
-  if (r == "Pregnant") return "pregnant";
-  if (r == "Empty" || r == "NotPregnant" || r == "Not Pregnant" || r == "Open") return "notPregnant";
-  return "unknown";
-}
-
-const char* heatMethod(const std::string& m) {
-  if (m == "Visual") return "visual";
-  if (m.find("ctivity") != std::string::npos || m.find("edometer") != std::string::npos || m.find("ensor") != std::string::npos) return "activity";
-  return "unknown";
-}
-
-std::string idOf(const Json& identifiers, const char* scheme) {
-  for (const Json& i : identifiers.items)
-    if (i["scheme"].str() == scheme) return i["id"].str();
-  return "";
-}
-
-struct HerdRead {
-  std::map<std::string, size_t> byId, byLife;                 // the server's animal id / life number -> index
-  std::map<std::string, std::string> sireByCode, sireByLife;  // -> the sire's name
-  std::string ucn;
-};
-
-std::string found(const std::map<std::string, std::string>& in, const std::string& key) {
-  auto it = in.find(key);
-  return it == in.end() ? "" : it->second;
-}
-
-cow::Animal* animal(Session& s, HerdRead& h, const Json& icarAnimal) {
-  auto it = h.byLife.find(icarAnimal["id"].str());
-  return it == h.byLife.end() ? nullptr : &s.cow.animals[it->second];
-}
-
 void readCow(Session& s) {
-  auto h = std::make_shared<HerdRead>();
+  auto h = std::make_shared<icar::Herd>();
   s.get("/t4capi/Animals/active", [&s, h](const Json& answer) {
     if (refused(s, answer, "animals")) return;
     for (const Json& a : answer["data"].items) {
@@ -151,89 +106,46 @@ void readCow(Session& s) {
       x.responder = a["responderNumber"].str();
       x.birthDate = cow::day(a["birthDate"].str());
       x.group = a["location"].str();
-      h->byId[x.id] = s.cow.animals.size();
-      h->byLife[x.lifeNumber] = s.cow.animals.size();
+      h->byId[x.lifeNumber] = s.cow.animals.size();   // the ICAR lists name an animal by its life number
       s.cow.animals.push_back(x);
     }
     for (size_t from = 0; from < s.cow.animals.size(); from += 150) {   // as the server's own pages ask
       std::string q;
       for (size_t i = from; i < s.cow.animals.size() && i < from + 150; i++) q += (q.empty() ? "?" : "&") + std::string("animalIds=") + s.cow.animals[i].id;
-      s.get("/t4capi/Animal/status" + q, [&s, h](const Json& answer) {
-        for (const Json& st : answer["data"].items) {
-          auto it = h->byId.find(st["animalId"].str());
-          if (it == h->byId.end()) continue;
-          cow::Animal& x = s.cow.animals[it->second];
-          x.reproduction = reproduction(st["reproductionStatusId"].num(0));
-          x.reproductionRaw = st["reproductionStatus"].str();
-          x.production = production(st["productionStatus"].str());
-          x.lactation = st["lactationNumber"].num();
-          x.daysInMilk = x.production == std::string(cow::production::Young) ? -1 : st["daysInLactation"].num();
-          const double preg = st["pregnancyDays"].num();
-          x.pregnantDays = x.reproduction == std::string(cow::reproduction::Pregnant) && preg > 0 ? preg : -1;
-          x.daysSinceInsemination = st["daysSinceInsemination"].num();
-          x.daysSinceHeat = st["daysSinceHeat"].num();
-          x.inseminationsThisLactation = st["numberOfInseminations"].num();
-        }
+      s.get("/t4capi/Animal/status" + q, [&s](const Json& answer) {
+        for (const Json& st : answer["data"].items)
+          for (cow::Animal& x : s.cow.animals) {
+            if (x.id != st["animalId"].str()) continue;
+            x.reproduction = reproduction(st["reproductionStatusId"].num(0));
+            x.reproductionRaw = st["reproductionStatus"].str();
+            x.production = production(st["productionStatus"].str());
+            x.lactation = st["lactationNumber"].num();
+            x.daysInMilk = x.production == std::string(cow::production::Young) ? -1 : st["daysInLactation"].num();
+            const double preg = st["pregnancyDays"].num();
+            x.pregnantDays = x.reproduction == std::string(cow::reproduction::Pregnant) && preg > 0 ? preg : -1;
+            x.daysSinceInsemination = st["daysSinceInsemination"].num();
+            x.daysSinceHeat = st["daysSinceHeat"].num();
+            x.inseminationsThisLactation = st["numberOfInseminations"].num();
+          }
       });
     }
     s.get("/t4capi/v2/herds", [&s, h](const Json& answer) {
+      std::string ucn;
       for (const Json& row : answer["data"].items)
-        if (h->ucn.empty()) h->ucn = row["ucnNumber"].str();
-      if (h->ucn.empty()) return s.fail(SESSION_UNEXPECTED, "herds: no UCN number for the events");
-      s.get("/t4capi/v2/sires", [&s, h](const Json& answer) {
+        if (ucn.empty()) ucn = row["ucnNumber"].str();
+      if (ucn.empty()) return s.fail(SESSION_UNEXPECTED, "herds: no UCN number for the events");
+      s.get("/t4capi/v2/sires", [h](const Json& answer) {
         for (const Json& sire : answer["data"].items) {
           if (!sire["sireCode"].str().empty()) h->sireByCode[sire["sireCode"].str()] = sire["sireName"].str();
           if (!sire["lifeNumber"].str().empty()) h->sireByLife[sire["lifeNumber"].str()] = sire["sireName"].str();
         }
       }, true);
-      const std::string farm = "?ucnNumber=" + h->ucn;
-      s.get("/t4capi/integrationglobal/parturitions" + farm, [&s, h](const Json& answer) {
+      const std::string path = "/t4capi/integrationglobal/", farm = "?ucnNumber=" + ucn;
+      icar::readEvents(s, h, path, farm);
+      s.get(path + "gestations" + farm, [&s, h](const Json& answer) {   // T4C's own list
         for (const Json& e : answer["data"].items)
-          if (cow::Animal* x = animal(s, *h, e["animal"])) {
-            const std::string d = cow::day(e["eventDateTime"].str());
-            if (d > x->calvingDate) x->calvingDate = d;
-          }
-      }, true);
-      s.get("/t4capi/integrationglobal/inseminations" + farm, [&s, h](const Json& answer) {
-        for (const Json& e : answer["data"].items)
-          if (cow::Animal* x = animal(s, *h, e["animal"])) {
-            cow::Insemination n;
-            n.date = cow::day(e["eventDateTime"].str());
-            n.sireCode = idOf(e["sireIdentifiers"], "nl.aicode");
-            n.sireLifeNumber = idOf(e["sireIdentifiers"], "eu.bovine");
-            n.sireName = found(h->sireByCode, n.sireCode);
-            if (n.sireName.empty()) n.sireName = found(h->sireByLife, n.sireLifeNumber);
-            n.type = inseminationType(e["inseminationType"].str());
-            x->inseminations.push_back(n);
-          }
-      }, true);
-      s.get("/t4capi/integrationglobal/pregnancy-checks" + farm, [&s, h](const Json& answer) {
-        for (const Json& e : answer["data"].items)
-          if (cow::Animal* x = animal(s, *h, e["animal"])) x->pregnancyChecks.push_back({cow::day(e["eventDateTime"].str()), checkResult(e["result"].str())});
-      }, true);
-      s.get("/t4capi/integrationglobal/gestations" + farm, [&s, h](const Json& answer) {
-        for (const Json& e : answer["data"].items)
-          if (cow::Animal* x = animal(s, *h, e["animal"]))
+          if (cow::Animal* x = h->animal(s, e["animal"]))
             if (x->reproduction == std::string(cow::reproduction::Pregnant)) x->expectedCalving = cow::day(e["expectedCalvingDate"].str());
-      }, true);
-      s.get("/t4capi/integrationglobal/heats" + farm, [&s, h](const Json& answer) {
-        for (const Json& e : answer["data"].items)
-          if (cow::Animal* x = animal(s, *h, e["animal"])) x->heats.push_back({cow::day(e["eventDateTime"].str()), heatMethod(e["heatDetectionMethod"].str())});
-      }, true);
-      s.get("/t4capi/integrationglobal/drying-offs" + farm, [&s, h](const Json& answer) {
-        for (const Json& e : answer["data"].items)
-          if (cow::Animal* x = animal(s, *h, e["animal"])) {
-            const std::string d = cow::day(e["eventDateTime"].str());
-            if (d > x->dryOffDate) x->dryOffDate = d;
-          }
-      }, true);
-      // T4C calls it "keep open", and sets the status back to open after a heat while the event stays
-      s.get("/t4capi/integrationglobal/do-not-breeds" + farm, [&s, h](const Json& answer) {
-        for (const Json& e : answer["data"].items)
-          if (cow::Animal* x = animal(s, *h, e["animal"])) {
-            const std::string d = cow::day(e["eventDateTime"].str());
-            if (d > x->doNotBreedDate) x->doNotBreedDate = d;
-          }
       }, true);
     });
   });

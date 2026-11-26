@@ -17,7 +17,7 @@ reached: a robot that tells by itself and a server that has to be asked give the
 |---|---|---|---|---|
 | Lely T4C server | [`t4c`](../../drivers/t4c/API.md) | yes | yes | |
 | Lely Astronaut A4 (the robot itself, experimental) | [`astronaut`](../../drivers/astronaut/API.md) | | | yes: the robot's box |
-| Fullwood FULLSENSE server | [`fullsense`](../../drivers/fullsense/API.md) | yes | | |
+| Fullwood FULLSENSE server | [`fullsense`](../../drivers/fullsense/API.md) | yes | yes | yes: the robots, asked |
 
 Not yet in the apps or on the buttons.
 

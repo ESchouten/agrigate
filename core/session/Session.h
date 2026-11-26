@@ -130,6 +130,11 @@ class Session {
 int32_t copyOut(const std::string& s, char* buf, int32_t size);
 /** A time for the JSON: "null" for 0. */
 std::string timeJson(int64_t ms);
+/** A server's time text ("2026-11-22T15:30:00+01:00", "...Z", "....123Z"; without a zone: UTC)
+ *  in ms since 1970; 0 for anything else. */
+int64_t timeMs(const std::string& when);
+/** [ms] since 1970 as "2026-11-22T14:30:00Z". */
+std::string timeText(int64_t ms);
 
 }  // namespace agrigate
 

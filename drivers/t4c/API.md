@@ -53,7 +53,8 @@ gives the date of the last such event; the herd API (`core/cow_c.h`) counts it w
 animal's last calving and last insemination, and then says `doNotBreed` for an animal that is not
 pregnant. `reproductionRaw` keeps T4C's own status.
 
-The `integrationglobal` lists are the ICAR Animal Data Exchange format; without dates they give the
+The `integrationglobal` lists are the ICAR Animal Data Exchange format (read with
+`core/session/Icar.h`, as the `fullsense` driver reads its server's); without dates they give the
 whole history (on the server checked: 983 inseminations since 2013 in 0.8 s). Their times are a
 day's start on the farm, given in UTC (`2025-11-24T23:00:00Z` = 25 November in the Netherlands): the
 driver takes a UTC time from noon on as the next day.

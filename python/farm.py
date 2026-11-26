@@ -8,6 +8,8 @@ reads only.
                                                      # also save what the server said (logins left out)
     python farm.py t4c 10.4.1.1:6969                 # no --user: the password is the licence key
     python farm.py astronaut 10.4.1.101 --follow     # which cow is at the robot, as it happens
+    python farm.py fullsense 192.168.1.20 --user agrigate --follow --record answers.json
+                                                     # a server that has to be asked: every 10 s
 """
 from __future__ import annotations
 
@@ -17,7 +19,7 @@ import json
 import os
 import time
 
-from agrigate.session import UNREACHABLE, Session, SessionError, drivers
+from agrigate.session import IDENTITY_SECONDS, UNREACHABLE, Session, SessionError, drivers
 
 
 def show_milk(data: dict) -> None:
@@ -77,7 +79,12 @@ def main() -> int:
                 if source.notes:
                     print("left out: " + source.notes)
             while a.follow:
-                time.sleep(1)
+                time.sleep(IDENTITY_SECONDS if asks else 1)
+                if asks and "identity" in source.contracts:
+                    try:
+                        source.identity()
+                    except SessionError as e:
+                        print(f"failed: {e}")
     except SessionError as e:
         print(f"failed: {e}")
         return 1
