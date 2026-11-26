@@ -1,6 +1,7 @@
 # T4C driver
 
-Reads the milking robots and the herd a T4C farm management server knows. Link:
+Reads the milking robots, the last cow at each of them and the herd a T4C farm management server
+knows. Link:
 `http`, port 6969 (a real server: `10.4.1.1:6969` on the robot network). The driver is
 `src/T4c.cpp`; it only asks, with `GET` (and the login's `POST` when a user name is given).
 
@@ -25,9 +26,29 @@ as written). An error comes as HTTP 200 with `ServerEror.Code` other than 200: t
 
 | Call | For |
 |---|---|
-| `GET /t4capi/astronaut/overviews` | The robots: `Id`, `Name`, `BarnName` (group), `RobotStatus` (raw), `LastProcessTime` (last visit); also `AniUserNumber`, the last cow's number |
+| `GET /t4capi/astronaut/overviews` | The robots: `Id`, `Name`, `BarnName` (group), `RobotStatus` (raw), `LastProcessTime` (last visit); `AniUserNumber`, the last cow's number, is for identity (below) |
 | `GET /t4capi/alarms/astronaut/{id}` | Its alarms: `creationDate`, `indicationId` (code), `description` (text) |
 | `GET /t4capi/astronaut/{id}/detail` | Its figures: the first of `AstronautKpis` (`TotalMilkProduced`, `NumberOfMilking`) and `FailedMilkingKpi.TotalFailedMilkingCount` |
+
+## Which cow is at the robot
+
+| Call | For |
+|---|---|
+| `GET /t4capi/astronaut/overviews` | Per robot (one place, `milkingRobot`): `AniUserNumber` (the cow's number) at `LastProcessTime` |
+
+The server says only which cow a robot dealt with last, not when she leaves or what the robot
+did. A new number or time is `identified`, at the session's time: `LastProcessTime` is the farm's
+own time without a zone. What a robot had at the first read is only noted, as it may be hours
+old. Read it every few seconds (`farm.py --follow` asks every 10 s). Not checked yet: whether
+"processed" is the moment the cow is identified or the end of her visit, how soon the server
+has it, and what `VisitResult` (1, 2, ...) means:
+
+```bash
+python farm.py t4c 10.4.1.1:6969 --follow --record t4c-live.json   # while cows come in
+```
+
+On a farm whose robot can be reached itself, the `astronaut` driver tells it as it happens, with
+the start and end of each milking and the refusals.
 
 ## The herd
 

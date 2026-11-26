@@ -45,7 +45,7 @@ def read(farm, password="geheim"):
 
 def test_driver_is_listed():
     d = next(d for d in drivers() if d["id"] == "t4c")
-    assert d["contracts"] == ["milk", "cow"] and d["links"] == [{"kind": "http", "scheme": "http", "port": 6969}]
+    assert d["contracts"] == ["milk", "cow", "identity"] and d["links"] == [{"kind": "http", "scheme": "http", "port": 6969}]
 
 
 def test_robots_alarms_and_figures():

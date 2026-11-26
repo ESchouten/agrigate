@@ -72,6 +72,24 @@ void readMilk(Session& s) {
   });
 }
 
+// ---- identity: the last cow each robot dealt with (astronaut/overviews: AniUserNumber at
+// LastProcessTime, the farm's own time without a zone). A new one is reported when it is seen, at
+// the session's time; what a robot had at the first read is only noted (it may be hours old).
+void readIdentity(Session& s) {
+  s.get("/t4capi/astronaut/overviews", [&s](const Json& answer) {
+    if (refused(s, answer, "robots")) return;
+    for (const Json& o : answer["data"].items) {
+      identity::Place& p = s.identity.place(o["id"].str(), identity::kind::MilkingRobot);
+      p.name = o["name"].str();
+      const std::string number = o["aniUserNumber"].str(), seen = number + " " + o["lastProcessTime"].str();
+      const bool first = p.seen.empty();
+      if (seen == p.seen) continue;
+      p.seen = seen;
+      if (!first && !number.empty() && number != "0") s.identity.identified(p, {number, "", ""}, s.now);
+    }
+  });
+}
+
 // ---- the herd: Animals/active, their status (one request per 150 animals), the farm's number,
 // the sires and the lists of events in the ICAR format (Icar.h) the server also offers
 
@@ -158,6 +176,7 @@ extern const Driver t4c = [] {
   d.login = login;
   d.milk = readMilk;
   d.cow = readCow;
+  d.identity = readIdentity;
   return d;
 }();
 

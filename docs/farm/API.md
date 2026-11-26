@@ -205,7 +205,7 @@ or a gate that identifies animals appears without a change for its clients.
 | Driver | Identity | Cow | Milk |
 |---|---|---|---|
 | `astronaut` | number, name, responder; one place per robot | | |
-| `t4c` | | everything above; `workNumber` is empty (T4C has none: in the Netherlands it is usually the last four digits before the check digit of the life number) | everything above; `state` is `unknown` with the server's number in `raw` |
+| `t4c` | number only; one place per robot, the last cow it dealt with, as often as it is asked (not checked: see the driver) | everything above; `workNumber` is empty (T4C has none: in the Netherlands it is usually the last four digits before the check digit of the life number) | everything above; `state` is `unknown` with the server's number in `raw` |
 | `fullsense` | number, name, responder; one place per robot, as often as it is asked (not checked on a real server) | no responder, group, sires or expected calving; day counts counted by the driver (not checked on a real server) | the figures of the last 24 hours (not checked on a real server) |
 
 The makes behind the drivers are in the [README](README.md). A new make is a new driver

@@ -38,6 +38,7 @@ struct Place {
   int64_t lastEnd = 0;        // the last visit end
   int64_t pendingStart = 0;   // a start not yet told: an identification may still come with it
   std::deque<std::pair<int64_t, Animal>> recent;   // the last identifications here (time, animal)
+  std::string seen;           // a driver that asks: what the source said here last (to tell a new one)
 };
 
 struct Event {
