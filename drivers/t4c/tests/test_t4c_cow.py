@@ -1,7 +1,7 @@
 """Offline tests: the T4C driver with the farm's licence key, as a real T4C server answers
 (checked on T4C 4.22: field names in PascalCase, "ServerEror", ICAR lists in integrationglobal).
 The animals here are made up. Run: python3 drivers/t4c/tests/test_t4c_cow.py"""
-import os, sys
+import os, sys, time
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 from farm_test import FakeFarm, Session, SessionError, drivers, run
@@ -70,7 +70,7 @@ def herd(farm, key=KEY):
 
 
 def test_the_driver_knows_a_herd():
-    assert next(d for d in drivers() if d["id"] == "t4c")["contracts"] == ["milk", "cow"]
+    assert next(d for d in drivers() if d["id"] == "t4c")["contracts"] == ["milk", "cow", "identity"]
 
 
 def test_the_herd():
@@ -158,6 +158,24 @@ def test_a_missing_event_list_is_left_out():
     assert animals["15"]["expectedCalving"] == "" and len(animals["15"]["inseminations"]) == 2 and "gestations" in notes
 
 
+def test_the_last_cow_at_each_robot():
+    farm = server()
+    robots = farm.routes["GET /t4capi/astronaut/overviews"]["Data"]
+    with Session("t4c", farm.address, "", KEY) as f:
+        place, = f.identity()["places"]
+        assert (place["name"], place["kind"], place["animal"]) == ("Melkrobot 1", "milkingRobot", None)   # 119 may be hours old: only noted
+        f.identity()
+        assert f.events(0)["events"] == []
+        robots[0].update(LastProcessTime="2026-11-23T13:31:02", AniUserNumber=15, VisitResult=1)
+        before = time.time() * 1000
+        place, = f.identity()["places"]
+        assert place["animal"]["number"] == "15" and place["animal"]["since"] >= before - 1
+        f.identity()
+        robots[0].update(LastProcessTime="2026-11-23T13:40:00", AniUserNumber=41, VisitResult=2)
+        f.identity()
+        assert [(e["kind"], e["animal"]["number"]) for e in f.events(0)["events"]] == [("identified", "15"), ("identified", "41")]
+
+
 def test_the_farm_service_on_this_server_and_a_robot():
     """The whole row once: a robot's datagram and the server's herd, out of the service's HTTP API."""
     import json, socket, struct, threading, time, urllib.request
@@ -184,7 +202,7 @@ def test_the_farm_service_on_this_server_and_a_robot():
         event, = get("/api/identity/events?after=0&wait=5")["events"]
         assert event["place"]["name"] == "Robot 1" and event["place"]["kind"] == "milkingRobot"
         assert (event["animal"]["number"], event["animal"]["lifeNumber"], event["animal"]["reproduction"]) == ("15", "NL 100000001", "pregnant")
-        place, = get("/api/identity/places")["places"]
+        place = next(p for p in get("/api/identity/places")["places"] if p["name"] == "Robot 1")
         assert place["connected"] and place["animal"]["name"] == "DINA 1"
         assert next(a for a in get("/api/cow/animals")["animals"] if a["number"] == "15")["at"]["place"] == "Robot 1"
         assert get("/api/milk/robots")["robots"][0]["name"] == "Melkrobot 1"

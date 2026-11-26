@@ -15,7 +15,7 @@ reached: a robot that tells by itself and a server that has to be asked give the
 
 | Source | Driver | Milk | Cow | Identity |
 |---|---|---|---|---|
-| Lely T4C server | [`t4c`](../../drivers/t4c/API.md) | yes | yes | |
+| Lely T4C server | [`t4c`](../../drivers/t4c/API.md) | yes | yes | the last cow per robot, asked |
 | Lely Astronaut A4 (the robot itself, experimental) | [`astronaut`](../../drivers/astronaut/API.md) | | | yes: the robot's box |
 | Fullwood FULLSENSE server | [`fullsense`](../../drivers/fullsense/API.md) | yes | yes | yes: the robots, asked |
 

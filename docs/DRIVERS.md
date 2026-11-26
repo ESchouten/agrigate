@@ -23,7 +23,7 @@ the same C++ runs on a phone, a computer and a microcontroller.
 | Clean | Manure robots: routes, schedule, status, and each make's own panel | `clean_c.h` | `discovery` |
 | Milk | Milking robots: state, alarms, figures | `milk_c.h` | `t4c`, `fullsense` |
 | Cow | The herd | `cow_c.h` | `t4c`, `fullsense` |
-| Cow | Identity: which animal is where | `identity_c.h` | `astronaut`, `fullsense` |
+| Cow | Identity: which animal is where | `identity_c.h` | `astronaut`, `fullsense`, `t4c` |
 
 Every contract works on a **session** (`session_c.h`): one source, one driver, one link.
 `session_c.h` is the host's side (how to keep the session going, per link); the contracts on top
