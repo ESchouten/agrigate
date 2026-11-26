@@ -53,6 +53,7 @@ def lib():
         L.session_response.argtypes = [S, i32, ctypes.c_char_p, i32]
         L.session_incoming.argtypes = [S, ctypes.c_char_p, i32, ctypes.c_int64]
         L.session_wait.argtypes = [S, i32]
+        L.session_setup.argtypes = [S, ctypes.c_char_p, ctypes.c_char_p]
         L.session_drivers_json.argtypes = out
         L.identity_events_json.argtypes = [S, ctypes.c_int64] + out
         L.clean_start_route.argtypes = [S, ctypes.c_char, i32]
@@ -80,7 +81,7 @@ def text(fn, *args) -> str:
 
 
 def drivers() -> list[dict]:
-    """The drivers in this build: [{"id", "name", "contracts", "links"}, ...] (core/session_c.h)."""
+    """The drivers in this build: [{"id", "name", "contracts", "setup", "links"}, ...] (core/session_c.h)."""
     return json.loads(text(lib().session_drivers_json))
 
 

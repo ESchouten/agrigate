@@ -3,6 +3,7 @@
 // milkings from its ICAR lists (/ICAR, Icar.h). Written from the server's API description; see
 // ../API.md for what a real server still has to confirm.
 #include <cstdlib>
+#include <random>
 
 #include "Icar.h"
 
@@ -80,8 +81,12 @@ bool given(const std::string& id) { return !id.empty() && id != "00000000-0000-0
 
 constexpr int64_t kDayMs = 24 * 3600 * 1000LL;
 
+std::string credentials(const std::string& user, const std::string& password) {   // the "}" still to come
+  return "{\"userName\":" + quote(user) + ",\"password\":" + quote(password);
+}
+
 void login(Session& s) {
-  s.post("/api/Authentication/Authenticate", "{\"userName\":" + quote(s.user) + ",\"password\":" + quote(s.password) + "}", [&s](const Json& answer) {
+  s.post("/api/Authentication/Authenticate", credentials(s.user, s.password) + "}", [&s](const Json& answer) {
     if (!answer["token"].str().empty()) s.headers["Authorization"] = "Bearer " + answer["token"].str();
   });
 }
@@ -252,6 +257,41 @@ void readCow(Session& s) {
   }, false);
 }
 
+// ---- setup: the program user (FULLSENSE's user management, type "Programma") Agrigate reads with.
+// Made with a password used once, then set to the user's own: as a new user would on first login.
+
+void setup(Session& s) {
+  s.get("/api/Settings/GetRoles", [&s](const Json& roles) {
+    std::string role, all;
+    for (const Json& r : roles.items) {
+      std::string lower = r.str();
+      for (char& c : lower) c = (char)tolower((unsigned char)c);
+      if (role.empty() && (lower.find("program") != std::string::npos || lower.find("applicat") != std::string::npos)) role = r.str();
+      all += (all.empty() ? "" : ", ") + r.str();
+    }
+    if (role.empty()) return s.fail(SESSION_UNEXPECTED, "roles: none for a program (" + all + ")");
+    s.get("/api/Settings/GetUsers", [&s, role](const Json& users) {
+      std::string id;   // a user of that name already: it gets the new password
+      for (const Json& u : users.items)
+        if (u["userName"].str() == s.setupUser) id = u["id"].str();
+      std::random_device random;
+      std::string once = "Ag-";
+      for (int i = 0; i < 16; i++) once += "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789"[random() % 56];
+      once += "-7a";
+      s.post("/api/Settings/SaveUser", "{" + (id.empty() ? "" : "\"id\":" + quote(id) + ",") + "\"isActive\":true,\"firstName\":" +
+                 quote(s.setupUser) + ",\"lastName\":\"\",\"userName\":" + quote(s.setupUser) + ",\"role\":" + quote(role) +
+                 ",\"oneTimePassword\":" + quote(once) + "}", [&s, once](const Json&) {
+        s.post("/api/Authentication/ChangeUserPassword", credentials(s.setupUser, once) + ",\"newPassword\":" + quote(s.setupPassword) + "}",
+               [&s](const Json&) {
+          s.post("/api/Authentication/Authenticate", credentials(s.setupUser, s.setupPassword) + "}", [&s](const Json& answer) {
+            if (answer["token"].str().empty()) s.fail(SESSION_UNEXPECTED, "the new user does not log in");
+          });
+        });
+      });
+    });
+  });
+}
+
 }  // namespace
 
 extern const Driver fullsense = [] {
@@ -260,6 +300,7 @@ extern const Driver fullsense = [] {
   d.milk = readMilk;
   d.cow = readCow;
   d.identity = readIdentity;
+  d.setup = setup;
   return d;
 }();
 

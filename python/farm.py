@@ -7,6 +7,9 @@ reads only.
     python farm.py t4c 192.168.1.10 --user erik --record answers.json
                                                      # also save what the server said (logins left out)
     python farm.py t4c 10.4.1.1:6969                 # no --user: the password is the licence key
+    python farm.py fullsense 192.168.1.20 --user beheer --setup Agrigate
+                                                     # make the server's user for Agrigate, as the farm's
+                                                     # administrator (asks both passwords); then use that one
     python farm.py astronaut 10.4.1.101 --follow     # which cow is at the robot, as it happens
     python farm.py fullsense 192.168.1.20 --user agrigate --follow --record answers.json
                                                      # a server that has to be asked: every 10 s
@@ -53,6 +56,7 @@ def main() -> int:
     ap.add_argument("address", nargs="?", help="the source on the farm network: host, host:port or http://host:port")
     ap.add_argument("--user", default="")
     ap.add_argument("--record", metavar="FILE", help="save every request and answer")
+    ap.add_argument("--setup", metavar="USER", help="make this user for Agrigate on the server (--user: one who may make users)")
     ap.add_argument("--follow", action="store_true", help="keep showing which animal is identified where (Ctrl+C stops)")
     a = ap.parse_args()
     if not a.address:
@@ -63,6 +67,19 @@ def main() -> int:
     asks = next((d["links"][0]["kind"] == "http" for d in drivers() if d["id"] == a.driver), False)
     password = (os.environ.get("FARM_PASSWORD") or getpass.getpass("Password: " if a.user else "Licence key: ")) if asks else ""
     recording = [] if a.record else None
+    if a.setup:
+        new = getpass.getpass(f"New password for {a.setup}: ")
+        if new != getpass.getpass("Again: "):
+            print("the passwords differ")
+            return 1
+        try:
+            with Session(a.driver, a.address, a.user, password) as source:
+                source.setup(a.setup, new)
+        except SessionError as e:
+            print(f"failed: {e}")
+            return 1
+        print(f"made: read with --user {a.setup}")
+        return 0
     try:
         with Session(a.driver, a.address, a.user, password, recording=recording, on_event=identified if a.follow else None) as source:
             for contract in source.contracts:

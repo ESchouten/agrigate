@@ -105,22 +105,31 @@ class Session:
             return json.loads(text(_lib().identity_events_json, self._s, int(after)))
 
     def read(self, contract: str) -> dict:
-        L = _lib()
         with self._lock:
-            L.session_tick(self._s, now_ms())
-            started = getattr(L, contract + "_read")(self._s)
-            if started != OK:
-                raise SessionError(started, "")
-            while request := text(L.session_request_json, self._s):
-                status, body = self._send(json.loads(request))
-                L.session_response(self._s, status, body, len(body))
-            self.notes = text(L.session_last_error, self._s)
-            if L.session_result(self._s) != OK:
-                raise SessionError(L.session_result(self._s), self.notes)
+            self._run(getattr(_lib(), contract + "_read"))
             known = self._known(contract)
         if contract == "identity":
             self._tell()
         return known
+
+    def setup(self, user: str, password: str) -> None:
+        """Make the server's own user for Agrigate (drivers() says which have "setup"), logged in
+        as a user who may make users. The one call that writes to a source (core/session_c.h)."""
+        with self._lock:
+            self._run(lambda s: _lib().session_setup(s, user.encode(), password.encode()))
+
+    def _run(self, start) -> None:
+        L = _lib()
+        L.session_tick(self._s, now_ms())
+        started = start(self._s)
+        if started != OK:
+            raise SessionError(started, "")
+        while request := text(L.session_request_json, self._s):
+            status, body = self._send(json.loads(request))
+            L.session_response(self._s, status, body, len(body))
+        self.notes = text(L.session_last_error, self._s)
+        if L.session_result(self._s) != OK:
+            raise SessionError(L.session_result(self._s), self.notes)
 
     def latest(self, contract: str) -> tuple[dict, str]:
         """What is known now, without waiting for the source: (data, what is wrong or ""). For a

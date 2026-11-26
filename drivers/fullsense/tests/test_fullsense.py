@@ -98,7 +98,7 @@ def read(farm, password="geheim"):
 
 def test_driver_is_listed():
     d = next(d for d in drivers() if d["id"] == "fullsense")
-    assert d["contracts"] == ["milk", "cow", "identity"] and d["links"][0]["port"] == 12080
+    assert d["contracts"] == ["milk", "cow", "identity"] and d["setup"] and d["links"][0]["port"] == 12080
 
 
 def test_robots_states_and_alarm():
@@ -257,6 +257,70 @@ def test_a_milking_done_between_two_reads():
         f.identity()
         f.identity()
         assert [(e["kind"], e["place"][:8]) for e in f.events(0)["events"]] == [("identified", "00000002"), ("visitStarted", "00000002"), ("visitEnded", "00000002")]
+
+
+def setup_server(users=()):
+    """A server with user management: the administrator erik, and what the setup makes."""
+    farm, made = server(), {}
+    accounts = {"erik": "geheim"}
+
+    def login(body):
+        ok = accounts.get(body["userName"]) == body["password"]
+        return {"token": farm.token, "refreshToken": "r", "expiration": "2026-11-26T20:00:00Z", "shouldChangePassword": False,
+                "isApplication": body["userName"] != "erik"} if ok else (400, '{"title": "Invalid credentials"}')
+
+    def save(body):
+        made["user"] = body
+        accounts[body["userName"]] = body["oneTimePassword"]
+        return 200, ""
+
+    def change(body):
+        if accounts.get(body["userName"]) != body["password"]:
+            return 400, '{"title": "Wrong password"}'
+        accounts[body["userName"]] = body["newPassword"]
+        return 200, ""
+
+    farm.routes.update({LOGIN: login, "GET /api/Settings/GetRoles": ["Administrator", "Engineer", "Programma"],
+                        "GET /api/Settings/GetUsers": [{"id": "u-1", "isActive": True, "userName": "erik", "role": "Administrator"}, *users],
+                        "POST /api/Settings/SaveUser": save, "POST /api/Authentication/ChangeUserPassword": change})
+    return farm, made
+
+
+def test_setup_makes_the_program_user():
+    farm, made = setup_server()
+    with Session("fullsense", farm.address, "erik", "geheim") as f:
+        f.setup("Agrigate", "eigen-wachtwoord")
+    user = made["user"]
+    assert (user["userName"], user["role"], user["isActive"]) == ("Agrigate", "Programma", True) and "id" not in user
+    assert user["oneTimePassword"] != "eigen-wachtwoord"   # used once, then changed to the user's own
+    with Session("fullsense", farm.address, "Agrigate", "eigen-wachtwoord") as f:
+        assert len(f.milk()["robots"]) == 3
+    writes = [k for k, _ in farm.asked if not k.startswith("GET ") and k != LOGIN]
+    assert writes == ["POST /api/Settings/SaveUser", "POST /api/Authentication/ChangeUserPassword"]
+
+
+def test_setup_again_gives_the_user_a_new_password():
+    farm, made = setup_server([{"id": "u-7", "isActive": True, "userName": "Agrigate", "role": "Programma"}])
+    with Session("fullsense", farm.address, "erik", "geheim") as f:
+        f.setup("Agrigate", "nieuw")
+    assert made["user"]["id"] == "u-7"
+
+
+def test_setup_without_a_program_role():
+    farm, made = setup_server()
+    farm.routes["GET /api/Settings/GetRoles"] = ["Administrator", "Engineer"]
+    with Session("fullsense", farm.address, "erik", "geheim") as f:
+        try:
+            f.setup("Agrigate", "eigen-wachtwoord")
+        except SessionError as e:
+            assert e.result == 3 and "Administrator, Engineer" in str(e)
+        else:
+            assert False
+    assert not made
+
+
+def test_only_fullsense_sets_up():
+    assert [d["id"] for d in drivers() if d["setup"]] == ["fullsense"]
 
 
 if __name__ == "__main__":

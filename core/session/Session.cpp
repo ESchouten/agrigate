@@ -81,8 +81,8 @@ void Session::response(int status, const std::string& body) {
     queue_.clear();
     return next();
   }
-  bool good = status >= 200 && status < 300, json = false;
-  Json answer = good ? Json::parse(body, &json) : Json();
+  bool good = status >= 200 && status < 300, json = good && r.method != "GET" && body.empty();
+  Json answer = good && !json ? Json::parse(body, &json) : Json();
   if (json) {
     r.then(answer);
   } else {
@@ -187,7 +187,7 @@ int32_t session_drivers_json(char* buf, int32_t size) {
     for (const auto& c : kContracts)
       if (d.*c.read) { o += std::string(first ? "" : ",") + quote(c.name); first = false; }
     if (d.clean) o += std::string(first ? "" : ",") + "\"clean\"";
-    o += "],\"links\":[";
+    o += std::string("],\"setup\":") + (d.setup ? "true" : "false") + ",\"links\":[";
     for (size_t l = 0; l < d.links.size(); l++) o += (l ? "," : "") + linkJson(d.links[l]);
     o += "]}";
   }
@@ -206,6 +206,13 @@ void session_close(session* s) { delete s; }
 void session_tick(session* s, int64_t now_ms) {
   s->now = now_ms;
   if (s->driver.tick) s->driver.tick(*s);
+}
+
+int32_t session_setup(session* s, const char* user, const char* password) {
+  if (!s->driver.setup || !user || !*user || !password || !*password) return SESSION_UNSUPPORTED;
+  s->setupUser = user;
+  s->setupPassword = password;
+  return s->read(s->driver.setup, &s->setUp);
 }
 
 int32_t session_request_json(session* s, char* buf, int32_t size) { return agrigate::copyOut(s->request(), buf, size); }

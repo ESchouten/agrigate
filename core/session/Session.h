@@ -49,6 +49,9 @@ struct Driver {
   void (*milk)(Session&) = nullptr;
   void (*cow)(Session&) = nullptr;
   void (*identity)(Session&) = nullptr;
+  /** http: make the server's user for Agrigate (Session::setupUser, setupPassword), logged in as
+   *  a user who may (session_setup). Null: the server needs none, or the driver cannot. */
+  void (*setup)(Session&) = nullptr;
   /** "clean": the robot behind a new session (Clean.h), which the session then owns. */
   clean::Robot* (*clean)(Session&) = nullptr;
 
@@ -79,12 +82,14 @@ class Session {
   identity::Places identity;
   std::unique_ptr<clean::Robot> robot;
   std::string step;   // of the robot's running command, until the host took it (clean_next_step)
+  std::string setupUser, setupPassword;   // session_setup's user to make
+  int64_t setUp = 0;                      // when that was last done
 
   // ---- http
   /** Sent with every request: the login, set by the driver. */
   std::map<std::string, std::string> headers;
   /** [optional]: an answer that is not there (an error status, no JSON) is left out and noted
-   *  in the error text instead of failing the read. */
+   *  in the error text instead of failing the read. A write's answer may be empty: null. */
   void get(const std::string& path, Answer then, bool optional = false) { ask("GET", path, "", std::move(then), optional); }
   void post(const std::string& path, const std::string& body, Answer then) { ask("POST", path, body, std::move(then), false); }
   /** End the read with this result; the open requests are dropped. */

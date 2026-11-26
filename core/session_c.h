@@ -70,6 +70,7 @@ enum {
 
 /* The drivers in this build: a JSON array of
  *   {"id", "name" (what the source is), "contracts": ["milk", "cow", "identity", "clean"],
+ *    "setup": whether its server wants a user of Agrigate's own, made with session_setup,
  *    "links": [...]}   how it is reached, the preferred first (the messages are the same over each):
  *      {"kind": "http", "scheme": "http", "port": 80} or {"kind": "udp", "port": 6000}:
  *        scheme and port are the defaults for an address without them
@@ -108,6 +109,13 @@ SESSION_API void session_link_down(session* s);
 SESSION_API void session_wait(session* s, int32_t ms);
 /* Leave: session_outgoing then gives the goodbye (if the driver has one). */
 SESSION_API void session_stop(session* s);
+
+/* "http", a driver with "setup" (session_drivers_json): make the server's own user for Agrigate,
+ * [user] with [password], logged in as the session's user, who has to be allowed to make users
+ * (the farm's administrator). Then open sessions with that user. The one call that writes to a
+ * source, once, when it is set up; running it again sets the password again. Returns SESSION_OK
+ * (started: now the link's exchange) or SESSION_UNSUPPORTED. */
+SESSION_API int32_t session_setup(session* s, const char* user, const char* password);
 
 /* How the last read or command went. */
 SESSION_API int32_t session_result(session* s);

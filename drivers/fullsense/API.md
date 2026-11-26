@@ -2,22 +2,38 @@
 
 Reads what a FULLSENSE farm management server knows: its milking robots and their figures, which
 cow is in which robot, and the herd. Link: `http`, port 12080. The driver is `src/Fullsense.cpp`;
-it only asks, with `GET`, after one login. It never uses the server's `/device/` calls (how the
+it only asks, with `GET`, after one login (and once writes, to make its own user). It never uses the server's `/device/` calls (how the
 robots themselves report to the server) and never writes to the ICAR lists.
 
 The server has two APIs, both behind the same login: its own (`/api`, the robots as they are now)
 and the ICAR Animal Data Exchange lists (`/ICAR`, the herd and the milkings, with filters). The
 ICAR lists are read with the same code as T4C's (`core/session/Icar.h`).
 
-## The login
+## The login and the setup
 
 | Call | For |
 |---|---|
 | `POST /api/Authentication/Authenticate` | `{"userName", "password"}`; the answer's `token` is sent on as `Authorization: Bearer` |
 
-Use a user of its own for Agrigate: in the FULLSENSE program, user management (Gebruikersbeheer),
-add a user of the type "Programma" named `Agrigate` with a password of its own. Do not reuse a
-farmer's login or another program's user.
+Agrigate reads with a user of its own: of the type "Programma" in the FULLSENSE program's user
+management (Gebruikersbeheer), named `Agrigate`, with a password of its own. Never a farmer's login
+or another program's user. The driver makes it (`session_setup`), logged in once as the farm's
+administrator, whose password is not kept:
+
+```bash
+cd python && python farm.py fullsense <address> --user <administrator> --setup Agrigate
+```
+
+| Call | For |
+|---|---|
+| `GET /api/Settings/GetRoles` | The program role: the first whose name has "program" or "applicat" in it; none, and the setup stops |
+| `GET /api/Settings/GetUsers` | A user `Agrigate` already there: the setup gives it the new password |
+| `POST /api/Settings/SaveUser` | The user: `userName`, `role`, `isActive`, a password used once (`oneTimePassword`) |
+| `POST /api/Authentication/ChangeUserPassword` | From that one to the user's own, as a new user does on first login |
+| `POST /api/Authentication/Authenticate` | The new user logs in |
+
+That is the only time the driver writes to the server. Making the user by hand in the program
+works the same.
 
 ## Milk
 
@@ -88,6 +104,8 @@ answers as that description says (`tests/test_fullsense.py`). Seen on a real ser
 A real server still has to show:
 
 - that the login is taken as `Bearer`, for the `/api` and the `/ICAR` calls alike;
+- the setup: the program role's name, whether `SaveUser` takes `oneTimePassword` so, and which
+  passwords the server accepts;
 - the ICAR farm's `scheme`, the animals' identifier schemes (the life number), and whether
   `milkingBoxNumber` is the robot's `locationIndex`;
 - that a robot's `currentMilkRecordingId` is the milking now, and what `merlinDecision` and the
