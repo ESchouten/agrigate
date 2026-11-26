@@ -29,6 +29,7 @@ python farm.py                                   # the drivers in this build
 python farm.py t4c 10.4.1.1:6969                 # robots and herd (asks the farm's licence key)
 python farm.py t4c 192.168.1.10 --user erik      # or with a user of the server (asks the password)
 python farm.py astronaut 10.4.1.101 --follow     # which cow is at the robot, as it happens
+python farm.py fullsense 192.168.1.20 --user beheer --setup Agrigate   # make the server's user for Agrigate (once)
 python farm.py t4c 10.4.1.1:6969 --record answers.json   # also save what the server said (logins left out)
 ```
 

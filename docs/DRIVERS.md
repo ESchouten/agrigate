@@ -50,7 +50,9 @@ One file, `drivers/<name>/src/<Name>.cpp`, with an `agrigate::Driver` (`core/ses
    up to date (`Milk.h`, `Cow.h`, `Identity.h`). Leave a contract the source does not know empty.
    - Over `http`: `login` asks for a login and puts what the server wants to see again in the
      session's headers; a contract's function asks (`get`, `post`) and fills the data from the
-     answers.
+     answers. A server that wants a user of Agrigate's own gets `setup`: it makes that user
+     (`Session::setupUser`, `setupPassword`), logged in as one who may (`session_setup`). It is
+     the one thing a driver may write, once.
    - Over `udp`: `tick` queues what has to go to the source now (`Session::send`), for example a
      registration it has to renew; `incoming` is handed each datagram and fills the data
      (`Session::heard` when it is one of the source's own); `stop` queues the goodbye. The
