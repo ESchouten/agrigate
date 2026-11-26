@@ -2,49 +2,16 @@
 #include "cow_c.h"
 
 #include <algorithm>
-#include <cstdio>
-#include <cstdlib>
 
 #include "Session.h"
 
 namespace agrigate {
 namespace cow {
-namespace {
-
-// days since 1970-01-01 and back (Howard Hinnant's civil calendar), for the day after a UTC evening
-long daysFrom(int y, unsigned m, unsigned d) {
-  y -= m <= 2;
-  const long era = (y >= 0 ? y : y - 399) / 400;
-  const unsigned yoe = (unsigned)(y - era * 400);
-  const unsigned doy = (153 * (m > 2 ? m - 3 : m + 9) + 2) / 5 + d - 1;
-  const unsigned doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
-  return era * 146097 + (long)doe - 719468;
-}
-
-void civil(long z, int& y, unsigned& m, unsigned& d) {
-  z += 719468;
-  const long era = (z >= 0 ? z : z - 146096) / 146097;
-  const unsigned doe = (unsigned)(z - era * 146097);
-  const unsigned yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
-  const unsigned doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-  const unsigned mp = (5 * doy + 2) / 153;
-  d = doy - (153 * mp + 2) / 5 + 1;
-  m = mp < 10 ? mp + 3 : mp - 9;
-  y = (int)(yoe + era * 400 + (m <= 2));
-}
-
-}  // namespace
 
 std::string day(const std::string& when) {
-  int y, h = 0;
-  unsigned m, d;
-  if (when.size() < 10 || sscanf(when.c_str(), "%4d-%2u-%2u", &y, &m, &d) != 3 || m < 1 || m > 12 || d < 1 || d > 31) return "";
-  if (when.size() >= 13 && when[10] == 'T') h = atoi(when.c_str() + 11);
-  const bool utc = when.back() == 'Z';
-  if (utc && h >= 12) civil(daysFrom(y, m, d) + 1, y, m, d);
-  char b[16];
-  snprintf(b, sizeof b, "%04d-%02u-%02u", y, m, d);
-  return b;
+  const int64_t t = timeMs(when);
+  if (!t) return "";
+  return when.back() == 'Z' ? timeText(t + 12 * 3600000LL).substr(0, 10) : when.substr(0, 10);   // UTC from noon on: the next day
 }
 
 std::string Herd::json() const {

@@ -15,7 +15,7 @@ The configuration (JSON):
 computer itself is answered. A source is anything a driver reaches (python farm.py lists them);
 "name" names its place when the source has none of its own; "password" is the user's, or the
 farm's licence key with an empty user where the server takes one. A source that has to be asked
-is asked again every "refreshSeconds". Token and password can also come from the environment
+is asked again every "refreshSeconds" (which animal is where: every 10 s). Token and password can also come from the environment
 (FARM_SERVER_TOKEN, FARM_SERVER_PASSWORD), so that they do not have to be in the file. It only
 reads: nothing here changes anything on the farm.
 """

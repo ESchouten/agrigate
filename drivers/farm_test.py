@@ -17,7 +17,8 @@ from agrigate.session import Session, SessionError, drivers  # noqa: for the tes
 
 
 class FakeFarm:
-    """routes: {"GET /path?query": answer}. An answer is given as JSON; (status, text) is given
+    """routes: {"GET /path?query": answer}; a key ending in "*" answers every request that starts
+    with the rest (for a query with the time in it). An answer is given as JSON; (status, text) is given
     as it is; a function gets the request's JSON and returns one of those. Every path but
     `login` wants the login the server last handed out (`token`), else 401. With `key` (a server
     that takes a licence key instead, as T4C does) every path wants the header "licensekey" with
@@ -34,11 +35,11 @@ class FakeFarm:
                 farm.asked.append((key, dict(self.headers)))
                 if farm.key is not None:
                     taken = any(k == "licensekey" and v == farm.key for k, v in self.headers.items())
-                    answer = farm.routes.get(key, (404, "")) if taken else (500, '{"Data":null,"ServerEror":{"Code":500,"Message":"Object reference not set to an instance of an object."}}')
+                    answer = farm.route(key) if taken else (500, '{"Data":null,"ServerEror":{"Code":500,"Message":"Object reference not set to an instance of an object."}}')
                 elif key != farm.login and self.headers.get("Authorization") != "Bearer " + farm.token:
                     answer = (401, "")
                 else:
-                    answer = farm.routes.get(key, (404, ""))
+                    answer = farm.route(key)
                 if callable(answer):
                     answer = answer(json.loads(body))
                 status, text = answer if isinstance(answer, tuple) else (200, json.dumps(answer))
@@ -56,6 +57,11 @@ class FakeFarm:
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
         self.address = "127.0.0.1:%d" % self.server.server_port
         threading.Thread(target=self.server.serve_forever, daemon=True).start()
+
+    def route(self, key: str):
+        if key in self.routes:
+            return self.routes[key]
+        return next((a for k, a in self.routes.items() if k.endswith("*") and key.startswith(k[:-1])), (404, ""))
 
     def count(self, key: str) -> int:
         return sum(1 for k, _ in self.asked if k == key)

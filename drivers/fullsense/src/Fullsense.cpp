@@ -1,7 +1,10 @@
-// The FULLSENSE farm management server: its milking robots, read only.
-// Written from the server's own API description; see ../API.md for what a real server still
-// has to confirm.
-#include "Session.h"
+// The FULLSENSE farm management server: its milking robots, which cow is in them, and its herd,
+// read only. The robots and the cows in them from the server's own API (/api), the herd and the
+// milkings from its ICAR lists (/ICAR, Icar.h). Written from the server's API description; see
+// ../API.md for what a real server still has to confirm.
+#include <cstdlib>
+
+#include "Icar.h"
 
 namespace agrigate {
 namespace {
@@ -70,7 +73,12 @@ const char* severity(const std::string& alarmClass) {
   return "unknown";
 }
 
+// MerlinDecisionCode: what the robot does with the cow in it
+const char* const kDecision[] = {"Milking", "Visit", "NotAllowed", "Timeout"};
+
 bool given(const std::string& id) { return !id.empty() && id != "00000000-0000-0000-0000-000000000000"; }
+
+constexpr int64_t kDayMs = 24 * 3600 * 1000LL;
 
 void login(Session& s) {
   s.post("/api/Authentication/Authenticate", "{\"userName\":" + quote(s.user) + ",\"password\":" + quote(s.password) + "}", [&s](const Json& answer) {
@@ -78,14 +86,46 @@ void login(Session& s) {
   });
 }
 
+// ---- ICAR: the server's lists are per farm ("location"): the first one it lists
+void withFarm(Session& s, std::function<void(const std::string& path)> then, bool optional) {
+  s.get("/ICAR/locations", [&s, then, optional](const Json& answer) {
+    const Json& id = icar::items(answer).at(0)["identifier"];
+    if (!id["id"].str().empty()) return then("/ICAR/locations/" + id["scheme"].str() + "/" + id["id"].str() + "/");
+    if (!optional) s.fail(SESSION_UNEXPECTED, "ICAR: the server lists no farm");
+  }, optional);
+}
+
+// The milkings of the last 24 hours, page by page: the figures per robot (its box number).
+void readMilkings(Session& s, const std::string& farm, std::shared_ptr<std::map<int, size_t>> boxes, int page) {
+  const int64_t from = s.now - kDayMs;
+  s.get(farm + "milking-visits?pageSize=100&currentPage=" + std::to_string(page) + "&meta-modified-from=" + timeText(from),
+        [&s, farm, boxes, page, from](const Json& answer) {
+    if (page == 1)
+      for (milk::Robot& r : s.milk.robots) r.milkKg = r.milkings = r.failedMilkings = 0;
+    for (const Json& v : icar::items(answer).items) {
+      auto it = boxes->find(atoi(v["milkingBoxNumber"].str().c_str()));
+      const std::string& start = v["milkingStartingDateTime"].str();
+      if (it == boxes->end() || timeMs(start) < from) continue;   // changed lately, milked before
+      milk::Robot& r = s.milk.robots[it->second];
+      (v["milkingComplete"].str() == "true" ? r.milkings : r.failedMilkings) += 1;
+      const Json& kg = v["milkingMilkWeight"];
+      r.milkKg += kg["value"].num(0) / (kg["unitCode"].str() == "GRM" ? 1000 : 1);
+      if (timeMs(start) > timeMs(r.lastVisit)) r.lastVisit = start;
+    }
+    if (answer["view"]["currentPage"].num(0) < answer["view"]["totalPages"].num(0) && page < 100) readMilkings(s, farm, boxes, page + 1);
+  }, true);
+}
+
 void readMilk(Session& s) {
   s.get("/api/Location/GetLocations?locationType=1", [&s](const Json& locations) {   // 1: the milking robots
+    auto boxes = std::make_shared<std::map<int, size_t>>();
     for (const Json& l : locations.items) {
       milk::Robot r;
       r.id = l["id"].str();
       r.name = l["description"].str();
       r.group = l["locationGroup"]["name"].str();
       size_t i = s.milk.robots.size();
+      (*boxes)[(int)l["locationIndex"].num()] = i;
       s.milk.robots.push_back(r);
       if (given(l["currentStatusRecordingId"].str()))
         s.get("/api/MerlinStatus/GetMerlinStatus?merlinStatusId=" + l["currentStatusRecordingId"].str(), [&s, i](const Json& status) {
@@ -105,7 +145,111 @@ void readMilk(Session& s) {
           if (alarm.code != "NoAlarm") s.milk.robots[i].alarms.push_back(alarm);
         }, true);
     }
+    if (s.now) withFarm(s, [&s, boxes](const std::string& farm) { readMilkings(s, farm, boxes, 1); }, true);
   });
+}
+
+// ---- identity: the cow a robot has now, from its current milking (milk recording)
+void readIdentity(Session& s) {
+  s.get("/api/Location/GetLocations?locationType=1", [&s](const Json& locations) {
+    for (const Json& l : locations.items) {
+      const std::string id = l["id"].str(), milking = l["currentMilkRecordingId"].str();
+      identity::Place& p = s.identity.place(id, identity::kind::MilkingRobot);
+      p.name = l["description"].str();
+      if (!given(milking)) {
+        if (p.visitSince) s.identity.visitEnded(p, s.now);
+        continue;
+      }
+      s.get("/api/Milking/GetMilkRecording?id=" + milking, [&s, id](const Json& m) {
+        identity::Place& p = s.identity.place(id, identity::kind::MilkingRobot);
+        const Json& cow = m["animal"];
+        const identity::Animal a{cow["animalNumber"].str(), cow["name"].str(), cow["tags"].at(0)["tagNumber"].str()};
+        int64_t start = timeMs(m["milkingStartTime"].str());
+        if (!start) start = s.now;
+        const std::string decision = name(m["merlinDecision"], kDecision);
+        const bool finished = m["isFinished"].str() == "true";
+        const bool fresh = !p.occupied || p.since != start || p.animal.number != a.number;   // not seen at the last read
+        if (fresh) s.identity.identified(p, a, start);
+        if (fresh && decision == "NotAllowed") s.identity.refused(p, a.responder, start);
+        if (decision == "Milking" && (fresh || (!finished && p.visitSince != start))) s.identity.visitStarted(p, start);
+        if (finished && p.visitSince == start) s.identity.visitEnded(p, s.now);
+        s.identity.settle(s.now);
+      }, true);
+    }
+    s.identity.settle(s.now);
+  });
+}
+
+// ---- the herd, from ICAR: the animals, their events and their lactations
+const char* production(const std::string& lactation) {
+  if (lactation == "Lactating" || lactation == "Fresh") return cow::production::Milking;
+  if (lactation == "Dry") return cow::production::Dry;
+  return cow::production::Unknown;
+}
+
+const char* reproduction(const std::string& r) {
+  if (r == "Open" || r == "NotPregnant" || r == "Birthed") return cow::reproduction::Open;
+  if (r == "Inseminated") return cow::reproduction::Inseminated;
+  if (r == "Pregnant" || r == "PregnantMultipleFoetus") return cow::reproduction::Pregnant;
+  if (r == "DoNotBreed") return cow::reproduction::DoNotBreed;
+  return cow::reproduction::Unknown;
+}
+
+// What the server does not count itself, counted from the events on the day of the read (UTC).
+void count(cow::Animal& x, int64_t now) {
+  const int64_t today = timeMs(timeText(now).substr(0, 10));
+  auto days = [today](const std::string& date) { return date.empty() ? -1.0 : (double)((today - timeMs(date)) / kDayMs); };
+  std::string insemination, heat;
+  double sinceCalving = 0;
+  for (const auto& n : x.inseminations) {
+    if (n.date > insemination) insemination = n.date;
+    sinceCalving += n.date > x.calvingDate;
+  }
+  for (const auto& h : x.heats)
+    if (h.date > heat) heat = h.date;
+  x.daysSinceInsemination = days(insemination);
+  x.daysSinceHeat = days(heat);
+  if (x.reproduction == std::string(cow::reproduction::Pregnant)) x.pregnantDays = days(insemination);
+  if (x.production == std::string(cow::production::Milking)) {
+    x.daysInMilk = days(x.calvingDate);
+    x.inseminationsThisLactation = sinceCalving;
+  }
+}
+
+void readCow(Session& s) {
+  withFarm(s, [&s](const std::string& farm) {
+    auto h = std::make_shared<icar::Herd>();
+    s.get(farm + "animals", [&s, h, farm](const Json& answer) {
+      for (const Json& a : icar::items(answer).items) {
+        if (a["status"].str() == "Dead" || a["status"].str() == "OffFarm") continue;
+        cow::Animal x;
+        x.id = a["identifier"]["id"].str();
+        x.number = a["managementTag"].str();
+        x.name = a["name"].str();
+        x.lifeNumber = icar::idOf(a["alternativeIdentifiers"], "eu.bovine");
+        x.birthDate = cow::day(a["birthDate"].str());
+        x.production = production(a["lactationStatus"].str());
+        x.reproductionRaw = a["reproductionStatus"].str();
+        x.reproduction = reproduction(x.reproductionRaw);
+        h->byId[x.id] = s.cow.animals.size();
+        s.cow.animals.push_back(x);
+      }
+      icar::readEvents(s, h, farm, "");
+      s.get(farm + "lactations", [&s, h](const Json& answer) {   // asked last: the herd is complete then
+        for (const Json& l : icar::items(answer).items)
+          if (cow::Animal* x = h->animal(s, l["animal"])) {
+            const std::string begin = cow::day(l["beginDate"].str());
+            if (l["parity"].num() > x->lactation) x->lactation = l["parity"].num();
+            if (begin > x->calvingDate) x->calvingDate = begin;
+          }
+        for (cow::Animal& x : s.cow.animals) {
+          if (x.lactation < 0) x.lactation = 0;
+          if (!x.lactation && x.production != std::string(cow::production::Milking)) x.production = cow::production::Young;
+          if (s.now) count(x, s.now);
+        }
+      }, true);
+    });
+  }, false);
 }
 
 }  // namespace
@@ -114,6 +258,8 @@ extern const Driver fullsense = [] {
   Driver d{"fullsense", "FULLSENSE", {{"http", "http", 12080}}};
   d.login = login;
   d.milk = readMilk;
+  d.cow = readCow;
+  d.identity = readIdentity;
   return d;
 }();
 

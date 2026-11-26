@@ -1,6 +1,7 @@
 // The session with one source and the C API on it (core/session_c.h).
 #include "Session.h"
 
+#include <cstdio>
 #include <cstring>
 
 namespace agrigate {
@@ -129,6 +130,48 @@ int32_t copyOut(const std::string& s, char* buf, int32_t size) {
 }
 
 std::string timeJson(int64_t ms) { return ms ? std::to_string(ms) : "null"; }
+
+// days since 1970-01-01 and back (Howard Hinnant's civil calendar)
+namespace {
+int64_t daysFrom(int y, unsigned m, unsigned d) {
+  y -= m <= 2;
+  const int64_t era = (y >= 0 ? y : y - 399) / 400;
+  const unsigned yoe = (unsigned)(y - era * 400);
+  const unsigned doy = (153 * (m > 2 ? m - 3 : m + 9) + 2) / 5 + d - 1;
+  return era * 146097 + (int64_t)(yoe * 365 + yoe / 4 - yoe / 100 + doy) - 719468;
+}
+}  // namespace
+
+int64_t timeMs(const std::string& when) {
+  int y, n = 0;
+  unsigned mo, d, h = 0, mi = 0, sec = 0;
+  if (sscanf(when.c_str(), "%4d-%2u-%2u%n", &y, &mo, &d, &n) != 3 || n != 10 || mo < 1 || mo > 12 || d < 1 || d > 31) return 0;
+  const char* rest = when.c_str() + 10;
+  if (*rest == 'T' || *rest == ' ') {
+    if (sscanf(rest + 1, "%2u:%2u:%2u%n", &h, &mi, &sec, &n) != 3) return 0;
+    rest += 1 + n;
+    if (*rest == '.') do rest++; while (*rest >= '0' && *rest <= '9');
+  }
+  int64_t t = ((daysFrom(y, mo, d) * 24 + h) * 60 + mi) * 60 + sec;
+  unsigned zh, zm;
+  if ((*rest == '+' || *rest == '-') && sscanf(rest + 1, "%2u:%2u", &zh, &zm) == 2) t -= (*rest == '+' ? 1 : -1) * (int64_t)(zh * 60 + zm) * 60;
+  return t * 1000;
+}
+
+std::string timeText(int64_t ms) {
+  int64_t s = ms / 1000 - (ms % 1000 < 0), z = s / 86400 - (s % 86400 < 0);
+  s -= z * 86400;
+  z += 719468;   // back from days (the same calendar)
+  const int64_t era = (z >= 0 ? z : z - 146096) / 146097;
+  const unsigned doe = (unsigned)(z - era * 146097);
+  const unsigned yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+  const unsigned doy = doe - (365 * yoe + yoe / 4 - yoe / 100), mp = (5 * doy + 2) / 153;
+  const unsigned d = doy - (153 * mp + 2) / 5 + 1, m = mp < 10 ? mp + 3 : mp - 9;
+  const unsigned sec = (unsigned)s;   // of the day
+  char b[64];
+  snprintf(b, sizeof b, "%04d-%02u-%02uT%02u:%02u:%02uZ", (int)(yoe + era * 400 + (m <= 2)), m, d, sec / 3600, sec / 60 % 60, sec % 60);
+  return b;
+}
 
 }  // namespace agrigate
 

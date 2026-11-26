@@ -30,6 +30,7 @@ import urllib.parse
 from .core import LOGIN_REJECTED, OK, UNEXPECTED, UNREACHABLE, UNSUPPORTED, drivers, lib as _lib, text  # noqa: F401
 
 SECRET = ("token", "password", "license")   # answer fields left out of a recording
+IDENTITY_SECONDS = 10   # a server that has to be asked: how often for which animal is where
 
 
 class SessionError(Exception):
@@ -52,7 +53,8 @@ def _hide(value):
 class Session:
     """One source. `contracts`: what its driver serves ("milk", "cow", "identity").
     on_event: called with each new identity event, on the thread that found it.
-    refresh: read every contract again every so many seconds, on a thread of its own, for latest().
+    refresh: read every contract again every so many seconds, on a thread of its own, for latest();
+    identity every IDENTITY_SECONDS.
     recording: a list that gets every request and its answer, logins and passwords left out (to
     see what a real server says)."""
 
@@ -148,14 +150,21 @@ class Session:
 
     # ---- http
     def _refresh(self, every: float):
+        # which animal is where is asked every IDENTITY_SECONDS, as it is about now; the rest every `every`
+        full = 0.0
         while not self._stop.is_set():
+            due = time.monotonic() >= full
             for contract in self.contracts:
+                if not due and contract != "identity":
+                    continue
                 try:
                     result = self.read(contract), ""
                 except SessionError as e:
                     result = self._known(contract), str(e)
                 self._latest[contract] = result
-            self._stop.wait(every)
+            if due:
+                full = time.monotonic() + every
+            self._stop.wait(min(every, IDENTITY_SECONDS) if "identity" in self.contracts else every)
 
     def _send(self, r: dict) -> tuple[int, bytes]:
         # http.client, not urllib: urllib changes a header's case ("licensekey" -> "Licensekey") and
